@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../lib/auth';
 import { registerPushToken } from '../../lib/notifications';
 import { useClientByProfile, useClients } from '../../lib/queries';
@@ -16,7 +16,7 @@ function TabLabel({ text, focused }: { text: string; focused: boolean }) {
 }
 
 export default function AppLayout() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, signOut } = useAuth();
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const isTrainer = profile?.role === 'trainer';
 
@@ -24,8 +24,11 @@ export default function AppLayout() {
   const ownClientQuery = useClientByProfile(!isTrainer ? profile?.id : undefined);
 
   useEffect(() => {
-    if (isTrainer && !selectedClientId && clientsQuery.data && clientsQuery.data.length > 0) {
-      setSelectedClientId(clientsQuery.data[0].id);
+    if (!isTrainer || !clientsQuery.data) return;
+    const stillExists = selectedClientId && clientsQuery.data.some((c) => c.id === selectedClientId);
+    if (!stillExists) {
+      // Handles both the initial pick and re-picking after the selected client got deleted.
+      setSelectedClientId(clientsQuery.data[0]?.id ?? null);
     }
   }, [isTrainer, selectedClientId, clientsQuery.data, setSelectedClientId]);
 
@@ -38,6 +41,20 @@ export default function AppLayout() {
   useEffect(() => {
     if (profile?.id && Platform.OS !== 'web') registerPushToken(profile.id);
   }, [profile?.id]);
+
+  if (!isTrainer && profile && ownClientQuery.isError) {
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.errorText}>
+          Hesabın henüz bir antrenöre bağlanmamış. Antrenörünün seni eklediği e-posta ile kayıt olduğundan emin ol,
+          sonra çıkış yapıp tekrar giriş dene.
+        </Text>
+        <Pressable onPress={signOut} hitSlop={10}>
+          <Text style={styles.signOutLink}>Çıkış yap</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (loading || (!isTrainer && profile && !selectedClientId)) {
     return (
@@ -112,5 +129,7 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  errorText: { color: C.grey, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  signOutLink: { color: C.lime, fontSize: 14, fontWeight: '700' },
 });

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
+import { localDateStr } from './theme';
 import type {
   AppNotification,
   CardioLog,
@@ -28,7 +29,7 @@ import type {
   WorkoutLog,
 } from './types';
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = localDateStr;
 
 // ---------- Clients ----------
 
@@ -712,7 +713,7 @@ export function useCheckinsInRange(clientId: string | undefined, days: number) {
         .from('checkins')
         .select('*')
         .eq('client_id', clientId)
-        .gte('date', since.toISOString().slice(0, 10))
+        .gte('date', localDateStr(since))
         .order('date');
       if (error) throw error;
       return data as Checkin[];
@@ -932,12 +933,14 @@ export function useCardioLogs(clientId: string | undefined, days = 7) {
   return useQuery({
     queryKey: ['cardio_logs', clientId, days],
     queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - (days - 1));
       const { data, error } = await supabase
         .from('cardio_logs')
         .select('*')
         .eq('client_id', clientId)
-        .order('date', { ascending: false })
-        .limit(days);
+        .gte('date', localDateStr(since))
+        .order('date', { ascending: false });
       if (error) throw error;
       return data as CardioLog[];
     },
@@ -1138,7 +1141,7 @@ export function useSessionLogs(clientId: string | undefined, days = 14) {
         .from('session_logs')
         .select('*')
         .eq('client_id', clientId)
-        .gte('date', since.toISOString().slice(0, 10))
+        .gte('date', localDateStr(since))
         .order('date');
       if (error) throw error;
       return data as SessionLog[];

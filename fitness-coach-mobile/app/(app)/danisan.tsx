@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
@@ -59,6 +59,8 @@ export default function DanisanScreen() {
 
   const clients = clientsQuery.data ?? [];
 
+  if (profile && profile.role !== 'trainer') return <Redirect href="/(app)/panel" />;
+
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -77,7 +79,7 @@ export default function DanisanScreen() {
     try {
       await addClient.mutateAsync({
         name: form.name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         goal: form.goal,
         start_weight: n(form.start_weight),
         kcal_target: n(form.kcal_target),
@@ -113,7 +115,7 @@ export default function DanisanScreen() {
       await updateClient.mutateAsync({
         id: editingClientId,
         name: editForm.name.trim(),
-        email: editForm.email.trim(),
+        email: editForm.email.trim().toLowerCase(),
         goal: editForm.goal,
         start_weight: n(editForm.start_weight),
         kcal_target: n(editForm.kcal_target),
@@ -154,7 +156,14 @@ export default function DanisanScreen() {
                   `${c.name} silinsin mi? Tüm program, ölçüm ve ödeme geçmişi kalıcı olarak silinir.`,
                   [
                     { text: 'Vazgeç', style: 'cancel' },
-                    { text: 'Sil', style: 'destructive', onPress: () => deleteClient.mutate(c.id) },
+                    {
+                      text: 'Sil',
+                      style: 'destructive',
+                      onPress: () =>
+                        deleteClient.mutate(c.id, {
+                          onError: (e: any) => Alert.alert('Silinemedi', e.message ?? 'Danışan silinemedi.'),
+                        }),
+                    },
                   ]
                 )
               }

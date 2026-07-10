@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { ExerciseCard } from '../../components/ExerciseCard';
 import { ExerciseEditRow } from '../../components/ExerciseEditRow';
@@ -29,11 +29,15 @@ import {
   useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, nf } from '../../lib/theme';
+import { C, localDateStr, nf } from '../../lib/theme';
 
 function formatTrDate(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y}`;
+}
+
+function onErr(title: string) {
+  return (e: any) => Alert.alert(title, e.message ?? 'Bir hata oluştu.');
 }
 
 export default function AntrenmanScreen() {
@@ -158,7 +162,7 @@ export default function AntrenmanScreen() {
                 <Text style={[styles.dayTabText, activeDay && d.id === activeDay.id && { color: C.bg }]}>{d.day_key}</Text>
               </Pressable>
               {editMode && (
-                <Pressable style={styles.dayDelete} onPress={() => deleteDay.mutate(d.id)}>
+                <Pressable style={styles.dayDelete} onPress={() => deleteDay.mutate(d.id, { onError: onErr('Gün silinemedi') })}>
                   <Text style={styles.dayDeleteText}>✕</Text>
                 </Pressable>
               )}
@@ -190,6 +194,7 @@ export default function AntrenmanScreen() {
                           setNewDayLabel('');
                           setAddingDay(false);
                         },
+                        onError: onErr('Gün eklenemedi'),
                       }
                     );
                   }}
@@ -210,8 +215,8 @@ export default function AntrenmanScreen() {
                     key={r.id}
                     initial={{ ex: r.ex, grp: r.grp, set_count: r.set_count, rep_count: r.rep_count, kg: r.kg }}
                     saving={updateExercise.isPending || deleteExercise.isPending}
-                    onSave={(v) => updateExercise.mutate({ id: r.id, ...v })}
-                    onDelete={() => deleteExercise.mutate(r.id)}
+                    onSave={(v) => updateExercise.mutate({ id: r.id, ...v }, { onError: onErr('Kaydedilemedi') })}
+                    onDelete={() => deleteExercise.mutate(r.id, { onError: onErr('Silinemedi') })}
                   />
                 );
               }
@@ -229,12 +234,14 @@ export default function AntrenmanScreen() {
                   key={r.id}
                   row={row}
                   history={exerciseHistoryQuery.data?.get(r.id)}
-                  onToggle={() => updateLog.mutate({ exercise: r, currentLog: log, patch: { done: !row.done } })}
+                  onToggle={() =>
+                    updateLog.mutate({ exercise: r, currentLog: log, patch: { done: !row.done } }, { onError: onErr('Kaydedilemedi') })
+                  }
                   onUpdate={(field, delta) => {
                     const current = field === 'set' ? row.set : field === 'rep' ? row.rep : row.kg;
                     const next = Math.max(0, current + delta);
                     const patchField = field === 'set' ? 'set_count' : field === 'rep' ? 'rep_count' : 'kg';
-                    updateLog.mutate({ exercise: r, currentLog: log, patch: { [patchField]: next } as any });
+                    updateLog.mutate({ exercise: r, currentLog: log, patch: { [patchField]: next } as any }, { onError: onErr('Kaydedilemedi') });
                   }}
                 />
               );
@@ -248,7 +255,7 @@ export default function AntrenmanScreen() {
                 onSave={(v) =>
                   addExercise.mutate(
                     { workout_day_id: activeDay.id, sort_order: activeDay.exercises.length, ...v },
-                    { onSuccess: () => setAddingExercise(false) }
+                    { onSuccess: () => setAddingExercise(false), onError: onErr('Egzersiz eklenemedi') }
                   )
                 }
                 onCancel={() => setAddingExercise(false)}
@@ -311,7 +318,7 @@ export default function AntrenmanScreen() {
                               {formatTrDate(h.date)} · {nf(h.weight, 1)} kg · {h.reps} tekrar
                             </Text>
                             {isTrainer && (
-                              <Pressable onPress={() => deletePrLog.mutate(h.id)} hitSlop={8}>
+                              <Pressable onPress={() => deletePrLog.mutate(h.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
                                 <Text style={styles.prDelete}>Sil</Text>
                               </Pressable>
                             )}
@@ -345,7 +352,7 @@ export default function AntrenmanScreen() {
               if (Number.isNaN(weight)) return;
               addPrLog.mutate(
                 { exercise: prDraft.exercise.trim(), weight, reps },
-                { onSuccess: () => setPrDraft({ exercise: '', weight: '', reps: '1' }) }
+                { onSuccess: () => setPrDraft({ exercise: '', weight: '', reps: '1' }), onError: onErr('PR kaydedilemedi') }
               );
             }}
           />
@@ -388,7 +395,7 @@ export default function AntrenmanScreen() {
                   {phase.note ? <Text style={styles.prMeta}>{phase.note}</Text> : null}
                 </View>
                 {isTrainer && (
-                  <Pressable onPress={() => deletePhase.mutate(phase.id)} hitSlop={8}>
+                  <Pressable onPress={() => deletePhase.mutate(phase.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
                     <Text style={styles.prDelete}>Sil</Text>
                   </Pressable>
                 )}
@@ -422,16 +429,19 @@ export default function AntrenmanScreen() {
                     onPress={() => {
                       const weeks = parseInt(phaseDraft.weeks, 10);
                       const start = new Date();
-                      const startStr = start.toISOString().slice(0, 10);
+                      const startStr = localDateStr(start);
                       let endStr: string | null = null;
                       if (!Number.isNaN(weeks) && weeks > 0) {
                         const end = new Date(start);
                         end.setDate(end.getDate() + weeks * 7);
-                        endStr = end.toISOString().slice(0, 10);
+                        endStr = localDateStr(end);
                       }
                       addPhase.mutate(
                         { name: phaseDraft.name.trim(), start_date: startStr, end_date: endStr, note: phaseDraft.note.trim() },
-                        { onSuccess: () => { setPhaseDraft({ name: '', weeks: '', note: '' }); setAddingPhase(false); } }
+                        {
+                          onSuccess: () => { setPhaseDraft({ name: '', weeks: '', note: '' }); setAddingPhase(false); },
+                          onError: onErr('Blok eklenemedi'),
+                        }
                       );
                     }}
                   />

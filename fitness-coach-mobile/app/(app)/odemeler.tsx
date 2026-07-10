@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -22,11 +22,13 @@ import {
   useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, nf } from '../../lib/theme';
+import { C, localDateStr, nf } from '../../lib/theme';
 import type { Payment, SessionLog } from '../../lib/types';
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+const todayStr = localDateStr;
+
+function onErr(title: string) {
+  return (e: any) => Alert.alert(title, e.message ?? 'Bir hata oluştu.');
 }
 
 // "10.05.2026" -> "2026-05-10"
@@ -140,7 +142,7 @@ export default function OdemelerScreen() {
     return Array.from({ length: 14 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (13 - i));
-      return d.toISOString().slice(0, 10);
+      return localDateStr(d);
     });
   }, []);
 
@@ -169,7 +171,7 @@ export default function OdemelerScreen() {
     setDateError(false);
     addPayment.mutate(
       { date: iso, amount: v, note, paid: iso <= todayStr() },
-      { onSuccess: () => { setDate(''); setAmount(''); setNote(''); } }
+      { onSuccess: () => { setDate(''); setAmount(''); setNote(''); }, onError: onErr('Ödeme eklenemedi') }
     );
   }
 
@@ -181,7 +183,7 @@ export default function OdemelerScreen() {
           payment={p}
           saving={updatePayment.isPending}
           onCancel={() => setEditingId(null)}
-          onSave={(v) => updatePayment.mutate({ id: p.id, ...v }, { onSuccess: () => setEditingId(null) })}
+          onSave={(v) => updatePayment.mutate({ id: p.id, ...v }, { onSuccess: () => setEditingId(null), onError: onErr('Kaydedilemedi') })}
         />
       );
     }
@@ -195,14 +197,14 @@ export default function OdemelerScreen() {
         <View style={styles.rowRight}>
           <Text style={styles.rowDate}>{formatTrDate(p.date)}</Text>
           {isTrainer ? (
-            <Pressable onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid })}>
+            <Pressable onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid }, { onError: onErr('Güncellenemedi') })}>
               <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
             </Pressable>
           ) : (
             <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
           )}
           {isTrainer && (
-            <Pressable onPress={() => deletePayment.mutate(p.id)} hitSlop={8}>
+            <Pressable onPress={() => deletePayment.mutate(p.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
               <Text style={styles.rowDelete}>Sil</Text>
             </Pressable>
           )}
@@ -242,7 +244,7 @@ export default function OdemelerScreen() {
                 </View>
               )}
               {isTrainer && (
-                <Pressable onPress={() => deletePackage.mutate(currentPackage.id)} hitSlop={8}>
+                <Pressable onPress={() => deletePackage.mutate(currentPackage.id, { onError: onErr('Paket silinemedi') })} hitSlop={8}>
                   <Text style={styles.rowDelete}>Bu paketi sil</Text>
                 </Pressable>
               )}
@@ -260,7 +262,7 @@ export default function OdemelerScreen() {
                     {p.name} · {p.total_sessions} seans · {p.start_date}
                   </Text>
                   {isTrainer && (
-                    <Pressable onPress={() => deletePackage.mutate(p.id)} hitSlop={8}>
+                    <Pressable onPress={() => deletePackage.mutate(p.id, { onError: onErr('Paket silinemedi') })} hitSlop={8}>
                       <Text style={styles.rowDelete}>Sil</Text>
                     </Pressable>
                   )}
@@ -295,7 +297,10 @@ export default function OdemelerScreen() {
                   if (!total || total <= 0) return;
                   addPackage.mutate(
                     { name: packageDraft.name.trim(), total_sessions: total, note: packageDraft.note.trim() },
-                    { onSuccess: () => { setPackageDraft({ name: '', total_sessions: '', note: '' }); setAddingPackage(false); } }
+                    {
+                      onSuccess: () => { setPackageDraft({ name: '', total_sessions: '', note: '' }); setAddingPackage(false); },
+                      onError: onErr('Paket eklenemedi'),
+                    }
                   );
                 }}
               />
@@ -331,11 +336,17 @@ export default function OdemelerScreen() {
                   disabled={!isTrainer}
                   onPress={() => {
                     if (!session) {
-                      setSessionStatus.mutate({ date: d, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null });
+                      setSessionStatus.mutate(
+                        { date: d, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null },
+                        { onError: onErr('İşaretlenemedi') }
+                      );
                     } else if (session.status === 'tamamlandi') {
-                      setSessionStatus.mutate({ date: d, status: 'atlandi', workout_day_id: activeDay?.id ?? null });
+                      setSessionStatus.mutate(
+                        { date: d, status: 'atlandi', workout_day_id: activeDay?.id ?? null },
+                        { onError: onErr('İşaretlenemedi') }
+                      );
                     } else {
-                      deleteSessionLog.mutate(session.id);
+                      deleteSessionLog.mutate(session.id, { onError: onErr('İşaretlenemedi') });
                     }
                   }}
                 >

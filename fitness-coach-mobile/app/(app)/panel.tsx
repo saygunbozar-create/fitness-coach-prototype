@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Ring } from '../../components/Ring';
@@ -20,7 +20,7 @@ import {
   useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, nf } from '../../lib/theme';
+import { C, localDateStr, nf } from '../../lib/theme';
 
 const REMINDER_INTERVALS = [1, 2, 3, 4];
 
@@ -142,7 +142,7 @@ export default function PanelScreen() {
   const report = useMemo(() => {
     const since = new Date();
     since.setDate(since.getDate() - reportDays);
-    const sinceStr = since.toISOString().slice(0, 10);
+    const sinceStr = localDateStr(since);
 
     const weightsInRange = (weightLogsQuery.data ?? []).filter((l) => l.date >= sinceStr);
     const weightChange = weightsInRange.length >= 2 ? weightsInRange[weightsInRange.length - 1].weight - weightsInRange[0].weight : 0;
@@ -249,7 +249,10 @@ export default function PanelScreen() {
             onPress={() => {
               const v = parseFloat(weightInput.replace(',', '.'));
               if (!Number.isNaN(v)) {
-                logWeight.mutate(v, { onSuccess: () => setWeightInput('') });
+                logWeight.mutate(v, {
+                  onSuccess: () => setWeightInput(''),
+                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kilo kaydedilemedi.'),
+                });
               }
             }}
           />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { Bar } from '../../components/Bar';
 import { FoodRow } from '../../components/FoodRow';
@@ -29,6 +29,10 @@ import {
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
+
+function onErr(title: string) {
+  return (e: any) => Alert.alert(title, e.message ?? 'Bir hata oluştu.');
+}
 
 export default function BeslenmeScreen() {
   const { profile } = useAuth();
@@ -129,7 +133,7 @@ export default function BeslenmeScreen() {
               right={editMode ? undefined : `${nf(mk)} kcal · ${nf(mp)} g protein`}
             >
               {editMode && (
-                <Pressable style={styles.deleteMealBtn} onPress={() => deleteMeal.mutate(m.id)}>
+                <Pressable style={styles.deleteMealBtn} onPress={() => deleteMeal.mutate(m.id, { onError: onErr('Öğün silinemedi') })}>
                   <Text style={styles.deleteMealText}>Öğünü Sil</Text>
                 </Pressable>
               )}
@@ -141,8 +145,8 @@ export default function BeslenmeScreen() {
                       key={it.id}
                       initial={{ food: it.food, unit: it.unit, kcal: it.kcal, p: it.p, k: it.k, y: it.y, default_qty: it.default_qty }}
                       saving={updateMealItem.isPending || deleteMealItem.isPending}
-                      onSave={(v) => updateMealItem.mutate({ id: it.id, ...v })}
-                      onDelete={() => deleteMealItem.mutate(it.id)}
+                      onSave={(v) => updateMealItem.mutate({ id: it.id, ...v }, { onError: onErr('Kaydedilemedi') })}
+                      onDelete={() => deleteMealItem.mutate(it.id, { onError: onErr('Silinemedi') })}
                     />
                   );
                 }
@@ -152,7 +156,7 @@ export default function BeslenmeScreen() {
                     item={{ food: it.food, qty: it.todayQty, kcal: it.kcal, p: it.p, k: it.k, y: it.y }}
                     onChange={(delta) => {
                       const next = Math.max(0, Math.round((it.todayQty + delta) * 2) / 2);
-                      updateQty.mutate({ mealItemId: it.id, qty: next });
+                      updateQty.mutate({ mealItemId: it.id, qty: next }, { onError: onErr('Kaydedilemedi') });
                     }}
                   />
                 );
@@ -166,7 +170,7 @@ export default function BeslenmeScreen() {
                   onSave={(v) =>
                     addMealItem.mutate(
                       { meal_id: m.id, sort_order: m.items.length, ...v },
-                      { onSuccess: () => setAddingItemForMeal(null) }
+                      { onSuccess: () => setAddingItemForMeal(null), onError: onErr('Besin eklenemedi') }
                     )
                   }
                   onCancel={() => setAddingItemForMeal(null)}
@@ -198,7 +202,7 @@ export default function BeslenmeScreen() {
               onPress={() =>
                 addMeal.mutate(
                   { name: newMealName.trim(), sort_order: meals.length },
-                  { onSuccess: () => { setNewMealName(''); setAddingMeal(false); } }
+                  { onSuccess: () => { setNewMealName(''); setAddingMeal(false); }, onError: onErr('Öğün eklenemedi') }
                 )
               }
             />
@@ -218,7 +222,7 @@ export default function BeslenmeScreen() {
                   </Text>
                 </View>
                 {editMode && (
-                  <Pressable onPress={() => deleteSupplement.mutate(s.id)} hitSlop={8}>
+                  <Pressable onPress={() => deleteSupplement.mutate(s.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
                     <Text style={styles.listDelete}>Sil</Text>
                   </Pressable>
                 )}
@@ -244,7 +248,7 @@ export default function BeslenmeScreen() {
                 onPress={() =>
                   addSupplement.mutate(
                     { name: supplementDraft.name.trim(), dose: supplementDraft.dose.trim(), timing: supplementDraft.timing.trim(), sort_order: supplements.length },
-                    { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }) }
+                    { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }), onError: onErr('Takviye eklenemedi') }
                   )
                 }
               />
@@ -260,7 +264,7 @@ export default function BeslenmeScreen() {
               <View key={item.id} style={styles.listRow}>
                 <Pressable
                   style={styles.shopCheckRow}
-                  onPress={() => toggleShoppingItem.mutate({ id: item.id, checked: !item.checked })}
+                  onPress={() => toggleShoppingItem.mutate({ id: item.id, checked: !item.checked }, { onError: onErr('Güncellenemedi') })}
                 >
                   <View style={[styles.checkbox, item.checked && styles.checkboxOn]}>
                     {item.checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
@@ -271,7 +275,7 @@ export default function BeslenmeScreen() {
                   </Text>
                 </Pressable>
                 {editMode && (
-                  <Pressable onPress={() => deleteShoppingItem.mutate(item.id)} hitSlop={8}>
+                  <Pressable onPress={() => deleteShoppingItem.mutate(item.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
                     <Text style={styles.listDelete}>Sil</Text>
                   </Pressable>
                 )}
@@ -296,7 +300,7 @@ export default function BeslenmeScreen() {
                 onPress={() =>
                   addShoppingItem.mutate(
                     { name: shoppingDraft.name.trim(), quantity: shoppingDraft.quantity.trim(), sort_order: shoppingItems.length },
-                    { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }) }
+                    { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }), onError: onErr('Ürün eklenemedi') }
                   )
                 }
               />

@@ -76,6 +76,13 @@ begin
 end;
 $$;
 
+-- Bu tetikleyici 0012'de de oluşturulmuştu; burada tekrar tanımlamak 0013'ü 0012'den
+-- bağımsız çalıştırılabilir (idempotent) hale getirir.
+drop trigger if exists on_checkin_insert on public.checkins;
+create trigger on_checkin_insert
+  after insert on public.checkins
+  for each row execute function public.notify_trainer_on_checkin();
+
 -- Ödeme hatırlatma cron görevi: hem trainer hem client'a ayrı ayrı, kişiselleştirilmiş bildirim + push
 create or replace function public.send_payment_reminders()
 returns void
