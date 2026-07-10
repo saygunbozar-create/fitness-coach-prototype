@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Fitness Coach — Prototip</title>
+<style>
+  :root{
+    --bg:#0B0D12; --card:#161C26; --card2:#1E2632; --edge:#2C3644;
+    --lime:#C6F94E; --white:#F5F7FA; --grey:#96A0AC; --greyd:#69737F;
+    --red:#FF6363; --blue:#60A5FA; --orange:#FBB040;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:#05070A;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+       display:flex;align-items:center;justify-content:center;min-height:100vh;padding:12px}
+  .phone{width:100%;max-width:400px;height:min(94vh,840px);background:var(--bg);
+         border:1px solid var(--edge);border-radius:34px;overflow:hidden;
+         display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .topbar{padding:20px 20px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+  .brand{font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--greyd)}
+  .screen-title{font-size:19px;font-weight:800;color:var(--white)}
+  .client-pill{font-size:12px;font-weight:700;color:var(--lime);background:var(--card);
+               border:1px solid var(--edge);border-radius:99px;padding:7px 14px;cursor:pointer}
+  .content{flex:1;overflow-y:auto;padding:0 14px 16px}
+  .content::-webkit-scrollbar{display:none}
+  .tabbar{display:flex;background:var(--card2);border-top:1px solid var(--edge);flex-shrink:0}
+  .tabbar button{flex:1;padding:11px 0 12px;background:none;border:none;cursor:pointer;
+                 display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabbar .ico{font-size:16px;line-height:1;color:var(--greyd)}
+  .tabbar .lbl{font-size:10px;font-weight:700;color:var(--greyd)}
+  .tabbar button.on .ico,.tabbar button.on .lbl{color:var(--lime)}
+  .panel{background:var(--card);border:1px solid var(--edge);border-radius:18px;overflow:hidden;margin-bottom:14px}
+  .panel-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
+           background:var(--card2);border-bottom:1px solid var(--edge)}
+  .panel-h .t{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--white)}
+  .panel-h .t::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--lime)}
+  .panel-h .r{font-size:11px;color:var(--grey)}
+  .panel-b{padding:14px}
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:var(--card2);border-left:3px solid var(--lime);border-radius:12px;padding:10px 12px}
+  .kpi .l{font-size:11px;color:var(--grey);margin-bottom:4px}
+  .kpi .v{font-size:17px;font-weight:800;color:var(--lime)}
+  .row-flex{display:flex;align-items:center;gap:14px}
+  .bar-wrap{margin-bottom:12px}
+  .bar-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
+  .bar-top .n{color:var(--grey)} .bar-top .v{font-weight:700;color:var(--white)}
+  .bar-top .v.over{color:var(--red)}
+  .bar-bg{height:9px;border-radius:99px;background:var(--edge);position:relative;overflow:visible}
+  .bar-fill{height:9px;border-radius:99px;transition:width .4s ease}
+  .over-mark{position:absolute;top:0;right:-8px;width:6px;height:9px;border-radius:99px;background:var(--red)}
+  .daytabs{display:flex;gap:8px;margin-bottom:14px}
+  .daytabs button{flex:1;padding:9px 0;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;
+                  background:var(--card);color:var(--grey);border:1px solid var(--edge)}
+  .daytabs button.on{background:var(--lime);color:var(--bg);border-color:var(--lime)}
+  .ex-card{background:var(--card2);border-radius:12px;padding:11px;margin-bottom:10px}
+  .ex-card.done{opacity:.6}
+  .ex-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;gap:8px}
+  .ex-name{display:flex;align-items:center;gap:9px;cursor:pointer;background:none;border:none;text-align:left;padding:0}
+  .chk{width:23px;height:23px;border-radius:50%;border:2px solid var(--greyd);flex-shrink:0;
+       display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg)}
+  .chk.on{background:var(--lime);border-color:var(--lime)}
+  .ex-name .nm{font-size:13px;font-weight:700;color:var(--white)}
+  .ex-card.done .nm{text-decoration:line-through}
+  .ex-name .gr{font-size:11px;color:var(--greyd)}
+  .ex-vol{font-size:13px;font-weight:800;color:var(--lime);white-space:nowrap}
+  .steppers{display:flex;gap:7px}
+  .stp{flex:1;display:flex;align-items:center;justify-content:space-between;background:var(--card);
+       border:1px solid var(--edge);border-radius:9px;padding:3px 4px}
+  .stp button{width:26px;height:26px;background:none;border:none;font-size:16px;font-weight:900;cursor:pointer}
+  .stp .minus{color:var(--grey)} .stp .plus{color:var(--lime)}
+  .stp .mid{text-align:center;font-size:11px;color:var(--greyd)}
+  .stp .mid b{display:block;font-size:13px;color:var(--white)}
+  .total-bar{background:var(--lime);border-radius:12px;padding:12px 16px;display:flex;
+             justify-content:space-between;font-weight:800;color:var(--bg);font-size:14px;margin-top:4px}
+  .food-row{display:flex;justify-content:space-between;align-items:center;gap:8px;
+            background:var(--card2);border-radius:12px;padding:9px 12px;margin-bottom:8px}
+  .food-row .fi{min-width:0}
+  .food-row .fn{font-size:13px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .food-row .fd{font-size:11px;color:var(--greyd)}
+  .qty{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .qty button{width:27px;height:27px;border-radius:8px;background:var(--card);border:1px solid var(--edge);
+              font-weight:900;font-size:15px;cursor:pointer}
+  .qty .q{font-size:13px;font-weight:700;color:var(--lime);min-width:26px;text-align:center}
+  .chart-note{display:flex;gap:16px;font-size:11px;color:var(--grey);margin-top:6px;align-items:center}
+  .leg{display:inline-block;width:16px;height:3px;margin-right:5px;vertical-align:middle}
+  .chips3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+  .chip3{background:var(--card2);border:1px solid var(--edge);border-radius:12px;padding:8px 4px;text-align:center}
+  .chip3 .v{font-size:13px;font-weight:800;color:var(--lime)}
+  .chip3 .l{font-size:10px;color:var(--grey)}
+  .ci-bars{display:flex;align-items:flex-end;gap:10px;height:150px;margin-bottom:8px}
+  .ci-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .ci-col .cv{font-size:12px;font-weight:700;color:var(--white);margin-bottom:4px}
+  .ci-col .cb{width:100%;border-radius:8px 8px 0 0;transition:height .5s ease}
+  .ci-col .cl{font-size:9px;color:var(--grey);margin-top:5px;text-align:center}
+  .note-box{font-size:11px;background:var(--card2);color:var(--grey);border-radius:9px;padding:9px 12px}
+  .cli-card{width:100%;display:flex;align-items:center;gap:12px;background:var(--card);text-align:left;
+            border:1px solid var(--edge);border-radius:16px;padding:14px;margin-bottom:10px;cursor:pointer}
+  .cli-card.on{border-color:var(--lime)}
+  .avatar{width:44px;height:44px;border-radius:50%;background:var(--card2);border:1px solid var(--edge);
+          color:var(--lime);font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .cli-info{flex:1;min-width:0}
+  .cli-info .n{font-weight:700;color:var(--white);font-size:14px}
+  .cli-info .g{font-size:11px;color:var(--grey)}
+  .status{font-size:11px;font-weight:700;border-radius:99px;padding:5px 11px;flex-shrink:0}
+  .status.ok{background:rgba(198,249,78,.12);color:var(--lime)}
+  .status.warn{background:rgba(251,176,64,.12);color:var(--orange)}
+  .add-cli{border:2px dashed var(--edge);border-radius:16px;padding:15px;text-align:center;
+           font-size:13px;color:var(--greyd)}
+  .w-big{font-size:28px;font-weight:800;color:var(--white)}
+  .w-diff{font-size:13px;font-weight:700}
+  h4.meal-note{font-size:11px;color:var(--greyd);font-weight:400;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar">
+    <div>
+      <div class="brand">FITNESS COACH</div>
+      <div class="screen-title" id="screenTitle">Panel</div>
+    </div>
+    <button class="client-pill" id="clientPill" onclick="setTab('danisan')"></button>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="tabbar" id="tabbar"></div>
+</div>
+<script>
+// ================== VERİLER (Excel'den) ==================
+const CLIENTS = [
+ {id:1,name:"Örnek Danışan",goal:"Yağ Yakımı",weight:80.2,startWeight:82,kcalTarget:2230,tdee:2786,
+  macros:{p:164,k:254,y:62},pr:151.7,
+  proj:[82,81.5,81,80.5,80,79.4,78.9,78.4,77.9,77.4,76.9,76.4,75.9],
+  actual:[82,81.6,81.1,80.7,80.2],
+  checkin:{"Uyku":8,"Enerji":8,"Açlık":6,"Stres":3,"Motivasyon":9}},
+ {id:2,name:"Mert K.",goal:"Kas Kazanımı",weight:71.4,startWeight:68,kcalTarget:3050,tdee:2750,
+  macros:{p:150,k:380,y:85},pr:122.5,
+  proj:[68,68.3,68.6,68.9,69.2,69.5,69.8,70.1,70.4,70.7,71,71.3,71.6],
+  actual:[68,68.4,69,69.9,70.6,71.4],
+  checkin:{"Uyku":6,"Enerji":7,"Açlık":4,"Stres":5,"Motivasyon":8}}
+];
+const WORKOUT = {
+ "Pzt":{label:"GÖĞÜS & TRICEPS",rows:[
+   {ex:"Bench Press",grp:"Göğüs",set:4,rep:8,kg:70,done:true},
+   {ex:"Incline DB Press",grp:"Göğüs (Üst)",set:4,rep:10,kg:26,done:true},
+   {ex:"Cable Fly",grp:"Göğüs",set:3,rep:12,kg:15,done:false},
+   {ex:"Dips",grp:"Göğüs/Triceps",set:3,rep:10,kg:0,done:false},
+   {ex:"Skull Crusher",grp:"Triceps",set:3,rep:10,kg:25,done:false},
+   {ex:"Triceps Pushdown",grp:"Triceps",set:3,rep:12,kg:25,done:false}]},
+ "Sal":{label:"SIRT & BICEPS",rows:[
+   {ex:"Barbell Row",grp:"Sırt",set:4,rep:8,kg:60,done:false},
+   {ex:"Lat Pulldown",grp:"Sırt (Kanat)",set:4,rep:10,kg:55,done:false},
+   {ex:"Seated Cable Row",grp:"Sırt (Orta)",set:3,rep:12,kg:50,done:false},
+   {ex:"Barbell Curl",grp:"Biceps",set:3,rep:10,kg:30,done:false},
+   {ex:"Hammer Curl",grp:"Biceps",set:3,rep:12,kg:12,done:false}]},
+ "Çar":{label:"BACAK",rows:[
+   {ex:"Squat",grp:"Bacak",set:4,rep:8,kg:90,done:false},
+   {ex:"Romanian Deadlift",grp:"Bacak (Arka)",set:4,rep:10,kg:70,done:false},
+   {ex:"Leg Press",grp:"Bacak",set:3,rep:12,kg:140,done:false},
+   {ex:"Leg Curl",grp:"Bacak (Arka)",set:3,rep:12,kg:40,done:false},
+   {ex:"Calf Raise",grp:"Baldır",set:4,rep:15,kg:60,done:false}]}
+};
+const MEALS = [
+ {name:"Kahvaltı",items:[
+   {food:"Yumurta (haşlanmış)",qty:3,kcal:70,p:6,k:1,y:5},
+   {food:"Yulaf Ezmesi 60 g",qty:1,kcal:230,p:8,k:40,y:4},
+   {food:"Muz",qty:1,kcal:105,p:1,k:27,y:0},
+   {food:"Badem 15 g",qty:1,kcal:90,p:3,k:3,y:8}]},
+ {name:"Ara Öğün",items:[
+   {food:"Protein Tozu (whey)",qty:1,kcal:120,p:24,k:3,y:1},
+   {food:"Süt (yağsız) 250 ml",qty:1,kcal:90,p:9,k:12,y:0},
+   {food:"Elma",qty:1,kcal:95,p:0,k:25,y:0}]},
+ {name:"Öğle Yemeği",items:[
+   {food:"Tavuk Göğsü (ızgara) 100 g",qty:1.8,kcal:165,p:31,k:0,y:4},
+   {food:"Basmati Pirinç 100 g",qty:1.5,kcal:130,p:3,k:28,y:0},
+   {food:"Yeşil Salata + Zeytinyağı",qty:1,kcal:120,p:2,k:6,y:10}]}
+];
+const TABS=[["panel","Panel","▦"],["antrenman","Antrenman","⬢"],["beslenme","Beslenme","◈"],["ilerleme","İlerleme","↗"],["danisan","Danışan","◉"]];
+
+// ================== DURUM ==================
+let state = {tab:"panel", clientId:1, day:"Pzt"};
+const nf=(v,d=0)=>v.toLocaleString("tr-TR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cli=()=>CLIENTS.find(c=>c.id===state.clientId);
+
+// ================== BİLEŞENLER ==================
+function panel(title,right,inner){
+ return `<div class="panel"><div class="panel-h"><span class="t">${title}</span><span class="r">${right||""}</span></div><div class="panel-b">${inner}</div></div>`;
+}
+function bar(label,val,target,unit,color){
+ const frac=Math.min(val/target,1)*100, over=val>target;
+ return `<div class="bar-wrap"><div class="bar-top"><span class="n">${label}</span>
+  <span class="v ${over?"over":""}">${nf(val)} / ${nf(target)} ${unit}</span></div>
+  <div class="bar-bg"><div class="bar-fill" style="width:${frac}%;background:${color}"></div>${over?'<div class="over-mark"></div>':""}</div></div>`;
+}
+function ring(pct){
+ const r=50,c=2*Math.PI*r,off=c*(1-Math.min(pct,100)/100);
+ const col=pct>105?"var(--orange)":"var(--lime)";
+ return `<svg width="120" height="120"><circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--edge)" stroke-width="10"/>
+  <circle cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round"
+   stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 60 60)"/>
+  <text x="60" y="60" text-anchor="middle" dy="7" font-size="22" font-weight="800" fill="var(--white)">%${Math.round(pct)}</text></svg>`;
+}
+function lineChart(proj,actual){
+ const w=320,h=170,all=[...proj,...actual];
+ const mn=Math.min(...all)-.8,mx=Math.max(...all)+.8;
+ const X=i=>14+i/(proj.length-1)*(w-28), Y=v=>h-24-(v-mn)/(mx-mn)*(h-44);
+ const path=a=>a.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+ const dots=actual.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="var(--lime)"/>`).join("");
+ const grid=[.25,.5,.75].map(f=>`<line x1="14" x2="${w-14}" y1="${20+f*(h-44)}" y2="${20+f*(h-44)}" stroke="var(--edge)"/>`).join("");
+ return `<svg viewBox="0 0 ${w} ${h}" style="width:100%">${grid}
+  <path d="${path(proj)}" fill="none" stroke="var(--greyd)" stroke-width="2.5" stroke-dasharray="5 5"/>
+  <path d="${path(actual)}" fill="none" stroke="var(--lime)" stroke-width="3.5" stroke-linecap="round"/>${dots}
+  <text x="14" y="${h-4}" font-size="10" fill="var(--greyd)">Başlangıç</text>
+  <text x="${w-14}" y="${h-4}" font-size="10" fill="var(--greyd)" text-anchor="end">Hafta 12</text></svg>`;
+}
+
+// ================== SEKMELER ==================
+function vDashboard(){
+ const c=cli(), days=Object.values(WORKOUT);
+ const sets=days.reduce((a,d)=>a+d.rows.reduce((x,r)=>x+r.set,0),0);
+ const vol=days.reduce((a,d)=>a+d.rows.reduce((x,r)=>x+r.set*r.rep*r.kg,0),0);
+ const kcal=MEALS.reduce((a,m)=>a+m.items.reduce((x,i)=>x+i.kcal*i.qty,0),0);
+ const pct=kcal/c.kcalTarget*100, diff=c.weight-c.startWeight;
+ const kpis=[["Antrenman Günü",days.length+" gün"],["Toplam Set",sets],["Haftalık Hacim",nf(vol)+" kg"],["En Yüksek 1RM",nf(c.pr,1)+" kg"]];
+ return panel("Kontrol Paneli",c.goal,
+   `<div class="kpi-grid">${kpis.map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}</div>`)
+  +panel("Bugünkü Kalori",`Hedef ${nf(c.kcalTarget)} kcal`,
+   `<div class="row-flex">${ring(pct)}<div style="flex:1;font-size:13px">
+     <div style="color:var(--white);font-weight:700">${nf(kcal)} kcal alındı</div>
+     <div style="color:${pct>105?"var(--orange)":"var(--grey)"};margin:3px 0">${pct>105?`Hedefin ${nf(kcal-c.kcalTarget)} kcal üzerinde`:"Hedef aralığında"}</div>
+     <div style="color:var(--greyd);font-size:11px">TDEE: ${nf(c.tdee)} kcal · otomatik</div></div></div>`)
+  +panel("Kilo Durumu","12 haftalık plan",
+   `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+     <span class="w-big">${nf(c.weight,1)} kg</span>
+     <span class="w-diff" style="color:${diff<=0?"var(--lime)":"var(--orange)"}">${diff>0?"+":""}${nf(diff,1)} kg</span></div>
+    ${lineChart(c.proj,c.actual)}
+    <div class="chart-note"><span><span class="leg" style="background:var(--lime)"></span>Gerçekleşen</span>
+    <span><span class="leg" style="border-top:2px dashed var(--greyd);height:0"></span>Projeksiyon</span></div>`);
+}
+function vWorkout(){
+ const d=WORKOUT[state.day];
+ const vol=d.rows.reduce((a,r)=>a+r.set*r.rep*r.kg,0);
+ const tabs=`<div class="daytabs">${Object.keys(WORKOUT).map(k=>
+   `<button class="${state.day===k?"on":""}" onclick="state.day='${k}';render()">${k}</button>`).join("")}</div>`;
+ const rows=d.rows.map((r,i)=>`
+  <div class="ex-card ${r.done?"done":""}">
+   <div class="ex-top">
+    <button class="ex-name" onclick="toggleDone(${i})">
+      <span class="chk ${r.done?"on":""}">${r.done?"✓":""}</span>
+      <span><span class="nm">${r.ex}</span><br><span class="gr">${r.grp}</span></span>
+    </button>
+    <span class="ex-vol">${nf(r.set*r.rep*r.kg)} kg</span>
+   </div>
+   <div class="steppers">
+    ${[["set","Set",1],["rep","Tekrar",1],["kg","kg",2.5]].map(([f,l,st])=>`
+     <div class="stp">
+      <button class="minus" onclick="updEx(${i},'${f}',-${st})">−</button>
+      <span class="mid"><b>${r[f]}</b>${l}</span>
+      <button class="plus" onclick="updEx(${i},'${f}',${st})">+</button>
+     </div>`).join("")}
+   </div>
+  </div>`).join("");
+ return tabs+panel(d.label,"Hacim = Set × Tekrar × kg",
+   rows+`<div class="total-bar"><span>Gün Toplamı</span><span>${nf(vol)} kg</span></div>`);
+}
+function vNutrition(){
+ const c=cli();
+ let T={kcal:0,p:0,k:0,y:0};
+ MEALS.forEach(m=>m.items.forEach(it=>{T.kcal+=it.kcal*it.qty;T.p+=it.p*it.qty;T.k+=it.k*it.qty;T.y+=it.y*it.qty;}));
+ let html=panel("Günlük Hedef Durumu","otomatik",
+   bar("Kalori",T.kcal,c.kcalTarget,"kcal","var(--lime)")+
+   bar("Protein",T.p,c.macros.p,"g","var(--blue)")+
+   bar("Karbonhidrat",T.k,c.macros.k,"g","var(--orange)")+
+   bar("Yağ",T.y,c.macros.y,"g","var(--red)"));
+ MEALS.forEach((m,mi)=>{
+  const mk=m.items.reduce((a,it)=>a+it.kcal*it.qty,0), mp=m.items.reduce((a,it)=>a+it.p*it.qty,0);
+  html+=panel(m.name,`${nf(mk)} kcal · ${nf(mp)} g protein`,
+   m.items.map((it,ii)=>`
+    <div class="food-row">
+     <div class="fi"><div class="fn">${it.food}</div>
+      <div class="fd">${nf(it.kcal*it.qty)} kcal · P ${nf(it.p*it.qty)} g</div></div>
+     <div class="qty">
+      <button style="color:var(--grey)" onclick="updQty(${mi},${ii},-0.5)">−</button>
+      <span class="q">${it.qty}</span>
+      <button style="color:var(--lime)" onclick="updQty(${mi},${ii},0.5)">+</button>
+     </div></div>`).join(""));
+ });
+ return html;
+}
+function vProgress(){
+ const c=cli(), es=Object.entries(c.checkin);
+ const avg=es.reduce((a,[,v])=>a+v,0)/es.length;
+ const low=es.some(([,v])=>v<=4);
+ const bars=es.map(([k,v])=>`
+  <div class="ci-col"><span class="cv">${v}</span>
+   <div class="cb" style="height:${v*10}%;background:${v<=4?"var(--red)":"var(--lime)"}"></div>
+   <span class="cl">${k}</span></div>`).join("");
+ const chips=[[nf(c.proj[12]-c.proj[0],1)+" kg","12 haftada"],
+              [nf((c.proj[12]-c.proj[0])/12,2)+" kg","haftalık"],
+              [nf(c.kcalTarget-c.tdee)+" kcal","günlük fark"]];
+ return panel("Haftalık Check-in",`Ortalama ${nf(avg,1)} / 10`,
+   `<div class="ci-bars">${bars}</div>
+    <div class="note-box">${low?"Düşük skor tespit edildi — danışanla görüşme öner.":"Tüm skorlar sağlıklı aralıkta."}</div>`)
+  +panel("Kilo Projeksiyonu","7700 kcal ≈ 1 kg",
+   lineChart(c.proj,c.actual)+
+   `<div class="chips3">${chips.map(([v,l])=>`<div class="chip3"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("")}</div>`);
+}
+function vClients(){
+ return CLIENTS.map(c=>{
+  const diff=c.weight-c.startWeight, gain=c.goal==="Kas Kazanımı";
+  const ok=gain?diff>0:diff<0;
+  return `<button class="cli-card ${state.clientId===c.id?"on":""}" onclick="pickClient(${c.id})">
+   <div class="avatar">${c.name[0]}</div>
+   <div class="cli-info"><div class="n">${c.name}</div><div class="g">${c.goal} · ${nf(c.weight,1)} kg</div></div>
+   <span class="status ${ok?"ok":"warn"}">${ok?"Yolunda":"Takip et"}</span></button>`;
+ }).join("")+`<div class="add-cli">+ Yeni danışan ekle</div>`;
+}
+
+// ================== OLAYLAR & RENDER ==================
+function updEx(i,f,d){const r=WORKOUT[state.day].rows[i];r[f]=Math.max(0,+(r[f]+d).toFixed(1));render();}
+function toggleDone(i){const r=WORKOUT[state.day].rows[i];r.done=!r.done;render();}
+function updQty(mi,ii,d){const it=MEALS[mi].items[ii];it.qty=Math.max(0,Math.round((it.qty+d)*2)/2);render();}
+function pickClient(id){state.clientId=id;state.tab="panel";render();}
+function setTab(t){state.tab=t;render();}
+
+function render(){
+ const views={panel:vDashboard,antrenman:vWorkout,beslenme:vNutrition,ilerleme:vProgress,danisan:vClients};
+ document.getElementById("content").innerHTML=views[state.tab]();
+ document.getElementById("screenTitle").textContent=TABS.find(t=>t[0]===state.tab)[1];
+ document.getElementById("clientPill").textContent=cli().name;
+ document.getElementById("tabbar").innerHTML=TABS.map(([id,lbl,ico])=>
+  `<button class="${state.tab===id?"on":""}" onclick="setTab('${id}')">
+    <span class="ico">${ico}</span><span class="lbl">${lbl}</span></button>`).join("");
+ document.getElementById("content").scrollTop=0;
+}
+render();
+</script>
+</body>
+</html>
