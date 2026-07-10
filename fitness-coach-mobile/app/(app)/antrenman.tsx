@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { ExerciseCard } from '../../components/ExerciseCard';
@@ -16,10 +16,13 @@ import {
   useDeleteExercise,
   useDeletePeriodizationPhase,
   useDeletePrLog,
+  useDeleteSessionLog,
   useDeleteWorkoutDay,
+  useExerciseHistory,
   useExerciseLibrary,
   usePeriodizationPhases,
   usePrLogs,
+  useSeedExerciseLibrary,
   useSessionLogs,
   useSetSessionStatus,
   useUpdateExercise,
@@ -46,8 +49,10 @@ export default function AntrenmanScreen() {
   const addPrLog = useAddPrLog(selectedClientId ?? undefined);
   const deletePrLog = useDeletePrLog(selectedClientId ?? undefined);
   const exerciseLibraryQuery = useExerciseLibrary(isTrainer ? profile?.id : undefined);
+  const seedExerciseLibrary = useSeedExerciseLibrary(isTrainer ? profile?.id : undefined);
   const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined);
   const setSessionStatus = useSetSessionStatus(selectedClientId ?? undefined);
+  const deleteSessionLog = useDeleteSessionLog(selectedClientId ?? undefined);
   const phasesQuery = usePeriodizationPhases(selectedClientId ?? undefined);
   const addPhase = useAddPeriodizationPhase(selectedClientId ?? undefined);
   const deletePhase = useDeletePeriodizationPhase(selectedClientId ?? undefined);
@@ -62,8 +67,18 @@ export default function AntrenmanScreen() {
   const [addingPhase, setAddingPhase] = useState(false);
   const [phaseDraft, setPhaseDraft] = useState({ name: '', weeks: '', note: '' });
 
+  useEffect(() => {
+    if (isTrainer && exerciseLibraryQuery.isSuccess && exerciseLibraryQuery.data?.length === 0 && !seedExerciseLibrary.isPending) {
+      seedExerciseLibrary.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTrainer, exerciseLibraryQuery.isSuccess, exerciseLibraryQuery.data?.length]);
+
   const days = workoutQuery.data ?? [];
   const activeDay = days.find((d) => d.id === dayId) ?? days[0];
+
+  const activeDayExerciseIds = useMemo(() => (activeDay ? activeDay.exercises.map((e) => e.id) : []), [activeDay]);
+  const exerciseHistoryQuery = useExerciseHistory(selectedClientId ?? undefined, activeDayExerciseIds);
 
   const dayVol = useMemo(() => {
     if (!activeDay) return 0;
@@ -211,6 +226,7 @@ export default function AntrenmanScreen() {
                 <ExerciseCard
                   key={r.id}
                   row={row}
+                  history={exerciseHistoryQuery.data?.get(r.id)}
                   onToggle={() => updateLog.mutate({ exercise: r, currentLog: log, patch: { done: !row.done } })}
                   onUpdate={(field, delta) => {
                     const current = field === 'set' ? row.set : field === 'rep' ? row.rep : row.kg;
@@ -313,8 +329,13 @@ export default function AntrenmanScreen() {
                   key={date}
                   style={[styles.calendarDay, { borderColor: color, backgroundColor: session ? `${color}22` : C.card2 }]}
                   onPress={() => {
-                    const nextStatus = !session ? 'tamamlandi' : session.status === 'tamamlandi' ? 'atlandi' : 'tamamlandi';
-                    setSessionStatus.mutate({ date, status: nextStatus, workout_day_id: activeDay?.id ?? null });
+                    if (!session) {
+                      setSessionStatus.mutate({ date, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null });
+                    } else if (session.status === 'tamamlandi') {
+                      setSessionStatus.mutate({ date, status: 'atlandi', workout_day_id: activeDay?.id ?? null });
+                    } else {
+                      deleteSessionLog.mutate(session.id);
+                    }
                   }}
                 >
                   <Text style={[styles.calendarDayText, { color: session ? color : C.greyD }]}>{date.slice(8, 10)}</Text>
@@ -331,7 +352,7 @@ export default function AntrenmanScreen() {
               <View style={[styles.legendDot, { backgroundColor: C.red }]} />
               <Text style={styles.legendText}>Atlandı</Text>
             </View>
-            <Text style={styles.legendHint}>Bir güne dokun: tamamlandı → atlandı → tamamlandı</Text>
+            <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>
           </View>
         </Panel>
 

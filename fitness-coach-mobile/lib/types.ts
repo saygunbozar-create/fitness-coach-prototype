@@ -105,6 +105,15 @@ export type LibraryExercise = { id: string; trainer_id: string; name: string; gr
 
 export type LibraryFood = { id: string; trainer_id: string; food: string; unit: string; kcal: number; p: number; k: number; y: number };
 
+export type ClientPackage = {
+  id: string;
+  client_id: string;
+  name: string;
+  total_sessions: number;
+  start_date: string;
+  note: string;
+};
+
 export type PeriodizationPhase = {
   id: string;
   client_id: string;

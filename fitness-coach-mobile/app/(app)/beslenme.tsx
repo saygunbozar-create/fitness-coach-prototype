@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { Bar } from '../../components/Bar';
@@ -20,6 +20,7 @@ import {
   useDeleteSupplementItem,
   useFoodLibrary,
   useMeals,
+  useSeedFoodLibrary,
   useShoppingItems,
   useSupplementItems,
   useToggleShoppingItem,
@@ -42,6 +43,7 @@ export default function BeslenmeScreen() {
   const updateMealItem = useUpdateMealItem(selectedClientId ?? undefined);
   const deleteMealItem = useDeleteMealItem(selectedClientId ?? undefined);
   const foodLibraryQuery = useFoodLibrary(isTrainer ? profile?.id : undefined);
+  const seedFoodLibrary = useSeedFoodLibrary(isTrainer ? profile?.id : undefined);
   const supplementsQuery = useSupplementItems(selectedClientId ?? undefined);
   const addSupplement = useAddSupplementItem(selectedClientId ?? undefined);
   const deleteSupplement = useDeleteSupplementItem(selectedClientId ?? undefined);
@@ -56,6 +58,13 @@ export default function BeslenmeScreen() {
   const [addingItemForMeal, setAddingItemForMeal] = useState<string | null>(null);
   const [supplementDraft, setSupplementDraft] = useState({ name: '', dose: '', timing: '' });
   const [shoppingDraft, setShoppingDraft] = useState({ name: '', quantity: '' });
+
+  useEffect(() => {
+    if (isTrainer && foodLibraryQuery.isSuccess && foodLibraryQuery.data?.length === 0 && !seedFoodLibrary.isPending) {
+      seedFoodLibrary.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTrainer, foodLibraryQuery.isSuccess, foodLibraryQuery.data?.length]);
 
   const totals = useMemo(() => {
     const meals = mealsQuery.data ?? [];

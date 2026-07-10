@@ -4,6 +4,7 @@ import type {
   CardioLog,
   Checkin,
   Client,
+  ClientPackage,
   InjuryLog,
   LibraryExercise,
   LibraryFood,
@@ -262,6 +263,30 @@ export function useWorkout(clientId: string | undefined) {
   });
 }
 
+export function useExerciseHistory(clientId: string | undefined, exerciseIds: string[]) {
+  const key = exerciseIds.slice().sort().join(',');
+  return useQuery({
+    queryKey: ['exercise_history', clientId, key],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workout_logs')
+        .select('*')
+        .in('workout_exercise_id', exerciseIds)
+        .lt('date', todayStr())
+        .order('date', { ascending: false });
+      if (error) throw error;
+      const byExercise = new Map<string, WorkoutLog[]>();
+      for (const log of data as WorkoutLog[]) {
+        const list = byExercise.get(log.workout_exercise_id) ?? [];
+        list.push(log);
+        byExercise.set(log.workout_exercise_id, list);
+      }
+      return byExercise;
+    },
+    enabled: !!clientId && exerciseIds.length > 0,
+  });
+}
+
 export function useUpdateWorkoutLog(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -355,6 +380,54 @@ export function useExerciseLibrary(trainerId: string | undefined) {
       return data as LibraryExercise[];
     },
     enabled: !!trainerId,
+  });
+}
+
+const DEFAULT_EXERCISE_LIBRARY: { name: string; grp: string }[] = [
+  { name: 'Bench Press', grp: 'Göğüs' },
+  { name: 'Incline DB Press', grp: 'Göğüs (Üst)' },
+  { name: 'Cable Fly', grp: 'Göğüs' },
+  { name: 'Dips', grp: 'Göğüs/Triceps' },
+  { name: 'Push-up', grp: 'Göğüs' },
+  { name: 'Barbell Row', grp: 'Sırt' },
+  { name: 'Lat Pulldown', grp: 'Sırt (Kanat)' },
+  { name: 'Seated Cable Row', grp: 'Sırt (Orta)' },
+  { name: 'Pull-up', grp: 'Sırt' },
+  { name: 'Deadlift', grp: 'Sırt/Bacak' },
+  { name: 'Squat', grp: 'Bacak' },
+  { name: 'Romanian Deadlift', grp: 'Bacak (Arka)' },
+  { name: 'Leg Press', grp: 'Bacak' },
+  { name: 'Leg Curl', grp: 'Bacak (Arka)' },
+  { name: 'Leg Extension', grp: 'Bacak (Ön)' },
+  { name: 'Calf Raise', grp: 'Baldır' },
+  { name: 'Lunge', grp: 'Bacak' },
+  { name: 'Overhead Press', grp: 'Omuz' },
+  { name: 'Lateral Raise', grp: 'Omuz' },
+  { name: 'Front Raise', grp: 'Omuz' },
+  { name: 'Face Pull', grp: 'Omuz (Arka)' },
+  { name: 'Arnold Press', grp: 'Omuz' },
+  { name: 'Barbell Curl', grp: 'Biceps' },
+  { name: 'Hammer Curl', grp: 'Biceps' },
+  { name: 'Cable Curl', grp: 'Biceps' },
+  { name: 'Triceps Pushdown', grp: 'Triceps' },
+  { name: 'Skull Crusher', grp: 'Triceps' },
+  { name: 'Plank', grp: 'Karın' },
+  { name: 'Crunch', grp: 'Karın' },
+  { name: 'Hanging Leg Raise', grp: 'Karın' },
+  { name: 'Cable Crunch', grp: 'Karın' },
+  { name: 'Russian Twist', grp: 'Karın' },
+];
+
+export function useSeedExerciseLibrary(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!trainerId) throw new Error('trainerId eksik');
+      const rows = DEFAULT_EXERCISE_LIBRARY.map((e) => ({ trainer_id: trainerId, name: e.name, grp: e.grp }));
+      const { error } = await supabase.from('exercise_library').upsert(rows, { onConflict: 'trainer_id,name' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['exercise_library', trainerId] }),
   });
 }
 
@@ -508,6 +581,42 @@ export function useFoodLibrary(trainerId: string | undefined) {
       return data as LibraryFood[];
     },
     enabled: !!trainerId,
+  });
+}
+
+const DEFAULT_FOOD_LIBRARY: { food: string; unit: string; kcal: number; p: number; k: number; y: number }[] = [
+  { food: 'Yumurta (haşlanmış)', unit: 'adet', kcal: 70, p: 6, k: 1, y: 5 },
+  { food: 'Yulaf Ezmesi 60 g', unit: 'porsiyon', kcal: 230, p: 8, k: 40, y: 4 },
+  { food: 'Tavuk Göğsü (ızgara) 100 g', unit: 'porsiyon', kcal: 165, p: 31, k: 0, y: 4 },
+  { food: 'Pirinç (pişmiş) 100 g', unit: 'porsiyon', kcal: 130, p: 3, k: 28, y: 0 },
+  { food: 'Somon (fırın) 120 g', unit: 'porsiyon', kcal: 230, p: 25, k: 0, y: 14 },
+  { food: 'Yoğurt (yağsız) 200 g', unit: 'porsiyon', kcal: 120, p: 12, k: 16, y: 0 },
+  { food: 'Muz', unit: 'adet', kcal: 105, p: 1, k: 27, y: 0 },
+  { food: 'Elma', unit: 'adet', kcal: 95, p: 0, k: 25, y: 0 },
+  { food: 'Badem 15 g', unit: 'porsiyon', kcal: 90, p: 3, k: 3, y: 8 },
+  { food: 'Beyaz Peynir 30 g', unit: 'porsiyon', kcal: 80, p: 6, k: 1, y: 6 },
+  { food: 'Tam Buğday Ekmek', unit: 'dilim', kcal: 80, p: 3, k: 15, y: 1 },
+  { food: 'Süt (yağsız) 250 ml', unit: 'porsiyon', kcal: 90, p: 9, k: 12, y: 0 },
+  { food: 'Protein Tozu (whey)', unit: 'ölçek', kcal: 120, p: 24, k: 3, y: 1 },
+  { food: 'Zeytinyağı', unit: 'yemek kaşığı', kcal: 120, p: 0, k: 0, y: 14 },
+  { food: 'Kinoa (pişmiş) 100 g', unit: 'porsiyon', kcal: 120, p: 4, k: 21, y: 2 },
+  { food: 'Ton Balığı (suda) 100 g', unit: 'porsiyon', kcal: 116, p: 26, k: 0, y: 1 },
+  { food: 'Avokado', unit: 'adet', kcal: 240, p: 3, k: 12, y: 22 },
+  { food: 'Brokoli (buharda) 100 g', unit: 'porsiyon', kcal: 35, p: 2, k: 7, y: 0 },
+  { food: 'Tatlı Patates 150 g', unit: 'porsiyon', kcal: 130, p: 2, k: 30, y: 0 },
+  { food: 'Mercimek (pişmiş) 100 g', unit: 'porsiyon', kcal: 116, p: 9, k: 20, y: 0 },
+];
+
+export function useSeedFoodLibrary(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!trainerId) throw new Error('trainerId eksik');
+      const rows = DEFAULT_FOOD_LIBRARY.map((f) => ({ trainer_id: trainerId, ...f }));
+      const { error } = await supabase.from('food_library').upsert(rows, { onConflict: 'trainer_id,food' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['food_library', trainerId] }),
   });
 }
 
@@ -1017,5 +1126,75 @@ export function useSetSessionStatus(clientId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['session_logs', clientId] }),
+  });
+}
+
+export function useDeleteSessionLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('session_logs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['session_logs', clientId] }),
+  });
+}
+
+// ---------- Paket Takip ----------
+
+export function usePackages(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['client_packages', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_packages')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('start_date', { ascending: false });
+      if (error) throw error;
+      return data as ClientPackage[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddPackage(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; total_sessions: number; note: string }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('client_packages').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client_packages', clientId] }),
+  });
+}
+
+export function useDeletePackage(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('client_packages').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['client_packages', clientId] }),
+  });
+}
+
+export function useCompletedSessionsSince(clientId: string | undefined, sinceDate: string | undefined) {
+  return useQuery({
+    queryKey: ['completed_sessions_since', clientId, sinceDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('session_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'tamamlandi')
+        .gte('date', sinceDate)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as SessionLog[];
+    },
+    enabled: !!clientId && !!sinceDate,
   });
 }

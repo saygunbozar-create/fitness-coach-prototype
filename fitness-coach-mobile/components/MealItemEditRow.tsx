@@ -40,25 +40,29 @@ export function MealItemEditRow({
   }
 
   const matches = useMemo(() => {
-    if (initial || !suggestions || !form.food.trim()) return [];
+    if (initial || !suggestions) return [];
     const q = form.food.trim().toLowerCase();
-    return suggestions.filter((s) => s.food.toLowerCase().includes(q) && s.food.toLowerCase() !== q).slice(0, 5);
+    if (!q) return suggestions.slice(0, 8);
+    return suggestions.filter((s) => s.food.toLowerCase().includes(q) && s.food.toLowerCase() !== q).slice(0, 8);
   }, [initial, suggestions, form.food]);
 
   return (
     <View style={styles.card}>
       <AuthField label="Besin" value={form.food} onChangeText={(v) => setForm((f) => ({ ...f, food: v }))} placeholder="Ör. Yulaf Ezmesi 60 g" />
       {matches.length > 0 && (
-        <View style={styles.suggestRow}>
-          {matches.map((s) => (
-            <Pressable
-              key={s.food}
-              style={styles.suggestChip}
-              onPress={() => setForm((f) => ({ ...f, food: s.food, unit: s.unit, kcal: s.kcal, p: s.p, k: s.k, y: s.y }))}
-            >
-              <Text style={styles.suggestText}>{s.food}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.suggestBlock}>
+          <Text style={styles.suggestLabel}>{form.food.trim() ? 'Öneriler' : 'Kütüphaneden seç'}</Text>
+          <View style={styles.suggestRow}>
+            {matches.map((s) => (
+              <Pressable
+                key={s.food}
+                style={styles.suggestChip}
+                onPress={() => setForm((f) => ({ ...f, food: s.food, unit: s.unit, kcal: s.kcal, p: s.p, k: s.k, y: s.y }))}
+              >
+                <Text style={styles.suggestText}>{s.food}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       )}
       <View style={styles.row}>
@@ -119,7 +123,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   actionText: { fontSize: 12, fontWeight: '700' },
-  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -8, marginBottom: 10 },
+  suggestBlock: { marginTop: -8, marginBottom: 10 },
+  suggestLabel: { fontSize: 10, color: C.greyD, marginBottom: 5, fontWeight: '700' },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   suggestChip: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   suggestText: { fontSize: 11, color: C.lime, fontWeight: '600' },
 });

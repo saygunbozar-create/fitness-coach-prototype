@@ -31,21 +31,25 @@ export function ExerciseEditRow({
   }
 
   const matches = useMemo(() => {
-    if (initial || !suggestions || !form.ex.trim()) return [];
+    if (initial || !suggestions) return [];
     const q = form.ex.trim().toLowerCase();
-    return suggestions.filter((s) => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q).slice(0, 5);
+    if (!q) return suggestions.slice(0, 8);
+    return suggestions.filter((s) => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q).slice(0, 8);
   }, [initial, suggestions, form.ex]);
 
   return (
     <View style={styles.card}>
       <AuthField label="Egzersiz" value={form.ex} onChangeText={(v) => setForm((f) => ({ ...f, ex: v }))} placeholder="Ör. Bench Press" />
       {matches.length > 0 && (
-        <View style={styles.suggestRow}>
-          {matches.map((s) => (
-            <Pressable key={s.name} style={styles.suggestChip} onPress={() => setForm((f) => ({ ...f, ex: s.name, grp: s.grp }))}>
-              <Text style={styles.suggestText}>{s.name}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.suggestBlock}>
+          <Text style={styles.suggestLabel}>{form.ex.trim() ? 'Öneriler' : 'Kütüphaneden seç'}</Text>
+          <View style={styles.suggestRow}>
+            {matches.map((s) => (
+              <Pressable key={s.name} style={styles.suggestChip} onPress={() => setForm((f) => ({ ...f, ex: s.name, grp: s.grp }))}>
+                <Text style={styles.suggestText}>{s.name}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       )}
       <AuthField label="Kas Grubu" value={form.grp} onChangeText={(v) => setForm((f) => ({ ...f, grp: v }))} placeholder="Ör. Göğüs" />
@@ -100,7 +104,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   actionText: { fontSize: 12, fontWeight: '700' },
-  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -8, marginBottom: 10 },
+  suggestBlock: { marginTop: -8, marginBottom: 10 },
+  suggestLabel: { fontSize: 10, color: C.greyD, marginBottom: 5, fontWeight: '700' },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   suggestChip: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   suggestText: { fontSize: 11, color: C.lime, fontWeight: '600' },
 });
