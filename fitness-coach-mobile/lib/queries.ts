@@ -3,6 +3,7 @@ import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import type {
+  AppNotification,
   CardioLog,
   Checkin,
   Client,
@@ -1252,5 +1253,71 @@ export function useCompletedSessionsSince(clientId: string | undefined, sinceDat
       return data as SessionLog[];
     },
     enabled: !!clientId && !!sinceDate,
+  });
+}
+
+// ---------- Bildirimler ----------
+
+export function useNotifications(profileId: string | undefined) {
+  return useQuery({
+    queryKey: ['notifications', profileId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('profile_id', profileId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as AppNotification[];
+    },
+    enabled: !!profileId,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUnreadNotificationCount(profileId: string | undefined) {
+  return useQuery({
+    queryKey: ['notifications_unread_count', profileId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('profile_id', profileId)
+        .eq('read', false);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!profileId,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkNotificationRead(profileId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications', profileId] });
+      qc.invalidateQueries({ queryKey: ['notifications_unread_count', profileId] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead(profileId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!profileId) throw new Error('profileId eksik');
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('profile_id', profileId).eq('read', false);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications', profileId] });
+      qc.invalidateQueries({ queryKey: ['notifications_unread_count', profileId] });
+    },
   });
 }

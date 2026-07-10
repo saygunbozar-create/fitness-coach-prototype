@@ -142,3 +142,14 @@ export type CardioLog = {
   steps: number;
   calories: number;
 };
+
+export type AppNotification = {
+  id: string;
+  profile_id: string;
+  type: string;
+  title: string;
+  body: string;
+  client_id: string | null;
+  read: boolean;
+  created_at: string;
+};

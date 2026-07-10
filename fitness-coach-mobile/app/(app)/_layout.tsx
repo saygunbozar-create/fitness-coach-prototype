@@ -106,6 +106,7 @@ export default function AppLayout() {
           tabBarLabel: ({ focused }) => <TabLabel text="Ödemeler" focused={focused} />,
         }}
       />
+      <Tabs.Screen name="bildirimler" options={{ href: null }} />
     </Tabs>
   );
 }
