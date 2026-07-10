@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fitness-coach-mobile-web",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location -LiteralPath 'C:\\Users\\saygu\\OneDrive\\Desktop\\Yeni klasör (2)\\fitness-coach-mobile'; $env:PATH += ';C:\\Program Files\\nodejs'; & 'C:\\Program Files\\nodejs\\npx.cmd' expo start --web --port 8090"
+      ],
+      "port": 8090,
+      "autoPort": false
+    }
+  ]
+}
