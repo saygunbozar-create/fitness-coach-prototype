@@ -39,7 +39,7 @@ export default function AppLayout() {
     if (profile?.id && Platform.OS !== 'web') registerPushToken(profile.id);
   }, [profile?.id]);
 
-  if (loading) {
+  if (loading || (!isTrainer && profile && !selectedClientId)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={C.lime} size="large" />

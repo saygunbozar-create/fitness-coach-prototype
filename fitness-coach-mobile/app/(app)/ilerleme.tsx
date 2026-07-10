@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { LineChart } from '../../components/LineChart';
 import { Panel } from '../../components/Panel';
@@ -47,6 +47,7 @@ const MEASURE_FIELDS: { key: 'chest' | 'waist' | 'hip' | 'arm' | 'thigh' | 'calf
 
 export default function IlerlemeScreen() {
   const { profile } = useAuth();
+  const isTrainer = profile?.role === 'trainer';
   const { selectedClientId } = useSelectedClient();
   const clientQuery = useClient(selectedClientId ?? undefined);
   const weightLogsQuery = useWeightLogs(selectedClientId ?? undefined);
@@ -106,11 +107,17 @@ export default function IlerlemeScreen() {
 
   async function pickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      Alert.alert('İzin gerekli', 'Fotoğraf eklemek için galeri izni vermen gerekiyor.');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    uploadPhoto.mutate({ uri: asset.uri, mimeType: asset.mimeType });
+    uploadPhoto.mutate(
+      { uri: asset.uri, mimeType: asset.mimeType },
+      { onError: (e: any) => Alert.alert('Yüklenemedi', e.message ?? 'Fotoğraf yüklenirken bir hata oldu.') }
+    );
   }
 
   return (
@@ -137,19 +144,32 @@ export default function IlerlemeScreen() {
             </View>
           )}
 
-          <View style={styles.formGrid}>
-            {FIELDS.map((f) => (
-              <View key={f.key} style={styles.formItem}>
-                <Stepper
-                  label={f.label}
-                  value={draft[f.key]}
-                  onChange={(d) => setDraft((s) => ({ ...s, [f.key]: Math.min(10, Math.max(1, s[f.key] + d)) }))}
-                  step={1}
-                />
+          {!isTrainer && (
+            <>
+              <View style={styles.formGrid}>
+                {FIELDS.map((f) => (
+                  <View key={f.key} style={styles.formItem}>
+                    <Stepper
+                      label={f.label}
+                      value={draft[f.key]}
+                      onChange={(d) => setDraft((s) => ({ ...s, [f.key]: Math.min(10, Math.max(1, s[f.key] + d)) }))}
+                      step={1}
+                    />
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-          <PrimaryButton label="Bugünün check-in'ini kaydet" loading={saveCheckin.isPending} onPress={() => saveCheckin.mutate(draft)} />
+              <PrimaryButton
+                label="Bugünün check-in'ini kaydet"
+                loading={saveCheckin.isPending}
+                onPress={() =>
+                  saveCheckin.mutate(draft, {
+                    onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Check-in kaydedilemedi.'),
+                  })
+                }
+              />
+            </>
+          )}
+          {isTrainer && !checkin && <Text style={styles.noteText}>Danışan henüz check-in göndermedi.</Text>}
         </Panel>
 
         <Panel title="Sakatlık & Mobilite" right={`${(injuryQuery.data ?? []).length} kayıt`}>
@@ -285,6 +305,10 @@ export default function IlerlemeScreen() {
             label="Bugünün kardiyosunu kaydet"
             loading={logCardio.isPending}
             onPress={() => {
+              if (!selectedClientId) {
+                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                return;
+              }
               const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
               logCardio.mutate(
                 {
@@ -294,7 +318,10 @@ export default function IlerlemeScreen() {
                   steps: Math.round(n(cardioDraft.steps)),
                   calories: n(cardioDraft.calories),
                 },
-                { onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }) }
+                {
+                  onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }),
+                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kardiyo kaydı kaydedilemedi.'),
+                }
               );
             }}
           />
@@ -340,6 +367,10 @@ export default function IlerlemeScreen() {
             label="Bugünün ölçümünü kaydet"
             loading={logMeasurement.isPending}
             onPress={() => {
+              if (!selectedClientId) {
+                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                return;
+              }
               const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
               logMeasurement.mutate(
                 {
@@ -350,7 +381,10 @@ export default function IlerlemeScreen() {
                   thigh: n(measureDraft.thigh),
                   calf: n(measureDraft.calf),
                 },
-                { onSuccess: () => setMeasureDraft({ chest: '', waist: '', hip: '', arm: '', thigh: '', calf: '' }) }
+                {
+                  onSuccess: () => setMeasureDraft({ chest: '', waist: '', hip: '', arm: '', thigh: '', calf: '' }),
+                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Ölçüm kaydedilemedi.'),
+                }
               );
             }}
           />

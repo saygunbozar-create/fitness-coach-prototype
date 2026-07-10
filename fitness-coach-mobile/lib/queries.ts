@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import type {
   CardioLog,
@@ -852,10 +854,12 @@ export function useUploadProgressPhoto(clientId: string | undefined) {
       if (!clientId) throw new Error('clientId eksik');
       const ext = input.mimeType?.split('/')[1] ?? input.uri.split('.').pop() ?? 'jpg';
       const path = `${clientId}/${Date.now()}.${ext}`;
-      const arraybuffer = await fetch(input.uri).then((res) => res.arrayBuffer());
+      // Local file:// URIs are unreliable with fetch().arrayBuffer() on native; read via File instead.
+      const uploadable =
+        Platform.OS === 'web' ? await fetch(input.uri).then((res) => res.arrayBuffer()) : await new File(input.uri).arrayBuffer();
       const { error: uploadErr } = await supabase.storage
         .from('progress-photos')
-        .upload(path, arraybuffer, { contentType: input.mimeType ?? 'image/jpeg' });
+        .upload(path, uploadable, { contentType: input.mimeType ?? 'image/jpeg' });
       if (uploadErr) throw uploadErr;
       const { error } = await supabase
         .from('progress_photos')

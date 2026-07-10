@@ -122,9 +122,16 @@ export default function OdemelerScreen() {
 
   const packages = packagesQuery.data ?? [];
   const currentPackage = packages[0] ?? null;
-  const completedSessionsQuery = useCompletedSessionsSince(selectedClientId ?? undefined, currentPackage?.start_date);
+  // Remaining sessions accumulate across every package ever bought (a new package tops up the pool
+  // instead of replacing what's left of the old one).
+  const totalPurchased = useMemo(() => packages.reduce((a, p) => a + p.total_sessions, 0), [packages]);
+  const earliestStart = useMemo(
+    () => packages.reduce((min: string | undefined, p) => (!min || p.start_date < min ? p.start_date : min), undefined as string | undefined),
+    [packages]
+  );
+  const completedSessionsQuery = useCompletedSessionsSince(selectedClientId ?? undefined, earliestStart);
   const usedSessions = useMemo(() => completedSessionsQuery.data ?? [], [completedSessionsQuery.data]);
-  const remaining = currentPackage ? Math.max(0, currentPackage.total_sessions - usedSessions.length) : 0;
+  const remaining = packages.length ? Math.max(0, totalPurchased - usedSessions.length) : 0;
 
   const days = workoutQuery.data ?? [];
   const activeDay = days.find((d) => d.id === activeDayId) ?? days[0];
@@ -211,10 +218,12 @@ export default function OdemelerScreen() {
         <Panel title="Paket & Seanslar" right={packages.length ? `${packages.length} paket` : undefined}>
           {currentPackage ? (
             <View style={styles.packageSummary}>
-              <Text style={styles.packageName}>{currentPackage.name}</Text>
+              <Text style={styles.packageName}>
+                {packages.length > 1 ? `Son alınan: ${currentPackage.name}` : currentPackage.name}
+              </Text>
               <View style={styles.packageChips}>
                 <View style={styles.packageChip}>
-                  <Text style={styles.packageChipValue}>{currentPackage.total_sessions}</Text>
+                  <Text style={styles.packageChipValue}>{totalPurchased}</Text>
                   <Text style={styles.packageChipLabel}>Toplam</Text>
                 </View>
                 <View style={styles.packageChip}>
