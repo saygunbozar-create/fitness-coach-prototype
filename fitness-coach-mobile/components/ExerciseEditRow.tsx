@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from './AuthField';
 import { C } from '../lib/theme';
 
 export type ExerciseFormValue = { ex: string; grp: string; set_count: number; rep_count: number; kg: number };
+export type ExerciseSuggestion = { name: string; grp: string };
 
 const empty: ExerciseFormValue = { ex: '', grp: '', set_count: 3, rep_count: 10, kg: 0 };
 
@@ -13,12 +14,14 @@ export function ExerciseEditRow({
   onDelete,
   onCancel,
   saving,
+  suggestions,
 }: {
   initial: ExerciseFormValue | null;
   onSave: (value: ExerciseFormValue) => void;
   onDelete?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  suggestions?: ExerciseSuggestion[];
 }) {
   const [form, setForm] = useState<ExerciseFormValue>(initial ?? empty);
 
@@ -27,9 +30,24 @@ export function ExerciseEditRow({
     return Number.isNaN(v) ? 0 : v;
   }
 
+  const matches = useMemo(() => {
+    if (initial || !suggestions || !form.ex.trim()) return [];
+    const q = form.ex.trim().toLowerCase();
+    return suggestions.filter((s) => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q).slice(0, 5);
+  }, [initial, suggestions, form.ex]);
+
   return (
     <View style={styles.card}>
       <AuthField label="Egzersiz" value={form.ex} onChangeText={(v) => setForm((f) => ({ ...f, ex: v }))} placeholder="Ör. Bench Press" />
+      {matches.length > 0 && (
+        <View style={styles.suggestRow}>
+          {matches.map((s) => (
+            <Pressable key={s.name} style={styles.suggestChip} onPress={() => setForm((f) => ({ ...f, ex: s.name, grp: s.grp }))}>
+              <Text style={styles.suggestText}>{s.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <AuthField label="Kas Grubu" value={form.grp} onChangeText={(v) => setForm((f) => ({ ...f, grp: v }))} placeholder="Ör. Göğüs" />
       <View style={styles.row}>
         <View style={styles.third}>
@@ -82,4 +100,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   actionText: { fontSize: 12, fontWeight: '700' },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -8, marginBottom: 10 },
+  suggestChip: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  suggestText: { fontSize: 11, color: C.lime, fontWeight: '600' },
 });

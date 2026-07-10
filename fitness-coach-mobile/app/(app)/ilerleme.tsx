@@ -9,9 +9,14 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { Stepper } from '../../components/Stepper';
 import { useAuth } from '../../lib/auth';
 import {
+  useAddInjuryLog,
+  useCardioLogs,
   useClient,
+  useDeleteInjuryLog,
   useDeleteProgressPhoto,
+  useInjuryLogs,
   useLatestCheckin,
+  useLogCardio,
   useLogMeasurement,
   useMeasurements,
   useProgressPhotos,
@@ -52,9 +57,16 @@ export default function IlerlemeScreen() {
   const photosQuery = useProgressPhotos(selectedClientId ?? undefined);
   const uploadPhoto = useUploadProgressPhoto(selectedClientId ?? undefined);
   const deletePhoto = useDeleteProgressPhoto(selectedClientId ?? undefined);
+  const cardioQuery = useCardioLogs(selectedClientId ?? undefined);
+  const logCardio = useLogCardio(selectedClientId ?? undefined);
+  const injuryQuery = useInjuryLogs(selectedClientId ?? undefined);
+  const addInjury = useAddInjuryLog(selectedClientId ?? undefined);
+  const deleteInjury = useDeleteInjuryLog(selectedClientId ?? undefined);
 
   const [draft, setDraft] = useState({ uyku: 5, enerji: 5, aclik: 5, stres: 5, motivasyon: 5 });
   const [measureDraft, setMeasureDraft] = useState({ chest: '', waist: '', hip: '', arm: '', thigh: '', calf: '' });
+  const [cardioDraft, setCardioDraft] = useState({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
+  const [injuryDraft, setInjuryDraft] = useState({ body_part: '', severity: 3, note: '' });
 
   const client = clientQuery.data;
 
@@ -87,6 +99,10 @@ export default function IlerlemeScreen() {
   const measurements = measurementsQuery.data ?? [];
   const latestMeasurement = measurements[measurements.length - 1];
   const prevMeasurement = measurements[measurements.length - 2];
+
+  const cardioWeek = [...(cardioQuery.data ?? [])].reverse();
+  const maxSteps = Math.max(1, ...cardioWeek.map((c) => c.steps));
+  const avgSteps = cardioWeek.length ? Math.round(cardioWeek.reduce((a, c) => a + c.steps, 0) / cardioWeek.length) : 0;
 
   async function pickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -136,6 +152,60 @@ export default function IlerlemeScreen() {
           <PrimaryButton label="Bugünün check-in'ini kaydet" loading={saveCheckin.isPending} onPress={() => saveCheckin.mutate(draft)} />
         </Panel>
 
+        <Panel title="Sakatlık & Mobilite" right={`${(injuryQuery.data ?? []).length} kayıt`}>
+          {(injuryQuery.data ?? []).length === 0 ? (
+            <Text style={styles.noteText}>Henüz kayıt yok.</Text>
+          ) : (
+            (injuryQuery.data ?? []).map((log) => (
+              <View key={log.id} style={styles.injuryRow}>
+                <View style={[styles.severityDot, { backgroundColor: log.severity >= 7 ? C.red : log.severity >= 4 ? C.orange : C.lime }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.listName}>
+                    {log.body_part} · {log.severity}/10
+                  </Text>
+                  {log.note ? <Text style={styles.listMeta}>{log.note}</Text> : null}
+                  <Text style={styles.listMeta}>{log.date}</Text>
+                </View>
+                <Pressable onPress={() => deleteInjury.mutate(log.id)} hitSlop={8}>
+                  <Text style={styles.listDelete}>Sil</Text>
+                </Pressable>
+              </View>
+            ))
+          )}
+
+          <AuthField
+            label="Bölge"
+            value={injuryDraft.body_part}
+            onChangeText={(v) => setInjuryDraft((s) => ({ ...s, body_part: v }))}
+            placeholder="Ör. Sol Diz"
+          />
+          <View style={styles.severityRow}>
+            <Stepper
+              label="Ağrı Şiddeti"
+              value={injuryDraft.severity}
+              onChange={(d) => setInjuryDraft((s) => ({ ...s, severity: Math.min(10, Math.max(1, s.severity + d)) }))}
+              step={1}
+            />
+          </View>
+          <AuthField
+            label="Not"
+            value={injuryDraft.note}
+            onChangeText={(v) => setInjuryDraft((s) => ({ ...s, note: v }))}
+            placeholder="Ör. Squat sırasında ağrı"
+          />
+          <PrimaryButton
+            label="Kaydet"
+            loading={addInjury.isPending}
+            disabled={!injuryDraft.body_part.trim()}
+            onPress={() =>
+              addInjury.mutate(
+                { body_part: injuryDraft.body_part.trim(), severity: injuryDraft.severity, note: injuryDraft.note.trim() },
+                { onSuccess: () => setInjuryDraft({ body_part: '', severity: 3, note: '' }) }
+              )
+            }
+          />
+        </Panel>
+
         <Panel title="Kilo Projeksiyonu" right="7700 kcal ≈ 1 kg">
           {proj.length > 0 && <LineChart proj={proj} actual={actual} />}
           <View style={styles.chips}>
@@ -150,6 +220,84 @@ export default function IlerlemeScreen() {
               </View>
             ))}
           </View>
+        </Panel>
+
+        <Panel title="Kardiyo & Adım" right={cardioWeek.length ? `Ort. ${nf(avgSteps)} adım` : 'Henüz kayıt yok'}>
+          {cardioWeek.length > 0 && (
+            <View style={styles.ciBars}>
+              {cardioWeek.map((c) => (
+                <View key={c.id} style={styles.ciCol}>
+                  <Text style={styles.stepValue}>{c.steps > 999 ? `${(c.steps / 1000).toFixed(1)}k` : c.steps}</Text>
+                  <View style={[styles.ciBar, { height: `${Math.max(4, (c.steps / maxSteps) * 100)}%`, backgroundColor: C.blue }]} />
+                  <Text style={styles.ciLabel}>{c.date.slice(5)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.formGrid}>
+            <View style={styles.measureFormItem}>
+              <AuthField
+                label="Adım Sayısı"
+                value={cardioDraft.steps}
+                onChangeText={(v) => setCardioDraft((s) => ({ ...s, steps: v }))}
+                keyboardType="number-pad"
+                placeholder="0"
+              />
+            </View>
+            <View style={styles.measureFormItem}>
+              <AuthField
+                label="Kardiyo Türü"
+                value={cardioDraft.cardio_type}
+                onChangeText={(v) => setCardioDraft((s) => ({ ...s, cardio_type: v }))}
+                placeholder="Ör. Koşu"
+              />
+            </View>
+            <View style={styles.measureFormItem}>
+              <AuthField
+                label="Süre (dk)"
+                value={cardioDraft.duration_minutes}
+                onChangeText={(v) => setCardioDraft((s) => ({ ...s, duration_minutes: v }))}
+                keyboardType="decimal-pad"
+                placeholder="0"
+              />
+            </View>
+            <View style={styles.measureFormItem}>
+              <AuthField
+                label="Mesafe (km)"
+                value={cardioDraft.distance_km}
+                onChangeText={(v) => setCardioDraft((s) => ({ ...s, distance_km: v }))}
+                keyboardType="decimal-pad"
+                placeholder="0"
+              />
+            </View>
+            <View style={styles.measureFormItem}>
+              <AuthField
+                label="Kalori"
+                value={cardioDraft.calories}
+                onChangeText={(v) => setCardioDraft((s) => ({ ...s, calories: v }))}
+                keyboardType="decimal-pad"
+                placeholder="0"
+              />
+            </View>
+          </View>
+          <PrimaryButton
+            label="Bugünün kardiyosunu kaydet"
+            loading={logCardio.isPending}
+            onPress={() => {
+              const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
+              logCardio.mutate(
+                {
+                  cardio_type: cardioDraft.cardio_type.trim(),
+                  duration_minutes: n(cardioDraft.duration_minutes),
+                  distance_km: n(cardioDraft.distance_km),
+                  steps: Math.round(n(cardioDraft.steps)),
+                  calories: n(cardioDraft.calories),
+                },
+                { onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }) }
+              );
+            }}
+          />
         </Panel>
 
         <Panel title="Ölçümler" right={latestMeasurement ? `Son: ${latestMeasurement.date}` : 'Henüz kayıt yok'}>
@@ -235,6 +383,7 @@ const styles = StyleSheet.create({
   ciValue: { fontSize: 12, fontWeight: '700', color: C.white, marginBottom: 4 },
   ciBar: { width: '100%', borderTopLeftRadius: 8, borderTopRightRadius: 8 },
   ciLabel: { fontSize: 9, color: C.grey, marginTop: 5, textAlign: 'center' },
+  stepValue: { fontSize: 10, fontWeight: '700', color: C.white, marginBottom: 4 },
   note: { backgroundColor: C.card2, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 14 },
   noteText: { fontSize: 11, color: C.grey },
   formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
@@ -256,4 +405,19 @@ const styles = StyleSheet.create({
   photo: { width: '100%', aspectRatio: 1, borderRadius: 10, backgroundColor: C.card2 },
   photoFallback: { alignItems: 'center', justifyContent: 'center' },
   photoDate: { fontSize: 9, color: C.greyD, marginTop: 3, textAlign: 'center' },
+  injuryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: C.card2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  severityDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  listName: { color: C.white, fontWeight: '700', fontSize: 13 },
+  listMeta: { color: C.greyD, fontSize: 11, marginTop: 2 },
+  listDelete: { color: C.red, fontSize: 11, fontWeight: '700' },
+  severityRow: { width: '48%', marginBottom: 14 },
 });

@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
 
 export function ScreenHeader({ title, clientName, showPill }: { title: string; clientName?: string; showPill?: boolean }) {
   const { signOut } = useAuth();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { paddingTop: insets.top + 12 }]}>
       <View>
         <Text style={styles.brand}>FITNESS COACH</Text>
         <Text style={styles.title}>{title}</Text>
@@ -30,7 +32,7 @@ export function ScreenHeader({ title, clientName, showPill }: { title: string; c
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
   brand: { fontSize: 10, fontWeight: '700', letterSpacing: 3, color: C.greyD },
   title: { fontSize: 19, fontWeight: '800', color: C.white },
   right: { flexDirection: 'row', alignItems: 'center', gap: 10 },

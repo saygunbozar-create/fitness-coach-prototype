@@ -1,14 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabase';
 import type {
+  CardioLog,
   Checkin,
   Client,
+  InjuryLog,
+  LibraryExercise,
+  LibraryFood,
   Meal,
   MealItem,
   MealLog,
   Measurement,
   Payment,
+  PeriodizationPhase,
+  PrLog,
   ProgressPhoto,
+  SessionLog,
+  ShoppingItem,
+  SupplementItem,
   WeightLog,
   WorkoutDay,
   WorkoutExercise,
@@ -299,7 +308,7 @@ export function useDeleteWorkoutDay(clientId: string | undefined) {
   });
 }
 
-export function useAddExercise(clientId: string | undefined) {
+export function useAddExercise(clientId: string | undefined, trainerId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -313,8 +322,28 @@ export function useAddExercise(clientId: string | undefined) {
     }) => {
       const { error } = await supabase.from('workout_exercises').insert(input);
       if (error) throw error;
+      if (trainerId && input.ex.trim()) {
+        await supabase
+          .from('exercise_library')
+          .upsert({ trainer_id: trainerId, name: input.ex.trim(), grp: input.grp }, { onConflict: 'trainer_id,name' });
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workout', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout', clientId] });
+      qc.invalidateQueries({ queryKey: ['exercise_library', trainerId] });
+    },
+  });
+}
+
+export function useExerciseLibrary(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['exercise_library', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('exercise_library').select('*').eq('trainer_id', trainerId).order('name');
+      if (error) throw error;
+      return data as LibraryExercise[];
+    },
+    enabled: !!trainerId,
   });
 }
 
@@ -429,7 +458,7 @@ export function useDeleteMeal(clientId: string | undefined) {
   });
 }
 
-export function useAddMealItem(clientId: string | undefined) {
+export function useAddMealItem(clientId: string | undefined, trainerId?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -445,8 +474,29 @@ export function useAddMealItem(clientId: string | undefined) {
     }) => {
       const { error } = await supabase.from('meal_items').insert(input);
       if (error) throw error;
+      if (trainerId && input.food.trim()) {
+        await supabase.from('food_library').upsert(
+          { trainer_id: trainerId, food: input.food.trim(), unit: input.unit, kcal: input.kcal, p: input.p, k: input.k, y: input.y },
+          { onConflict: 'trainer_id,food' }
+        );
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['meals', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meals', clientId] });
+      qc.invalidateQueries({ queryKey: ['food_library', trainerId] });
+    },
+  });
+}
+
+export function useFoodLibrary(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['food_library', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('food_library').select('*').eq('trainer_id', trainerId).order('food');
+      if (error) throw error;
+      return data as LibraryFood[];
+    },
+    enabled: !!trainerId,
   });
 }
 
@@ -502,6 +552,25 @@ export function useLatestCheckin(clientId: string | undefined) {
   });
 }
 
+export function useCheckinsInRange(clientId: string | undefined, days: number) {
+  return useQuery({
+    queryKey: ['checkins_range', clientId, days],
+    queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const { data, error } = await supabase
+        .from('checkins')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('date', since.toISOString().slice(0, 10))
+        .order('date');
+      if (error) throw error;
+      return data as Checkin[];
+    },
+    enabled: !!clientId,
+  });
+}
+
 export function useSaveCheckin(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -533,9 +602,43 @@ export function usePayments(clientId: string | undefined) {
 export function useAddPayment(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { amount: number; note: string }) => {
+    mutationFn: async (input: { date: string; amount: number; note: string; paid: boolean }) => {
       if (!clientId) throw new Error('clientId eksik');
       const { error } = await supabase.from('payments').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payments', clientId] }),
+  });
+}
+
+export function useUpdatePayment(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; date: string; amount: number; note: string }) => {
+      const { id, ...patch } = input;
+      const { error } = await supabase.from('payments').update(patch).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payments', clientId] }),
+  });
+}
+
+export function useTogglePaymentPaid(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; paid: boolean }) => {
+      const { error } = await supabase.from('payments').update({ paid: input.paid }).eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payments', clientId] }),
+  });
+}
+
+export function useDeletePayment(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('payments').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['payments', clientId] }),
@@ -625,5 +728,283 @@ export function useDeleteProgressPhoto(clientId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['progress_photos', clientId] }),
+  });
+}
+
+// ---------- PR & Güç Takibi ----------
+
+export function usePrLogs(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['pr_logs', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pr_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as PrLog[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddPrLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { exercise: string; weight: number; reps: number }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase
+        .from('pr_logs')
+        .upsert({ client_id: clientId, date: todayStr(), ...input }, { onConflict: 'client_id,exercise,date' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pr_logs', clientId] }),
+  });
+}
+
+export function useDeletePrLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('pr_logs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pr_logs', clientId] }),
+  });
+}
+
+// ---------- Kardiyo & Adım ----------
+
+export function useCardioLogs(clientId: string | undefined, days = 7) {
+  return useQuery({
+    queryKey: ['cardio_logs', clientId, days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cardio_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('date', { ascending: false })
+        .limit(days);
+      if (error) throw error;
+      return data as CardioLog[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useLogCardio(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { cardio_type: string; duration_minutes: number; distance_km: number; steps: number; calories: number }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase
+        .from('cardio_logs')
+        .upsert({ client_id: clientId, date: todayStr(), ...input }, { onConflict: 'client_id,date' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] }),
+  });
+}
+
+// ---------- Takviye Planı ----------
+
+export function useSupplementItems(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['supplement_items', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('supplement_items').select('*').eq('client_id', clientId).order('sort_order');
+      if (error) throw error;
+      return data as SupplementItem[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddSupplementItem(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; dose: string; timing: string; sort_order: number }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('supplement_items').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['supplement_items', clientId] }),
+  });
+}
+
+export function useDeleteSupplementItem(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('supplement_items').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['supplement_items', clientId] }),
+  });
+}
+
+// ---------- Alışveriş Listesi ----------
+
+export function useShoppingItems(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['shopping_items', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('shopping_items').select('*').eq('client_id', clientId).order('sort_order');
+      if (error) throw error;
+      return data as ShoppingItem[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddShoppingItem(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; quantity: string; sort_order: number }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('shopping_items').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shopping_items', clientId] }),
+  });
+}
+
+export function useToggleShoppingItem(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; checked: boolean }) => {
+      const { error } = await supabase.from('shopping_items').update({ checked: input.checked }).eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shopping_items', clientId] }),
+  });
+}
+
+export function useDeleteShoppingItem(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('shopping_items').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shopping_items', clientId] }),
+  });
+}
+
+// ---------- Sakatlık & Mobilite ----------
+
+export function useInjuryLogs(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['injury_logs', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('injury_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as InjuryLog[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddInjuryLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { body_part: string; severity: number; note: string }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('injury_logs').insert({ client_id: clientId, date: todayStr(), ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['injury_logs', clientId] }),
+  });
+}
+
+export function useDeleteInjuryLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('injury_logs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['injury_logs', clientId] }),
+  });
+}
+
+// ---------- Periyodizasyon ----------
+
+export function usePeriodizationPhases(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['periodization_phases', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('periodization_phases')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('start_date', { ascending: false });
+      if (error) throw error;
+      return data as PeriodizationPhase[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddPeriodizationPhase(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; start_date: string; end_date: string | null; note: string }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('periodization_phases').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['periodization_phases', clientId] }),
+  });
+}
+
+export function useDeletePeriodizationPhase(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('periodization_phases').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['periodization_phases', clientId] }),
+  });
+}
+
+// ---------- Seans Takvimi ----------
+
+export function useSessionLogs(clientId: string | undefined, days = 14) {
+  return useQuery({
+    queryKey: ['session_logs', clientId, days],
+    queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const { data, error } = await supabase
+        .from('session_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('date', since.toISOString().slice(0, 10))
+        .order('date');
+      if (error) throw error;
+      return data as SessionLog[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useSetSessionStatus(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { date: string; status: 'tamamlandi' | 'atlandi'; workout_day_id: string | null }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase
+        .from('session_logs')
+        .upsert({ client_id: clientId, ...input }, { onConflict: 'client_id,date' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['session_logs', clientId] }),
   });
 }

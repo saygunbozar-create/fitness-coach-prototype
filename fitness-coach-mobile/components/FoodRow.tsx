@@ -1,9 +1,19 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { C, nf } from '../lib/theme';
 
 export type MealItem = { food: string; qty: number; kcal: number; p: number; k: number; y: number };
 
 export function FoodRow({ item, onChange }: { item: MealItem; onChange: (delta: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(String(item.qty));
+
+  function commit() {
+    setEditing(false);
+    const parsed = parseFloat(text.replace(',', '.'));
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed !== item.qty) onChange(parsed - item.qty);
+  }
+
   return (
     <View style={styles.row}>
       <View style={styles.info}>
@@ -18,7 +28,22 @@ export function FoodRow({ item, onChange }: { item: MealItem; onChange: (delta: 
         <Pressable onPress={() => onChange(-0.5)} hitSlop={8}>
           <Text style={[styles.btn, { color: C.grey }]}>−</Text>
         </Pressable>
-        <Text style={styles.qtyValue}>{item.qty}</Text>
+        {editing ? (
+          <TextInput
+            style={styles.qtyInput}
+            value={text}
+            onChangeText={setText}
+            onBlur={commit}
+            onSubmitEditing={commit}
+            keyboardType="decimal-pad"
+            autoFocus
+            selectTextOnFocus
+          />
+        ) : (
+          <Pressable onPress={() => { setText(String(item.qty)); setEditing(true); }}>
+            <Text style={styles.qtyValue}>{item.qty}</Text>
+          </Pressable>
+        )}
         <Pressable onPress={() => onChange(0.5)} hitSlop={8}>
           <Text style={[styles.btn, { color: C.lime }]}>+</Text>
         </Pressable>
@@ -57,4 +82,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   qtyValue: { fontSize: 13, fontWeight: '700', color: C.lime, minWidth: 26, textAlign: 'center' },
+  qtyInput: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.lime,
+    minWidth: 26,
+    textAlign: 'center',
+    padding: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lime,
+  },
 });

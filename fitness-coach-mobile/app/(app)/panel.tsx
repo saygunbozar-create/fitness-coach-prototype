@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Ring } from '../../components/Ring';
@@ -7,11 +7,26 @@ import { LineChart } from '../../components/LineChart';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { AuthField } from '../../components/AuthField';
 import { useAuth } from '../../lib/auth';
-import { useClient, useLogWeight, useMeals, useWeightLogs, useWorkout } from '../../lib/queries';
+import {
+  useCheckinsInRange,
+  useClient,
+  useLogWeight,
+  useMeals,
+  usePayments,
+  usePrLogs,
+  useSessionLogs,
+  useWeightLogs,
+  useWorkout,
+} from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
 
 const WEEKS = 12;
+const REPORT_PERIODS = [
+  { label: 'Haftalık', days: 7 },
+  { label: 'Aylık', days: 30 },
+  { label: 'Yıl Sonu', days: 365 },
+];
 
 export default function PanelScreen() {
   const { profile } = useAuth();
@@ -20,8 +35,13 @@ export default function PanelScreen() {
   const workoutQuery = useWorkout(selectedClientId ?? undefined);
   const mealsQuery = useMeals(selectedClientId ?? undefined);
   const weightLogsQuery = useWeightLogs(selectedClientId ?? undefined);
+  const prLogsQuery = usePrLogs(selectedClientId ?? undefined);
+  const paymentsQuery = usePayments(selectedClientId ?? undefined);
   const logWeight = useLogWeight(selectedClientId ?? undefined);
   const [weightInput, setWeightInput] = useState('');
+  const [reportDays, setReportDays] = useState(7);
+  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined, reportDays);
+  const checkinsRangeQuery = useCheckinsInRange(selectedClientId ?? undefined, reportDays);
 
   const client = clientQuery.data;
 
@@ -49,6 +69,31 @@ export default function PanelScreen() {
     return logs.length ? logs.map((l) => l.weight) : [client.start_weight];
   }, [weightLogsQuery.data, client]);
 
+  const report = useMemo(() => {
+    const since = new Date();
+    since.setDate(since.getDate() - reportDays);
+    const sinceStr = since.toISOString().slice(0, 10);
+
+    const weightsInRange = (weightLogsQuery.data ?? []).filter((l) => l.date >= sinceStr);
+    const weightChange = weightsInRange.length >= 2 ? weightsInRange[weightsInRange.length - 1].weight - weightsInRange[0].weight : 0;
+
+    const paymentsInRange = (paymentsQuery.data ?? []).filter((p) => p.date >= sinceStr);
+    const totalPaid = paymentsInRange.reduce((a, p) => a + p.amount, 0);
+
+    const prsInRange = (prLogsQuery.data ?? []).filter((p) => p.date >= sinceStr).length;
+
+    const sessions = sessionLogsQuery.data ?? [];
+    const completed = sessions.filter((s) => s.status === 'tamamlandi').length;
+    const skipped = sessions.filter((s) => s.status === 'atlandi').length;
+
+    const checkins = checkinsRangeQuery.data ?? [];
+    const avgMood = checkins.length
+      ? checkins.reduce((a, c) => a + (c.uyku + c.enerji + c.motivasyon - c.stres - c.aclik) / 5, 0) / checkins.length
+      : null;
+
+    return { weightChange, totalPaid, prsInRange, completed, skipped, avgMood, weightEntries: weightsInRange.length };
+  }, [reportDays, weightLogsQuery.data, paymentsQuery.data, prLogsQuery.data, sessionLogsQuery.data, checkinsRangeQuery.data]);
+
   if (clientQuery.isLoading || !client) {
     return (
       <View style={styles.loading}>
@@ -60,6 +105,8 @@ export default function PanelScreen() {
   const currentWeight = actual[actual.length - 1] ?? client.start_weight;
   const diff = currentWeight - client.start_weight;
   const pct = client.kcal_target > 0 ? (kcalToday / client.kcal_target) * 100 : 0;
+  const prLogs = prLogsQuery.data ?? [];
+  const bestPr = prLogs.length ? Math.max(...prLogs.map((l) => l.weight)) : client.pr;
 
   return (
     <View style={styles.flex}>
@@ -71,7 +118,7 @@ export default function PanelScreen() {
               ['Antrenman Günü', `${kpis.days} gün`],
               ['Toplam Set', String(kpis.sets)],
               ['Haftalık Hacim', `${nf(kpis.vol)} kg`],
-              ['En Yüksek 1RM', `${nf(client.pr, 1)} kg`],
+              ['En Yüksek 1RM', `${nf(bestPr, 1)} kg`],
             ].map(([l, v]) => (
               <View key={l} style={styles.kpi}>
                 <Text style={styles.kpiLabel}>{l}</Text>
@@ -137,6 +184,35 @@ export default function PanelScreen() {
             }}
           />
         </Panel>
+
+        <Panel title="Rapor" right={REPORT_PERIODS.find((p) => p.days === reportDays)?.label}>
+          <View style={styles.periodRow}>
+            {REPORT_PERIODS.map((p) => (
+              <Pressable
+                key={p.days}
+                onPress={() => setReportDays(p.days)}
+                style={[styles.periodBtn, reportDays === p.days && { backgroundColor: C.lime, borderColor: C.lime }]}
+              >
+                <Text style={[styles.periodBtnText, reportDays === p.days && { color: C.bg }]}>{p.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.kpiGrid}>
+            {[
+              ['Kilo Değişimi', report.weightEntries >= 2 ? `${report.weightChange > 0 ? '+' : ''}${nf(report.weightChange, 1)} kg` : '—'],
+              ['Tamamlanan Seans', String(report.completed)],
+              ['Atlanan Seans', String(report.skipped)],
+              ['Yeni PR', String(report.prsInRange)],
+              ['Toplam Ödeme', `${nf(report.totalPaid)} ₺`],
+              ['Ort. Ruh Hali', report.avgMood != null ? nf(report.avgMood, 1) : '—'],
+            ].map(([l, v]) => (
+              <View key={l} style={styles.kpi}>
+                <Text style={styles.kpiLabel}>{l}</Text>
+                <Text style={styles.kpiValue}>{v}</Text>
+              </View>
+            ))}
+          </View>
+        </Panel>
       </ScrollView>
     </View>
   );
@@ -164,4 +240,7 @@ const styles = StyleSheet.create({
   legendSwatchDashed: { width: 16, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: C.greyD },
   legendText: { fontSize: 11, color: C.grey },
   logRow: { flexDirection: 'row', gap: 10 },
+  periodRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
+  periodBtnText: { fontSize: 12, fontWeight: '700', color: C.grey },
 });

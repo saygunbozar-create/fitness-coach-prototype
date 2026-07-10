@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from './AuthField';
 import { C } from '../lib/theme';
@@ -13,6 +13,8 @@ export type MealItemFormValue = {
   default_qty: number;
 };
 
+export type FoodSuggestion = { food: string; unit: string; kcal: number; p: number; k: number; y: number };
+
 const empty: MealItemFormValue = { food: '', unit: 'porsiyon', kcal: 0, p: 0, k: 0, y: 0, default_qty: 1 };
 
 export function MealItemEditRow({
@@ -21,12 +23,14 @@ export function MealItemEditRow({
   onDelete,
   onCancel,
   saving,
+  suggestions,
 }: {
   initial: MealItemFormValue | null;
   onSave: (value: MealItemFormValue) => void;
   onDelete?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  suggestions?: FoodSuggestion[];
 }) {
   const [form, setForm] = useState<MealItemFormValue>(initial ?? empty);
 
@@ -35,9 +39,28 @@ export function MealItemEditRow({
     return Number.isNaN(v) ? 0 : v;
   }
 
+  const matches = useMemo(() => {
+    if (initial || !suggestions || !form.food.trim()) return [];
+    const q = form.food.trim().toLowerCase();
+    return suggestions.filter((s) => s.food.toLowerCase().includes(q) && s.food.toLowerCase() !== q).slice(0, 5);
+  }, [initial, suggestions, form.food]);
+
   return (
     <View style={styles.card}>
       <AuthField label="Besin" value={form.food} onChangeText={(v) => setForm((f) => ({ ...f, food: v }))} placeholder="Ör. Yulaf Ezmesi 60 g" />
+      {matches.length > 0 && (
+        <View style={styles.suggestRow}>
+          {matches.map((s) => (
+            <Pressable
+              key={s.food}
+              style={styles.suggestChip}
+              onPress={() => setForm((f) => ({ ...f, food: s.food, unit: s.unit, kcal: s.kcal, p: s.p, k: s.k, y: s.y }))}
+            >
+              <Text style={styles.suggestText}>{s.food}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <View style={styles.row}>
         <View style={styles.half}>
           <AuthField label="Birim" value={form.unit} onChangeText={(v) => setForm((f) => ({ ...f, unit: v }))} placeholder="porsiyon" />
@@ -96,4 +119,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   actionText: { fontSize: 12, fontWeight: '700' },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -8, marginBottom: 10 },
+  suggestChip: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  suggestText: { fontSize: 11, color: C.lime, fontWeight: '600' },
 });

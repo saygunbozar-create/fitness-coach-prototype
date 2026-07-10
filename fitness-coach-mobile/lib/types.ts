@@ -77,7 +77,7 @@ export type Checkin = {
   motivasyon: number;
 };
 
-export type Payment = { id: string; client_id: string; date: string; amount: number; note: string };
+export type Payment = { id: string; client_id: string; date: string; amount: number; note: string; paid: boolean };
 
 export type Measurement = {
   id: string;
@@ -92,3 +92,44 @@ export type Measurement = {
 };
 
 export type ProgressPhoto = { id: string; client_id: string; date: string; storage_path: string; note: string };
+
+export type PrLog = { id: string; client_id: string; exercise: string; date: string; weight: number; reps: number };
+
+export type SupplementItem = { id: string; client_id: string; name: string; dose: string; timing: string; sort_order: number };
+
+export type ShoppingItem = { id: string; client_id: string; name: string; quantity: string; checked: boolean; sort_order: number };
+
+export type InjuryLog = { id: string; client_id: string; date: string; body_part: string; severity: number; note: string };
+
+export type LibraryExercise = { id: string; trainer_id: string; name: string; grp: string };
+
+export type LibraryFood = { id: string; trainer_id: string; food: string; unit: string; kcal: number; p: number; k: number; y: number };
+
+export type PeriodizationPhase = {
+  id: string;
+  client_id: string;
+  name: string;
+  start_date: string;
+  end_date: string | null;
+  note: string;
+};
+
+export type SessionLog = {
+  id: string;
+  client_id: string;
+  date: string;
+  workout_day_id: string | null;
+  status: 'tamamlandi' | 'atlandi';
+  note: string;
+};
+
+export type CardioLog = {
+  id: string;
+  client_id: string;
+  date: string;
+  cardio_type: string;
+  duration_minutes: number;
+  distance_km: number;
+  steps: number;
+  calories: number;
+};
