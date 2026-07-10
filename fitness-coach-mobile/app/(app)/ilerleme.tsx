@@ -186,7 +186,10 @@ export default function IlerlemeScreen() {
                   {log.note ? <Text style={styles.listMeta}>{log.note}</Text> : null}
                   <Text style={styles.listMeta}>{log.date}</Text>
                 </View>
-                <Pressable onPress={() => deleteInjury.mutate(log.id)} hitSlop={8}>
+                <Pressable
+                  onPress={() => deleteInjury.mutate(log.id, { onError: (e: any) => Alert.alert('Silinemedi', e.message ?? 'Kayıt silinemedi.') })}
+                  hitSlop={8}
+                >
                   <Text style={styles.listDelete}>Sil</Text>
                 </Pressable>
               </View>
@@ -396,7 +399,11 @@ export default function IlerlemeScreen() {
           </Pressable>
           <View style={styles.photoGrid}>
             {(photosQuery.data ?? []).map((p: any) => (
-              <Pressable key={p.id} style={styles.photoWrap} onLongPress={() => deletePhoto.mutate(p)}>
+              <Pressable
+                key={p.id}
+                style={styles.photoWrap}
+                onLongPress={() => deletePhoto.mutate(p, { onError: (e: any) => Alert.alert('Silinemedi', e.message ?? 'Fotoğraf silinemedi.') })}
+              >
                 {p.url ? <Image source={{ uri: p.url }} style={styles.photo} /> : <View style={[styles.photo, styles.photoFallback]} />}
                 <Text style={styles.photoDate}>{p.date}</Text>
               </Pressable>
