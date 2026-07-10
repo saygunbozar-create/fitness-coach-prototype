@@ -7,11 +7,13 @@ export function ClientCard({
   active,
   onPress,
   onLongPress,
+  onEdit,
 }: {
   client: Client;
   active: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  onEdit?: () => void;
 }) {
   const isActive = client.status === 'active';
   return (
@@ -28,6 +30,11 @@ export function ClientCard({
       <View style={[styles.status, { backgroundColor: isActive ? 'rgba(198,249,78,.12)' : 'rgba(251,176,64,.12)' }]}>
         <Text style={[styles.statusText, { color: isActive ? C.lime : C.orange }]}>{isActive ? 'Aktif' : 'Bekliyor'}</Text>
       </View>
+      {onEdit && (
+        <Pressable style={styles.editBtn} onPress={onEdit} hitSlop={8}>
+          <Text style={styles.editBtnText}>✎</Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -60,4 +67,15 @@ const styles = StyleSheet.create({
   goal: { fontSize: 11, color: C.grey },
   status: { borderRadius: 99, paddingHorizontal: 11, paddingVertical: 5 },
   statusText: { fontSize: 11, fontWeight: '700' },
+  editBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.card2,
+    borderWidth: 1,
+    borderColor: C.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editBtnText: { fontSize: 13, color: C.lime },
 });

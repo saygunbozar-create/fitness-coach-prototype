@@ -181,6 +181,33 @@ export function useAddClient(trainerId: string | undefined) {
   });
 }
 
+export function useUpdateClient(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      name: string;
+      email: string;
+      goal: string;
+      start_weight: number;
+      kcal_target: number;
+      tdee: number;
+      macro_p: number;
+      macro_k: number;
+      macro_y: number;
+      pr: number;
+    }) => {
+      const { id, ...patch } = input;
+      const { error } = await supabase.from('clients').update(patch).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ['clients', trainerId] });
+      qc.invalidateQueries({ queryKey: ['client', input.id] });
+    },
+  });
+}
+
 export function useDeleteClient(trainerId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({

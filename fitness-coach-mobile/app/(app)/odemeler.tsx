@@ -4,6 +4,7 @@ import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
+import { useAuth } from '../../lib/auth';
 import {
   useAddPackage,
   useAddPayment,
@@ -80,6 +81,8 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
 }
 
 export default function OdemelerScreen() {
+  const { profile } = useAuth();
+  const isTrainer = profile?.role === 'trainer';
   const { selectedClientId } = useSelectedClient();
   const clientQuery = useClient(selectedClientId ?? undefined);
   const paymentsQuery = usePayments(selectedClientId ?? undefined);
@@ -164,7 +167,7 @@ export default function OdemelerScreen() {
   }
 
   function renderRow(p: Payment) {
-    if (editingId === p.id) {
+    if (isTrainer && editingId === p.id) {
       return (
         <EditPaymentForm
           key={p.id}
@@ -177,19 +180,25 @@ export default function OdemelerScreen() {
     }
     return (
       <View key={p.id} style={styles.row}>
-        <Pressable style={{ flex: 1 }} onPress={() => setEditingId(p.id)}>
+        <Pressable style={{ flex: 1 }} disabled={!isTrainer} onPress={() => setEditingId(p.id)}>
           <Text style={styles.rowAmount}>{nf(p.amount)} ₺</Text>
           {p.note ? <Text style={styles.rowNote}>{p.note}</Text> : null}
-          <Text style={styles.rowEditHint}>Düzenlemek için dokun</Text>
+          {isTrainer && <Text style={styles.rowEditHint}>Düzenlemek için dokun</Text>}
         </Pressable>
         <View style={styles.rowRight}>
           <Text style={styles.rowDate}>{formatTrDate(p.date)}</Text>
-          <Pressable onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid })}>
+          {isTrainer ? (
+            <Pressable onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid })}>
+              <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
+            </Pressable>
+          ) : (
             <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
-          </Pressable>
-          <Pressable onPress={() => deletePayment.mutate(p.id)} hitSlop={8}>
-            <Text style={styles.rowDelete}>Sil</Text>
-          </Pressable>
+          )}
+          {isTrainer && (
+            <Pressable onPress={() => deletePayment.mutate(p.id)} hitSlop={8}>
+              <Text style={styles.rowDelete}>Sil</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -197,7 +206,7 @@ export default function OdemelerScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Paket ve Ödemeler" clientName={clientQuery.data.name} showPill />
+      <ScreenHeader title="Paket ve Ödemeler" clientName={clientQuery.data.name} showPill={isTrainer} />
       <ScrollView contentContainerStyle={styles.content}>
         <Panel title="Paket & Seanslar" right={packages.length ? `${packages.length} paket` : undefined}>
           {currentPackage ? (
@@ -223,9 +232,11 @@ export default function OdemelerScreen() {
                   <Text style={styles.usedDatesValue}>{usedSessions.map((s) => s.date).join(', ')}</Text>
                 </View>
               )}
-              <Pressable onPress={() => deletePackage.mutate(currentPackage.id)} hitSlop={8}>
-                <Text style={styles.rowDelete}>Bu paketi sil</Text>
-              </Pressable>
+              {isTrainer && (
+                <Pressable onPress={() => deletePackage.mutate(currentPackage.id)} hitSlop={8}>
+                  <Text style={styles.rowDelete}>Bu paketi sil</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <Text style={styles.empty}>Henüz bir paket tanımlanmadı.</Text>
@@ -239,21 +250,23 @@ export default function OdemelerScreen() {
                   <Text style={styles.oldPackageText}>
                     {p.name} · {p.total_sessions} seans · {p.start_date}
                   </Text>
-                  <Pressable onPress={() => deletePackage.mutate(p.id)} hitSlop={8}>
-                    <Text style={styles.rowDelete}>Sil</Text>
-                  </Pressable>
+                  {isTrainer && (
+                    <Pressable onPress={() => deletePackage.mutate(p.id)} hitSlop={8}>
+                      <Text style={styles.rowDelete}>Sil</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </View>
           )}
 
-          {!addingPackage && (
+          {isTrainer && !addingPackage && (
             <Pressable style={styles.addPackageBtn} onPress={() => setAddingPackage(true)}>
               <Text style={styles.addPackageBtnText}>+ Yeni Paket Ekle</Text>
             </Pressable>
           )}
 
-          {addingPackage && (
+          {isTrainer && addingPackage && (
             <View style={styles.packageForm}>
               <AuthField label="Paket Adı" value={packageDraft.name} onChangeText={(v) => setPackageDraft((s) => ({ ...s, name: v }))} placeholder="Ör. 12 Seanslık Paket" />
               <AuthField
@@ -282,7 +295,7 @@ export default function OdemelerScreen() {
         </Panel>
 
         <Panel title="Seans Takvimi" right="Son 14 gün">
-          {days.length > 0 && (
+          {isTrainer && days.length > 0 && (
             <>
               <Text style={styles.dayPickLabel}>İşaretlerken hangi program uygulandı?</Text>
               <View style={styles.dayPickRow}>
@@ -306,6 +319,7 @@ export default function OdemelerScreen() {
                 <Pressable
                   key={d}
                   style={[styles.calendarDay, { borderColor: color, backgroundColor: session ? `${color}22` : C.card2 }]}
+                  disabled={!isTrainer}
                   onPress={() => {
                     if (!session) {
                       setSessionStatus.mutate({ date: d, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null });
@@ -330,7 +344,7 @@ export default function OdemelerScreen() {
               <View style={[styles.legendDot, { backgroundColor: C.red }]} />
               <Text style={styles.legendText}>Atlandı</Text>
             </View>
-            <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>
+            {isTrainer && <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>}
           </View>
         </Panel>
 
@@ -339,18 +353,20 @@ export default function OdemelerScreen() {
           {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
         </Panel>
 
-        <Panel title="Yeni Ödeme Ekle" right="geçmiş veya ileri tarihli olabilir">
-          <AuthField
-            label="Tarih (GG.AA.YYYY, boş = bugün)"
-            value={date}
-            onChangeText={(v) => { setDate(v); setDateError(false); }}
-            placeholder="Ör. 10.05.2026"
-          />
-          {dateError && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir (Ör. 10.05.2026)</Text>}
-          <AuthField label="Tutar (₺)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="Ör. 3000" />
-          <AuthField label="Not (paket, ay vb.)" value={note} onChangeText={setNote} placeholder="Ör. Haziran paketi" />
-          <PrimaryButton label="Ödeme Ekle" loading={addPayment.isPending} disabled={!amount} onPress={submit} />
-        </Panel>
+        {isTrainer && (
+          <Panel title="Yeni Ödeme Ekle" right="geçmiş veya ileri tarihli olabilir">
+            <AuthField
+              label="Tarih (GG.AA.YYYY, boş = bugün)"
+              value={date}
+              onChangeText={(v) => { setDate(v); setDateError(false); }}
+              placeholder="Ör. 10.05.2026"
+            />
+            {dateError && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir (Ör. 10.05.2026)</Text>}
+            <AuthField label="Tutar (₺)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="Ör. 3000" />
+            <AuthField label="Not (paket, ay vb.)" value={note} onChangeText={setNote} placeholder="Ör. Haziran paketi" />
+            <PrimaryButton label="Ödeme Ekle" loading={addPayment.isPending} disabled={!amount} onPress={submit} />
+          </Panel>
+        )}
 
         <Panel title="Yaklaşan Ödemeler" right={`${upcoming.length} kayıt`}>
           {upcoming.length === 0 ? <Text style={styles.empty}>Planlı ödeme yok.</Text> : upcoming.map(renderRow)}

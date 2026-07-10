@@ -7,9 +7,10 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { useAddClient, useClients, useDeleteClient } from '../../lib/queries';
+import { useAddClient, useClients, useDeleteClient, useUpdateClient } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
+import type { Client } from '../../lib/types';
 
 const GOALS = ['Yağ Yakımı', 'Kas Kazanımı'];
 
@@ -26,20 +27,44 @@ const emptyForm = {
   pr: '',
 };
 
+function clientToForm(c: Client) {
+  return {
+    name: c.name,
+    email: c.email,
+    goal: c.goal,
+    start_weight: String(c.start_weight),
+    kcal_target: String(c.kcal_target),
+    tdee: String(c.tdee),
+    macro_p: String(c.macro_p),
+    macro_k: String(c.macro_k),
+    macro_y: String(c.macro_y),
+    pr: String(c.pr),
+  };
+}
+
 export default function DanisanScreen() {
   const { profile } = useAuth();
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const clientsQuery = useClients(profile?.id);
   const addClient = useAddClient(profile?.id);
+  const updateClient = useUpdateClient(profile?.id);
   const deleteClient = useDeleteClient(profile?.id);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
 
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const clients = clientsQuery.data ?? [];
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setEdit<K extends keyof typeof editForm>(key: K, value: string) {
+    setEditForm((f) => ({ ...f, [key]: value }));
   }
 
   async function onSubmit() {
@@ -69,11 +94,46 @@ export default function DanisanScreen() {
     }
   }
 
+  function startEdit(c: Client) {
+    setEditingClientId(c.id);
+    setEditForm(clientToForm(c));
+    setEditError(null);
+    setShowForm(false);
+  }
+
+  async function onEditSubmit() {
+    if (!editingClientId) return;
+    setEditError(null);
+    const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
+    if (!editForm.name.trim() || !editForm.email.trim()) {
+      setEditError('Ad ve e-posta zorunlu.');
+      return;
+    }
+    try {
+      await updateClient.mutateAsync({
+        id: editingClientId,
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        goal: editForm.goal,
+        start_weight: n(editForm.start_weight),
+        kcal_target: n(editForm.kcal_target),
+        tdee: n(editForm.tdee),
+        macro_p: n(editForm.macro_p),
+        macro_k: n(editForm.macro_k),
+        macro_y: n(editForm.macro_y),
+        pr: n(editForm.pr),
+      });
+      setEditingClientId(null);
+    } catch (e: any) {
+      setEditError(e.message ?? 'Danışan güncellenemedi.');
+    }
+  }
+
   return (
     <View style={styles.flex}>
       <ScreenHeader title="Danışan" />
       <ScrollView contentContainerStyle={styles.content}>
-        {clients.length > 0 && <Text style={styles.hint}>Bir danışanı silmek için karta uzun bas.</Text>}
+        {clients.length > 0 && <Text style={styles.hint}>Bir danışanı silmek için karta uzun bas, düzenlemek için ✎ ikonuna dokun.</Text>}
 
         {clientsQuery.isLoading ? (
           <ActivityIndicator color={C.lime} />
@@ -87,6 +147,7 @@ export default function DanisanScreen() {
                 setSelectedClientId(c.id);
                 router.push('/(app)/panel');
               }}
+              onEdit={() => startEdit(c)}
               onLongPress={() =>
                 Alert.alert(
                   'Danışanı Sil',
@@ -101,7 +162,39 @@ export default function DanisanScreen() {
           ))
         )}
 
-        {showForm ? (
+        {editingClientId ? (
+          <Panel title="Danışanı Düzenle" right="bilgileri güncelle">
+            <AuthField label="Ad Soyad" value={editForm.name} onChangeText={(v) => setEdit('name', v)} placeholder="Ör. Mert K." />
+            <AuthField label="E-posta" value={editForm.email} onChangeText={(v) => setEdit('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
+
+            <Text style={styles.label}>Hedef</Text>
+            <View style={styles.goalRow}>
+              {GOALS.map((g) => (
+                <Pressable key={g} onPress={() => setEdit('goal', g)} style={[styles.goalPill, editForm.goal === g && styles.goalPillActive]}>
+                  <Text style={[styles.goalPillText, editForm.goal === g && { color: C.bg }]}>{g}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <AuthField label="Başlangıç Kilosu (kg)" value={editForm.start_weight} onChangeText={(v) => setEdit('start_weight', v)} keyboardType="decimal-pad" />
+            <AuthField label="Kalori Hedefi (kcal)" value={editForm.kcal_target} onChangeText={(v) => setEdit('kcal_target', v)} keyboardType="decimal-pad" />
+            <AuthField label="TDEE (kcal)" value={editForm.tdee} onChangeText={(v) => setEdit('tdee', v)} keyboardType="decimal-pad" />
+            <AuthField label="Protein Hedefi (g)" value={editForm.macro_p} onChangeText={(v) => setEdit('macro_p', v)} keyboardType="decimal-pad" />
+            <AuthField label="Karbonhidrat Hedefi (g)" value={editForm.macro_k} onChangeText={(v) => setEdit('macro_k', v)} keyboardType="decimal-pad" />
+            <AuthField label="Yağ Hedefi (g)" value={editForm.macro_y} onChangeText={(v) => setEdit('macro_y', v)} keyboardType="decimal-pad" />
+            <AuthField label="Mevcut PR (kg)" value={editForm.pr} onChangeText={(v) => setEdit('pr', v)} keyboardType="decimal-pad" />
+
+            {editError ? <Text style={styles.error}>{editError}</Text> : null}
+            <View style={styles.rowGap}>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton label="Kaydet" onPress={onEditSubmit} loading={updateClient.isPending} />
+              </View>
+              <Pressable style={styles.cancelBtn} onPress={() => setEditingClientId(null)}>
+                <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              </Pressable>
+            </View>
+          </Panel>
+        ) : showForm ? (
           <Panel title="Yeni Danışan" right="e-posta ile davet">
             <AuthField label="Ad Soyad" value={form.name} onChangeText={(v) => set('name', v)} placeholder="Ör. Mert K." />
             <AuthField label="E-posta" value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
@@ -148,4 +241,7 @@ const styles = StyleSheet.create({
   goalPillActive: { backgroundColor: C.lime, borderColor: C.lime },
   goalPillText: { fontSize: 12, fontWeight: '700', color: C.grey },
   error: { color: C.red, fontSize: 12, marginBottom: 12 },
+  rowGap: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  cancelBtn: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
+  cancelBtnText: { fontSize: 13, fontWeight: '700', color: C.grey },
 });

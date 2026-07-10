@@ -1,7 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../lib/auth';
+import { registerPushToken } from '../../lib/notifications';
 import { useClientByProfile, useClients } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
@@ -33,6 +34,10 @@ export default function AppLayout() {
       setSelectedClientId(ownClientQuery.data.id);
     }
   }, [isTrainer, ownClientQuery.data, selectedClientId, setSelectedClientId]);
+
+  useEffect(() => {
+    if (profile?.id && Platform.OS !== 'web') registerPushToken(profile.id);
+  }, [profile?.id]);
 
   if (loading) {
     return (
@@ -97,7 +102,6 @@ export default function AppLayout() {
         name="odemeler"
         options={{
           title: 'Ödemeler',
-          href: isTrainer ? undefined : null,
           tabBarIcon: ({ focused }) => <TabIcon glyph="₺" focused={focused} />,
           tabBarLabel: ({ focused }) => <TabLabel text="Ödemeler" focused={focused} />,
         }}

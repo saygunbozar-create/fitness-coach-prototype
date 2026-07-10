@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { supabase } from './supabase';
 
 const PREFS_KEY = 'water_reminder_prefs';
 const NOTIFICATION_IDS_KEY = 'water_reminder_notification_ids';
@@ -82,4 +84,21 @@ export async function disableWaterReminder() {
   await cancelScheduled();
   const prefs = await getWaterReminderPrefs();
   await setWaterReminderPrefs({ ...prefs, enabled: false });
+}
+
+export async function registerPushToken(profileId: string) {
+  if (Platform.OS === 'web') return;
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let status = existing;
+  if (status !== 'granted') {
+    const req = await Notifications.requestPermissionsAsync();
+    status = req.status;
+  }
+  if (status !== 'granted') return;
+
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+  if (tokenResponse.data) {
+    await supabase.from('profiles').update({ push_token: tokenResponse.data }).eq('id', profileId);
+  }
 }
