@@ -4,7 +4,18 @@ import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { useAddPayment, useClient, useDeletePayment, usePayments, useTogglePaymentPaid, useUpdatePayment } from '../../lib/queries';
+import {
+  useAddPackage,
+  useAddPayment,
+  useClient,
+  useCompletedSessionsSince,
+  useDeletePackage,
+  useDeletePayment,
+  usePackages,
+  usePayments,
+  useTogglePaymentPaid,
+  useUpdatePayment,
+} from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
 import type { Payment } from '../../lib/types';
@@ -72,12 +83,17 @@ export default function OdemelerScreen() {
   const updatePayment = useUpdatePayment(selectedClientId ?? undefined);
   const togglePaid = useTogglePaymentPaid(selectedClientId ?? undefined);
   const deletePayment = useDeletePayment(selectedClientId ?? undefined);
+  const packagesQuery = usePackages(selectedClientId ?? undefined);
+  const addPackage = useAddPackage(selectedClientId ?? undefined);
+  const deletePackage = useDeletePackage(selectedClientId ?? undefined);
 
   const [date, setDate] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [dateError, setDateError] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [addingPackage, setAddingPackage] = useState(false);
+  const [packageDraft, setPackageDraft] = useState({ name: '', total_sessions: '', note: '' });
 
   const payments = paymentsQuery.data ?? [];
   const totalPaid = useMemo(() => payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0), [payments]);
@@ -91,6 +107,12 @@ export default function OdemelerScreen() {
     () => payments.filter((p) => p.paid).sort((a, b) => b.date.localeCompare(a.date)),
     [payments]
   );
+
+  const packages = packagesQuery.data ?? [];
+  const currentPackage = packages[0] ?? null;
+  const completedSessionsQuery = useCompletedSessionsSince(selectedClientId ?? undefined, currentPackage?.start_date);
+  const usedSessions = useMemo(() => completedSessionsQuery.data ?? [], [completedSessionsQuery.data]);
+  const remaining = currentPackage ? Math.max(0, currentPackage.total_sessions - usedSessions.length) : 0;
 
   if (clientQuery.isLoading || !clientQuery.data) {
     return (
@@ -149,8 +171,90 @@ export default function OdemelerScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Ödemeler" clientName={clientQuery.data.name} showPill />
+      <ScreenHeader title="Paket ve Ödemeler" clientName={clientQuery.data.name} showPill />
       <ScrollView contentContainerStyle={styles.content}>
+        <Panel title="Paket & Seanslar" right={packages.length ? `${packages.length} paket` : undefined}>
+          {currentPackage ? (
+            <View style={styles.packageSummary}>
+              <Text style={styles.packageName}>{currentPackage.name}</Text>
+              <View style={styles.packageChips}>
+                <View style={styles.packageChip}>
+                  <Text style={styles.packageChipValue}>{currentPackage.total_sessions}</Text>
+                  <Text style={styles.packageChipLabel}>Toplam</Text>
+                </View>
+                <View style={styles.packageChip}>
+                  <Text style={styles.packageChipValue}>{usedSessions.length}</Text>
+                  <Text style={styles.packageChipLabel}>Kullanılan</Text>
+                </View>
+                <View style={styles.packageChip}>
+                  <Text style={[styles.packageChipValue, { color: remaining === 0 ? C.orange : C.lime }]}>{remaining}</Text>
+                  <Text style={styles.packageChipLabel}>Kalan</Text>
+                </View>
+              </View>
+              {usedSessions.length > 0 && (
+                <View style={styles.usedDates}>
+                  <Text style={styles.usedDatesLabel}>Kullanılan seans tarihleri:</Text>
+                  <Text style={styles.usedDatesValue}>{usedSessions.map((s) => s.date).join(', ')}</Text>
+                </View>
+              )}
+              <Pressable onPress={() => deletePackage.mutate(currentPackage.id)} hitSlop={8}>
+                <Text style={styles.rowDelete}>Bu paketi sil</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={styles.empty}>Henüz bir paket tanımlanmadı.</Text>
+          )}
+
+          {packages.length > 1 && (
+            <View style={styles.oldPackages}>
+              <Text style={styles.usedDatesLabel}>Geçmiş paketler:</Text>
+              {packages.slice(1).map((p) => (
+                <View key={p.id} style={styles.oldPackageRow}>
+                  <Text style={styles.oldPackageText}>
+                    {p.name} · {p.total_sessions} seans · {p.start_date}
+                  </Text>
+                  <Pressable onPress={() => deletePackage.mutate(p.id)} hitSlop={8}>
+                    <Text style={styles.rowDelete}>Sil</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {!addingPackage && (
+            <Pressable style={styles.addPackageBtn} onPress={() => setAddingPackage(true)}>
+              <Text style={styles.addPackageBtnText}>+ Yeni Paket Ekle</Text>
+            </Pressable>
+          )}
+
+          {addingPackage && (
+            <View style={styles.packageForm}>
+              <AuthField label="Paket Adı" value={packageDraft.name} onChangeText={(v) => setPackageDraft((s) => ({ ...s, name: v }))} placeholder="Ör. 12 Seanslık Paket" />
+              <AuthField
+                label="Toplam Seans"
+                value={packageDraft.total_sessions}
+                onChangeText={(v) => setPackageDraft((s) => ({ ...s, total_sessions: v }))}
+                keyboardType="number-pad"
+                placeholder="Ör. 12"
+              />
+              <AuthField label="Not" value={packageDraft.note} onChangeText={(v) => setPackageDraft((s) => ({ ...s, note: v }))} placeholder="Opsiyonel" />
+              <PrimaryButton
+                label="Paket Ekle"
+                loading={addPackage.isPending}
+                disabled={!packageDraft.name.trim() || !packageDraft.total_sessions}
+                onPress={() => {
+                  const total = parseInt(packageDraft.total_sessions, 10);
+                  if (!total || total <= 0) return;
+                  addPackage.mutate(
+                    { name: packageDraft.name.trim(), total_sessions: total, note: packageDraft.note.trim() },
+                    { onSuccess: () => { setPackageDraft({ name: '', total_sessions: '', note: '' }); setAddingPackage(false); } }
+                  );
+                }}
+              />
+            </View>
+          )}
+        </Panel>
+
         <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
           <Text style={styles.total}>{nf(totalPaid)} ₺</Text>
           {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
@@ -206,9 +310,24 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', gap: 4 },
   rowDate: { color: C.grey, fontSize: 11 },
   rowStatus: { fontSize: 11, fontWeight: '700' },
-  rowDelete: { fontSize: 10, fontWeight: '700', color: C.red },
+  rowDelete: { fontSize: 11, fontWeight: '700', color: C.red },
   editCard: { backgroundColor: C.card2, borderRadius: 12, borderWidth: 1, borderColor: C.edge, padding: 12, marginBottom: 8 },
   editActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   editBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   editBtnText: { fontSize: 12, fontWeight: '700' },
+  packageSummary: { marginBottom: 12 },
+  packageName: { color: C.white, fontWeight: '800', fontSize: 15, marginBottom: 10 },
+  packageChips: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  packageChip: { flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge, borderRadius: 12, padding: 10, alignItems: 'center' },
+  packageChipValue: { fontSize: 18, fontWeight: '800', color: C.lime },
+  packageChipLabel: { fontSize: 10, color: C.grey, marginTop: 2 },
+  usedDates: { backgroundColor: C.card2, borderRadius: 10, padding: 10, marginBottom: 10 },
+  usedDatesLabel: { fontSize: 11, color: C.greyD, fontWeight: '700', marginBottom: 4 },
+  usedDatesValue: { fontSize: 11, color: C.grey, lineHeight: 16 },
+  oldPackages: { marginBottom: 12 },
+  oldPackageRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  oldPackageText: { fontSize: 11, color: C.grey, flexShrink: 1 },
+  addPackageBtn: { borderWidth: 2, borderColor: C.edge, borderStyle: 'dashed', borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
+  addPackageBtnText: { fontSize: 13, color: C.greyD },
+  packageForm: { marginTop: 4 },
 });

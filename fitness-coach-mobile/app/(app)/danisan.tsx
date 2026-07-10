@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { ClientCard } from '../../components/ClientCard';
@@ -7,15 +7,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import {
-  useAddClient,
-  useAddPackage,
-  useClients,
-  useCompletedSessionsSince,
-  useDeleteClient,
-  useDeletePackage,
-  usePackages,
-} from '../../lib/queries';
+import { useAddClient, useClients, useDeleteClient } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
 
@@ -40,22 +32,11 @@ export default function DanisanScreen() {
   const clientsQuery = useClients(profile?.id);
   const addClient = useAddClient(profile?.id);
   const deleteClient = useDeleteClient(profile?.id);
-  const packagesQuery = usePackages(selectedClientId ?? undefined);
-  const addPackage = useAddPackage(selectedClientId ?? undefined);
-  const deletePackage = useDeletePackage(selectedClientId ?? undefined);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
-  const [addingPackage, setAddingPackage] = useState(false);
-  const [packageDraft, setPackageDraft] = useState({ name: '', total_sessions: '', note: '' });
 
   const clients = clientsQuery.data ?? [];
-  const selectedClient = clients.find((c) => c.id === selectedClientId);
-  const packages = packagesQuery.data ?? [];
-  const currentPackage = packages[0] ?? null;
-  const completedSessionsQuery = useCompletedSessionsSince(selectedClientId ?? undefined, currentPackage?.start_date);
-  const usedSessions = useMemo(() => completedSessionsQuery.data ?? [], [completedSessionsQuery.data]);
-  const remaining = currentPackage ? Math.max(0, currentPackage.total_sessions - usedSessions.length) : 0;
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -120,90 +101,6 @@ export default function DanisanScreen() {
           ))
         )}
 
-        {selectedClient && (
-          <Panel title={`Paket & Seanslar — ${selectedClient.name}`} right={packages.length ? `${packages.length} paket` : undefined}>
-            {currentPackage ? (
-              <View style={styles.packageSummary}>
-                <Text style={styles.packageName}>{currentPackage.name}</Text>
-                <View style={styles.packageChips}>
-                  <View style={styles.packageChip}>
-                    <Text style={styles.packageChipValue}>{currentPackage.total_sessions}</Text>
-                    <Text style={styles.packageChipLabel}>Toplam</Text>
-                  </View>
-                  <View style={styles.packageChip}>
-                    <Text style={styles.packageChipValue}>{usedSessions.length}</Text>
-                    <Text style={styles.packageChipLabel}>Kullanılan</Text>
-                  </View>
-                  <View style={styles.packageChip}>
-                    <Text style={[styles.packageChipValue, { color: remaining === 0 ? C.orange : C.lime }]}>{remaining}</Text>
-                    <Text style={styles.packageChipLabel}>Kalan</Text>
-                  </View>
-                </View>
-                {usedSessions.length > 0 && (
-                  <View style={styles.usedDates}>
-                    <Text style={styles.usedDatesLabel}>Kullanılan seans tarihleri:</Text>
-                    <Text style={styles.usedDatesValue}>{usedSessions.map((s) => s.date).join(', ')}</Text>
-                  </View>
-                )}
-                <Pressable onPress={() => deletePackage.mutate(currentPackage.id)} hitSlop={8}>
-                  <Text style={styles.packageDelete}>Bu paketi sil</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Text style={styles.empty}>Henüz bir paket tanımlanmadı.</Text>
-            )}
-
-            {packages.length > 1 && (
-              <View style={styles.oldPackages}>
-                <Text style={styles.usedDatesLabel}>Geçmiş paketler:</Text>
-                {packages.slice(1).map((p) => (
-                  <View key={p.id} style={styles.oldPackageRow}>
-                    <Text style={styles.oldPackageText}>
-                      {p.name} · {p.total_sessions} seans · {p.start_date}
-                    </Text>
-                    <Pressable onPress={() => deletePackage.mutate(p.id)} hitSlop={8}>
-                      <Text style={styles.packageDelete}>Sil</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {!addingPackage && (
-              <Pressable style={styles.addCli} onPress={() => setAddingPackage(true)}>
-                <Text style={styles.addCliText}>+ Yeni Paket Ekle</Text>
-              </Pressable>
-            )}
-
-            {addingPackage && (
-              <View style={styles.packageForm}>
-                <AuthField label="Paket Adı" value={packageDraft.name} onChangeText={(v) => setPackageDraft((s) => ({ ...s, name: v }))} placeholder="Ör. 12 Seanslık Paket" />
-                <AuthField
-                  label="Toplam Seans"
-                  value={packageDraft.total_sessions}
-                  onChangeText={(v) => setPackageDraft((s) => ({ ...s, total_sessions: v }))}
-                  keyboardType="number-pad"
-                  placeholder="Ör. 12"
-                />
-                <AuthField label="Not" value={packageDraft.note} onChangeText={(v) => setPackageDraft((s) => ({ ...s, note: v }))} placeholder="Opsiyonel" />
-                <PrimaryButton
-                  label="Paket Ekle"
-                  loading={addPackage.isPending}
-                  disabled={!packageDraft.name.trim() || !packageDraft.total_sessions}
-                  onPress={() => {
-                    const total = parseInt(packageDraft.total_sessions, 10);
-                    if (!total || total <= 0) return;
-                    addPackage.mutate(
-                      { name: packageDraft.name.trim(), total_sessions: total, note: packageDraft.note.trim() },
-                      { onSuccess: () => { setPackageDraft({ name: '', total_sessions: '', note: '' }); setAddingPackage(false); } }
-                    );
-                  }}
-                />
-              </View>
-            )}
-          </Panel>
-        )}
-
         {showForm ? (
           <Panel title="Yeni Danışan" right="e-posta ile davet">
             <AuthField label="Ad Soyad" value={form.name} onChangeText={(v) => set('name', v)} placeholder="Ör. Mert K." />
@@ -251,19 +148,4 @@ const styles = StyleSheet.create({
   goalPillActive: { backgroundColor: C.lime, borderColor: C.lime },
   goalPillText: { fontSize: 12, fontWeight: '700', color: C.grey },
   error: { color: C.red, fontSize: 12, marginBottom: 12 },
-  empty: { color: C.greyD, fontSize: 12, marginBottom: 12 },
-  packageSummary: { marginBottom: 12 },
-  packageName: { color: C.white, fontWeight: '800', fontSize: 15, marginBottom: 10 },
-  packageChips: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  packageChip: { flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge, borderRadius: 12, padding: 10, alignItems: 'center' },
-  packageChipValue: { fontSize: 18, fontWeight: '800', color: C.lime },
-  packageChipLabel: { fontSize: 10, color: C.grey, marginTop: 2 },
-  usedDates: { backgroundColor: C.card2, borderRadius: 10, padding: 10, marginBottom: 10 },
-  usedDatesLabel: { fontSize: 11, color: C.greyD, fontWeight: '700', marginBottom: 4 },
-  usedDatesValue: { fontSize: 11, color: C.grey, lineHeight: 16 },
-  packageDelete: { fontSize: 11, fontWeight: '700', color: C.red },
-  oldPackages: { marginBottom: 12 },
-  oldPackageRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-  oldPackageText: { fontSize: 11, color: C.grey, flexShrink: 1 },
-  packageForm: { marginTop: 4 },
 });
