@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Ring } from '../../components/Ring';
@@ -7,6 +7,7 @@ import { LineChart } from '../../components/LineChart';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { AuthField } from '../../components/AuthField';
 import { useAuth } from '../../lib/auth';
+import { disableWaterReminder, enableWaterReminder, getWaterReminderPrefs, type WaterReminderPrefs } from '../../lib/notifications';
 import {
   useCheckinsInRange,
   useClient,
@@ -20,6 +21,75 @@ import {
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
+
+const REMINDER_INTERVALS = [1, 2, 3, 4];
+
+function WaterReminderCard() {
+  const [prefs, setPrefs] = useState<WaterReminderPrefs>({ enabled: false, intervalHours: 2 });
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    getWaterReminderPrefs().then(setPrefs);
+  }, []);
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setNotice(null);
+    if (next) {
+      const result = await enableWaterReminder(prefs.intervalHours);
+      if (result === 'denied') {
+        setNotice('Bildirim izni verilmedi. Telefon ayarlarından izin vermen gerekiyor.');
+      } else if (result === 'unsupported') {
+        setNotice('Bildirimler web önizlemede desteklenmiyor, telefonda dene.');
+      } else {
+        setPrefs((p) => ({ ...p, enabled: true }));
+      }
+    } else {
+      await disableWaterReminder();
+      setPrefs((p) => ({ ...p, enabled: false }));
+    }
+    setBusy(false);
+  }
+
+  async function changeInterval(hours: number) {
+    setPrefs((p) => ({ ...p, intervalHours: hours }));
+    if (prefs.enabled) {
+      setBusy(true);
+      await enableWaterReminder(hours);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title="Su İçme Hatırlatıcısı" right="💧">
+      <View style={styles.waterRow}>
+        <Text style={styles.waterLabel}>{prefs.enabled ? `Her ${prefs.intervalHours} saatte bir hatırlatılıyor` : 'Kapalı'}</Text>
+        <Switch
+          value={prefs.enabled}
+          onValueChange={toggle}
+          disabled={busy}
+          trackColor={{ false: C.edge, true: C.lime }}
+          thumbColor={C.white}
+        />
+      </View>
+      <View style={styles.periodRow}>
+        {REMINDER_INTERVALS.map((h) => (
+          <Pressable
+            key={h}
+            onPress={() => changeInterval(h)}
+            disabled={busy}
+            style={[styles.periodBtn, prefs.intervalHours === h && { backgroundColor: C.lime, borderColor: C.lime }]}
+          >
+            <Text style={[styles.periodBtnText, prefs.intervalHours === h && { color: C.bg }]}>{h} saat</Text>
+          </Pressable>
+        ))}
+      </View>
+      {notice && <Text style={styles.waterNotice}>{notice}</Text>}
+      {Platform.OS === 'web' && !notice && <Text style={styles.waterNotice}>Gerçek bildirim için telefonda dene.</Text>}
+    </Panel>
+  );
+}
 
 const WEEKS = 12;
 const REPORT_PERIODS = [
@@ -185,6 +255,8 @@ export default function PanelScreen() {
           />
         </Panel>
 
+        {profile?.role !== 'trainer' && <WaterReminderCard />}
+
         <Panel title="Rapor" right={REPORT_PERIODS.find((p) => p.days === reportDays)?.label}>
           <View style={styles.periodRow}>
             {REPORT_PERIODS.map((p) => (
@@ -243,4 +315,7 @@ const styles = StyleSheet.create({
   periodRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
   periodBtnText: { fontSize: 12, fontWeight: '700', color: C.grey },
+  waterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  waterLabel: { fontSize: 13, color: C.white, fontWeight: '600', flex: 1, marginRight: 10 },
+  waterNotice: { fontSize: 11, color: C.orange, marginTop: 8 },
 });

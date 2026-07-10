@@ -11,14 +11,18 @@ import {
   useCompletedSessionsSince,
   useDeletePackage,
   useDeletePayment,
+  useDeleteSessionLog,
   usePackages,
   usePayments,
+  useSessionLogs,
+  useSetSessionStatus,
   useTogglePaymentPaid,
   useUpdatePayment,
+  useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
-import type { Payment } from '../../lib/types';
+import type { Payment, SessionLog } from '../../lib/types';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -86,6 +90,10 @@ export default function OdemelerScreen() {
   const packagesQuery = usePackages(selectedClientId ?? undefined);
   const addPackage = useAddPackage(selectedClientId ?? undefined);
   const deletePackage = useDeletePackage(selectedClientId ?? undefined);
+  const workoutQuery = useWorkout(selectedClientId ?? undefined);
+  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined);
+  const setSessionStatus = useSetSessionStatus(selectedClientId ?? undefined);
+  const deleteSessionLog = useDeleteSessionLog(selectedClientId ?? undefined);
 
   const [date, setDate] = useState('');
   const [amount, setAmount] = useState('');
@@ -94,6 +102,7 @@ export default function OdemelerScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingPackage, setAddingPackage] = useState(false);
   const [packageDraft, setPackageDraft] = useState({ name: '', total_sessions: '', note: '' });
+  const [activeDayId, setActiveDayId] = useState<string | null>(null);
 
   const payments = paymentsQuery.data ?? [];
   const totalPaid = useMemo(() => payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0), [payments]);
@@ -113,6 +122,23 @@ export default function OdemelerScreen() {
   const completedSessionsQuery = useCompletedSessionsSince(selectedClientId ?? undefined, currentPackage?.start_date);
   const usedSessions = useMemo(() => completedSessionsQuery.data ?? [], [completedSessionsQuery.data]);
   const remaining = currentPackage ? Math.max(0, currentPackage.total_sessions - usedSessions.length) : 0;
+
+  const days = workoutQuery.data ?? [];
+  const activeDay = days.find((d) => d.id === activeDayId) ?? days[0];
+
+  const last14Days = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (13 - i));
+      return d.toISOString().slice(0, 10);
+    });
+  }, []);
+
+  const sessionByDate = useMemo(() => {
+    const map = new Map<string, SessionLog>();
+    (sessionLogsQuery.data ?? []).forEach((s) => map.set(s.date, s));
+    return map;
+  }, [sessionLogsQuery.data]);
 
   if (clientQuery.isLoading || !clientQuery.data) {
     return (
@@ -255,6 +281,59 @@ export default function OdemelerScreen() {
           )}
         </Panel>
 
+        <Panel title="Seans Takvimi" right="Son 14 gün">
+          {days.length > 0 && (
+            <>
+              <Text style={styles.dayPickLabel}>İşaretlerken hangi program uygulandı?</Text>
+              <View style={styles.dayPickRow}>
+                {days.map((d) => (
+                  <Pressable
+                    key={d.id}
+                    onPress={() => setActiveDayId(d.id)}
+                    style={[styles.dayPick, activeDay?.id === d.id && { backgroundColor: C.lime, borderColor: C.lime }]}
+                  >
+                    <Text style={[styles.dayPickText, activeDay?.id === d.id && { color: C.bg }]}>{d.day_key}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+          <View style={styles.calendarGrid}>
+            {last14Days.map((d) => {
+              const session = sessionByDate.get(d);
+              const color = session?.status === 'tamamlandi' ? C.lime : session?.status === 'atlandi' ? C.red : C.edge;
+              return (
+                <Pressable
+                  key={d}
+                  style={[styles.calendarDay, { borderColor: color, backgroundColor: session ? `${color}22` : C.card2 }]}
+                  onPress={() => {
+                    if (!session) {
+                      setSessionStatus.mutate({ date: d, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null });
+                    } else if (session.status === 'tamamlandi') {
+                      setSessionStatus.mutate({ date: d, status: 'atlandi', workout_day_id: activeDay?.id ?? null });
+                    } else {
+                      deleteSessionLog.mutate(session.id);
+                    }
+                  }}
+                >
+                  <Text style={[styles.calendarDayText, { color: session ? color : C.greyD }]}>{d.slice(8, 10)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.calendarLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: C.lime }]} />
+              <Text style={styles.legendText}>Tamamlandı</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: C.red }]} />
+              <Text style={styles.legendText}>Atlandı</Text>
+            </View>
+            <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>
+          </View>
+        </Panel>
+
         <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
           <Text style={styles.total}>{nf(totalPaid)} ₺</Text>
           {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
@@ -330,4 +409,16 @@ const styles = StyleSheet.create({
   addPackageBtn: { borderWidth: 2, borderColor: C.edge, borderStyle: 'dashed', borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
   addPackageBtnText: { fontSize: 13, color: C.greyD },
   packageForm: { marginTop: 4 },
+  dayPickLabel: { fontSize: 11, color: C.greyD, marginBottom: 8 },
+  dayPickRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+  dayPick: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
+  dayPickText: { fontSize: 12, fontWeight: '700', color: C.grey },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  calendarDay: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  calendarDayText: { fontSize: 11, fontWeight: '700' },
+  calendarLegend: { gap: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, color: C.grey },
+  legendHint: { fontSize: 10, color: C.greyD, marginTop: 4 },
 });

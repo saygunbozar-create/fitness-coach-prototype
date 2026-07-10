@@ -4,6 +4,7 @@ import { AuthField } from '../../components/AuthField';
 import { ExerciseCard } from '../../components/ExerciseCard';
 import { ExerciseEditRow } from '../../components/ExerciseEditRow';
 import { Panel } from '../../components/Panel';
+import { PrChart } from '../../components/PrChart';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
@@ -16,22 +17,24 @@ import {
   useDeleteExercise,
   useDeletePeriodizationPhase,
   useDeletePrLog,
-  useDeleteSessionLog,
   useDeleteWorkoutDay,
   useExerciseHistory,
   useExerciseLibrary,
   usePeriodizationPhases,
   usePrLogs,
   useSeedExerciseLibrary,
-  useSessionLogs,
-  useSetSessionStatus,
+  useSessionHistory,
   useUpdateExercise,
   useUpdateWorkoutLog,
   useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
-import type { SessionLog } from '../../lib/types';
+
+function formatTrDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
 
 export default function AntrenmanScreen() {
   const { profile } = useAuth();
@@ -50,9 +53,7 @@ export default function AntrenmanScreen() {
   const deletePrLog = useDeletePrLog(selectedClientId ?? undefined);
   const exerciseLibraryQuery = useExerciseLibrary(isTrainer ? profile?.id : undefined);
   const seedExerciseLibrary = useSeedExerciseLibrary(isTrainer ? profile?.id : undefined);
-  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined);
-  const setSessionStatus = useSetSessionStatus(selectedClientId ?? undefined);
-  const deleteSessionLog = useDeleteSessionLog(selectedClientId ?? undefined);
+  const sessionHistoryQuery = useSessionHistory(selectedClientId ?? undefined);
   const phasesQuery = usePeriodizationPhases(selectedClientId ?? undefined);
   const addPhase = useAddPeriodizationPhase(selectedClientId ?? undefined);
   const deletePhase = useDeletePeriodizationPhase(selectedClientId ?? undefined);
@@ -64,6 +65,8 @@ export default function AntrenmanScreen() {
   const [newDayLabel, setNewDayLabel] = useState('');
   const [addingExercise, setAddingExercise] = useState(false);
   const [prDraft, setPrDraft] = useState({ exercise: '', weight: '', reps: '1' });
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [addingPhase, setAddingPhase] = useState(false);
   const [phaseDraft, setPhaseDraft] = useState({ name: '', weeks: '', note: '' });
 
@@ -101,19 +104,18 @@ export default function AntrenmanScreen() {
     return Array.from(best.values()).sort((a, b) => b.weight - a.weight);
   }, [prLogsQuery.data]);
 
-  const last14Days = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (13 - i));
-      return d.toISOString().slice(0, 10);
-    });
-  }, []);
-
-  const sessionByDate = useMemo(() => {
-    const map = new Map<string, SessionLog>();
-    (sessionLogsQuery.data ?? []).forEach((s) => map.set(s.date, s));
+  const logsByExercise = useMemo(() => {
+    const map = new Map<string, { date: string; weight: number; reps: number; id: string }[]>();
+    for (const log of prLogsQuery.data ?? []) {
+      const arr = map.get(log.exercise) ?? [];
+      arr.push(log);
+      map.set(log.exercise, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.date.localeCompare(b.date));
     return map;
-  }, [sessionLogsQuery.data]);
+  }, [prLogsQuery.data]);
+
+  const dayLabelById = useMemo(() => new Map(days.map((d) => [d.id, d.label])), [days]);
 
   if (clientQuery.isLoading || workoutQuery.isLoading || !clientQuery.data) {
     return (
@@ -272,24 +274,54 @@ export default function AntrenmanScreen() {
           {bestByExercise.length === 0 ? (
             <Text style={styles.empty}>Henüz PR kaydı yok.</Text>
           ) : (
-            bestByExercise.map((log) => (
-              <View key={log.id} style={styles.prRow}>
-                <View>
-                  <Text style={styles.prExercise}>{log.exercise}</Text>
-                  <Text style={styles.prMeta}>
-                    {log.date} · {log.reps} tekrar
-                  </Text>
-                </View>
-                <View style={styles.prRight}>
-                  <Text style={styles.prWeight}>{nf(log.weight, 1)} kg</Text>
-                  {isTrainer && (
-                    <Pressable onPress={() => deletePrLog.mutate(log.id)} hitSlop={8}>
-                      <Text style={styles.prDelete}>Sil</Text>
-                    </Pressable>
+            bestByExercise.map((log) => {
+              const expanded = expandedExercise === log.exercise;
+              const history = logsByExercise.get(log.exercise) ?? [];
+              return (
+                <View key={log.id}>
+                  <Pressable
+                    style={styles.prRow}
+                    onPress={() => {
+                      const next = expanded ? null : log.exercise;
+                      setExpandedExercise(next);
+                      if (next) setPrDraft((s) => ({ ...s, exercise: log.exercise }));
+                    }}
+                  >
+                    <View>
+                      <Text style={styles.prExercise}>{log.exercise}</Text>
+                      <Text style={styles.prMeta}>
+                        {log.date} · {log.reps} tekrar · {history.length} kayıt
+                      </Text>
+                    </View>
+                    <View style={styles.prRight}>
+                      <Text style={styles.prWeight}>{nf(log.weight, 1)} kg</Text>
+                      <Text style={styles.prExpandHint}>{expanded ? 'Kapat ▲' : 'Detay ▼'}</Text>
+                    </View>
+                  </Pressable>
+
+                  {expanded && (
+                    <View style={styles.prExpanded}>
+                      <PrChart points={history.map((h) => ({ date: formatTrDate(h.date), weight: h.weight }))} />
+                      {history
+                        .slice()
+                        .reverse()
+                        .map((h) => (
+                          <View key={h.id} style={styles.prHistoryRow}>
+                            <Text style={styles.prHistoryText}>
+                              {formatTrDate(h.date)} · {nf(h.weight, 1)} kg · {h.reps} tekrar
+                            </Text>
+                            {isTrainer && (
+                              <Pressable onPress={() => deletePrLog.mutate(h.id)} hitSlop={8}>
+                                <Text style={styles.prDelete}>Sil</Text>
+                              </Pressable>
+                            )}
+                          </View>
+                        ))}
+                    </View>
                   )}
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
 
           <View style={styles.prForm}>
@@ -319,41 +351,26 @@ export default function AntrenmanScreen() {
           />
         </Panel>
 
-        <Panel title="Seans Takvimi" right="Son 14 gün">
-          <View style={styles.calendarGrid}>
-            {last14Days.map((date) => {
-              const session = sessionByDate.get(date);
-              const color = session?.status === 'tamamlandi' ? C.lime : session?.status === 'atlandi' ? C.red : C.edge;
-              return (
-                <Pressable
-                  key={date}
-                  style={[styles.calendarDay, { borderColor: color, backgroundColor: session ? `${color}22` : C.card2 }]}
-                  onPress={() => {
-                    if (!session) {
-                      setSessionStatus.mutate({ date, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null });
-                    } else if (session.status === 'tamamlandi') {
-                      setSessionStatus.mutate({ date, status: 'atlandi', workout_day_id: activeDay?.id ?? null });
-                    } else {
-                      deleteSessionLog.mutate(session.id);
-                    }
-                  }}
-                >
-                  <Text style={[styles.calendarDayText, { color: session ? color : C.greyD }]}>{date.slice(8, 10)}</Text>
+        <Panel title="Program Geçmişi" right={`${(sessionHistoryQuery.data ?? []).length} kayıt`}>
+          {(sessionHistoryQuery.data ?? []).length === 0 ? (
+            <Text style={styles.empty}>Henüz tamamlanan seans yok. Seans işaretlemek için Ödemeler ekranındaki takvimi kullan.</Text>
+          ) : (
+            <>
+              {(showAllHistory ? sessionHistoryQuery.data! : sessionHistoryQuery.data!.slice(0, 10)).map((s) => (
+                <View key={s.id} style={styles.historyRow}>
+                  <Text style={styles.historyDate}>{formatTrDate(s.date)}</Text>
+                  <Text style={styles.historyLabel}>
+                    {s.workout_day_id ? dayLabelById.get(s.workout_day_id) ?? 'Program' : 'Antrenman tamamlandı'}
+                  </Text>
+                </View>
+              ))}
+              {sessionHistoryQuery.data!.length > 10 && (
+                <Pressable onPress={() => setShowAllHistory((v) => !v)} hitSlop={8}>
+                  <Text style={styles.showMore}>{showAllHistory ? 'Daha az göster' : `Tümünü göster (${sessionHistoryQuery.data!.length})`}</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.calendarLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: C.lime }]} />
-              <Text style={styles.legendText}>Tamamlandı</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: C.red }]} />
-              <Text style={styles.legendText}>Atlandı</Text>
-            </View>
-            <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>
-          </View>
+              )}
+            </>
+          )}
         </Panel>
 
         <Panel title="Periyodizasyon" right={`${(phasesQuery.data ?? []).length} blok`}>
@@ -493,15 +510,31 @@ const styles = StyleSheet.create({
   prRight: { alignItems: 'flex-end', gap: 4 },
   prWeight: { color: C.lime, fontWeight: '800', fontSize: 14 },
   prDelete: { color: C.red, fontSize: 11, fontWeight: '700' },
+  prExpandHint: { color: C.greyD, fontSize: 10, fontWeight: '700' },
+  prExpanded: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.edge, padding: 10, marginTop: -4, marginBottom: 8 },
+  prHistoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: C.edge,
+  },
+  prHistoryText: { color: C.grey, fontSize: 11 },
   prForm: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  calendarDay: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  calendarDayText: { fontSize: 11, fontWeight: '700' },
-  calendarLegend: { gap: 4 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: C.grey },
-  legendHint: { fontSize: 10, color: C.greyD, marginTop: 4 },
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: C.card2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  historyDate: { color: C.white, fontWeight: '700', fontSize: 12 },
+  historyLabel: { color: C.greyD, fontSize: 12 },
+  showMore: { color: C.lime, fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 4 },
   phaseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

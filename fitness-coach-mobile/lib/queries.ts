@@ -1115,6 +1115,23 @@ export function useSessionLogs(clientId: string | undefined, days = 14) {
   });
 }
 
+export function useSessionHistory(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['session_history', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('session_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('status', 'tamamlandi')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as SessionLog[];
+    },
+    enabled: !!clientId,
+  });
+}
+
 export function useSetSessionStatus(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -1125,7 +1142,11 @@ export function useSetSessionStatus(clientId: string | undefined) {
         .upsert({ client_id: clientId, ...input }, { onConflict: 'client_id,date' });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['session_logs', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['session_logs', clientId] });
+      qc.invalidateQueries({ queryKey: ['session_history', clientId] });
+      qc.invalidateQueries({ queryKey: ['completed_sessions_since', clientId] });
+    },
   });
 }
 
@@ -1136,7 +1157,11 @@ export function useDeleteSessionLog(clientId: string | undefined) {
       const { error } = await supabase.from('session_logs').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['session_logs', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['session_logs', clientId] });
+      qc.invalidateQueries({ queryKey: ['session_history', clientId] });
+      qc.invalidateQueries({ queryKey: ['completed_sessions_since', clientId] });
+    },
   });
 }
 
