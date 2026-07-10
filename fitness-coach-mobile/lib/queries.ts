@@ -180,6 +180,17 @@ export function useAddClient(trainerId: string | undefined) {
   });
 }
 
+export function useDeleteClient(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await supabase.from('clients').delete().eq('id', clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients', trainerId] }),
+  });
+}
+
 // ---------- Weight logs ----------
 
 export function useWeightLogs(clientId: string | undefined) {

@@ -2,10 +2,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Client } from '../lib/types';
 import { C, nf } from '../lib/theme';
 
-export function ClientCard({ client, active, onPress }: { client: Client; active: boolean; onPress: () => void }) {
+export function ClientCard({
+  client,
+  active,
+  onPress,
+  onLongPress,
+}: {
+  client: Client;
+  active: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
   const isActive = client.status === 'active';
   return (
-    <Pressable style={[styles.card, active && { borderColor: C.lime }]} onPress={onPress}>
+    <Pressable style={[styles.card, active && { borderColor: C.lime }]} onPress={onPress} onLongPress={onLongPress}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{client.name[0]}</Text>
       </View>

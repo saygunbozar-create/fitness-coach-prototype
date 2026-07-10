@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { ClientCard } from '../../components/ClientCard';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { useAddClient, useClients } from '../../lib/queries';
+import { useAddClient, useClients, useDeleteClient } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
 
@@ -31,6 +31,7 @@ export default function DanisanScreen() {
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const clientsQuery = useClients(profile?.id);
   const addClient = useAddClient(profile?.id);
+  const deleteClient = useDeleteClient(profile?.id);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,8 @@ export default function DanisanScreen() {
     <View style={styles.flex}>
       <ScreenHeader title="Danışan" />
       <ScrollView contentContainerStyle={styles.content}>
+        {clients.length > 0 && <Text style={styles.hint}>Bir danışanı silmek için karta uzun bas.</Text>}
+
         {clientsQuery.isLoading ? (
           <ActivityIndicator color={C.lime} />
         ) : (
@@ -84,6 +87,16 @@ export default function DanisanScreen() {
                 setSelectedClientId(c.id);
                 router.push('/(app)/panel');
               }}
+              onLongPress={() =>
+                Alert.alert(
+                  'Danışanı Sil',
+                  `${c.name} silinsin mi? Tüm program, ölçüm ve ödeme geçmişi kalıcı olarak silinir.`,
+                  [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    { text: 'Sil', style: 'destructive', onPress: () => deleteClient.mutate(c.id) },
+                  ]
+                )
+              }
             />
           ))
         )}
@@ -128,6 +141,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingTop: 4 },
   addCli: { borderWidth: 2, borderColor: C.edge, borderStyle: 'dashed', borderRadius: 16, padding: 15, alignItems: 'center' },
   addCliText: { fontSize: 13, color: C.greyD },
+  hint: { fontSize: 11, color: C.greyD, marginBottom: 10, fontStyle: 'italic' },
   label: { fontSize: 12, fontWeight: '700', color: C.grey, marginBottom: 6 },
   goalRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   goalPill: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
