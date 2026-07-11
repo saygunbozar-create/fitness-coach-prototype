@@ -56,7 +56,12 @@ export default function AppLayout() {
     );
   }
 
-  if (loading || (!isTrainer && profile && !selectedClientId)) {
+  // Block rendering until the trainer's own client list has loaded at least once — otherwise a
+  // trainer could land on a screen and tap "save" while selectedClientId is still null, which
+  // every mutation rejects with a silent-looking "clientId eksik" error.
+  const trainerNotReady = isTrainer && clientsQuery.isLoading;
+
+  if (loading || trainerNotReady || (!isTrainer && profile && !selectedClientId)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={C.lime} size="large" />

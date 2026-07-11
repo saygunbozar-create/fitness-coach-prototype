@@ -208,8 +208,12 @@ export default function OdemelerScreen() {
         <View style={styles.rowRight}>
           <Text style={styles.rowDate}>{formatTrDate(p.date)}</Text>
           {isTrainer ? (
-            <Pressable onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid }, { onError: onErr('Güncellenemedi') })}>
-              <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
+            <Pressable
+              style={[styles.paidBtn, { backgroundColor: p.paid ? 'rgba(198,249,78,.14)' : 'rgba(251,176,64,.14)', borderColor: p.paid ? C.lime : C.orange }]}
+              onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid }, { onError: onErr('Güncellenemedi') })}
+              hitSlop={6}
+            >
+              <Text style={[styles.paidBtnText, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? '✓ Ödendi' : 'Ödendi işaretle'}</Text>
             </Pressable>
           ) : (
             <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
@@ -470,6 +474,8 @@ const styles = StyleSheet.create({
   rowRight: { alignItems: 'flex-end', gap: 4 },
   rowDate: { color: C.grey, fontSize: 11 },
   rowStatus: { fontSize: 11, fontWeight: '700' },
+  paidBtn: { borderWidth: 1.5, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  paidBtnText: { fontSize: 11, fontWeight: '700' },
   rowDelete: { fontSize: 11, fontWeight: '700', color: C.red },
   editCard: { backgroundColor: C.card2, borderRadius: 12, borderWidth: 1, borderColor: C.edge, padding: 12, marginBottom: 8 },
   editActions: { flexDirection: 'row', gap: 8, marginTop: 4 },

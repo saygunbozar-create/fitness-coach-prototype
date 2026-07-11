@@ -129,6 +129,11 @@ export default function BeslenmeScreen() {
           <Bar label="Protein" val={totals.p} target={client.macro_p} unit="g" color={C.blue} />
           <Bar label="Karbonhidrat" val={totals.k} target={client.macro_k} unit="g" color={C.orange} />
           <Bar label="Yağ" val={totals.y} target={client.macro_y} unit="g" color={C.red} />
+          {isTrainer && totals.kcal === 0 && (
+            <Text style={styles.barHint}>
+              Bu çubuklar danışanın aşağıda "Yendi" işaretlediği besinlere göre dolar — danışan henüz bugün için hiçbir şey işaretlemedi.
+            </Text>
+          )}
         </Panel>
 
         <Panel title="Notlar" right={`${notes.length} not`}>
@@ -288,12 +293,13 @@ export default function BeslenmeScreen() {
                 label="Takviye Ekle"
                 loading={addSupplement.isPending}
                 disabled={!supplementDraft.name.trim()}
-                onPress={() =>
+                onPress={() => {
+                  if (!selectedClientId) { Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
                   addSupplement.mutate(
                     { name: supplementDraft.name.trim(), dose: supplementDraft.dose.trim(), timing: supplementDraft.timing.trim(), sort_order: supplements.length },
                     { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }), onError: onErr('Takviye eklenemedi') }
-                  )
-                }
+                  );
+                }}
               />
             </View>
           )}
@@ -340,12 +346,13 @@ export default function BeslenmeScreen() {
                 label="Ürün Ekle"
                 loading={addShoppingItem.isPending}
                 disabled={!shoppingDraft.name.trim()}
-                onPress={() =>
+                onPress={() => {
+                  if (!selectedClientId) { Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
                   addShoppingItem.mutate(
                     { name: shoppingDraft.name.trim(), quantity: shoppingDraft.quantity.trim(), sort_order: shoppingItems.length },
                     { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }), onError: onErr('Ürün eklenemedi') }
-                  )
-                }
+                  );
+                }}
               />
             </View>
           )}
@@ -379,6 +386,7 @@ const styles = StyleSheet.create({
   addMealText: { fontSize: 13, color: C.greyD },
   addMealCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.edge, padding: 14, marginBottom: 14 },
   empty: { color: C.greyD, fontSize: 12 },
+  barHint: { color: C.greyD, fontSize: 11, marginTop: 6, lineHeight: 16, fontStyle: 'italic' },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -106,6 +106,10 @@ export default function IlerlemeScreen() {
   const avgSteps = cardioWeek.length ? Math.round(cardioWeek.reduce((a, c) => a + c.steps, 0) / cardioWeek.length) : 0;
 
   async function pickPhoto() {
+    if (!selectedClientId) {
+      Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+      return;
+    }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('İzin gerekli', 'Fotoğraf eklemek için galeri izni vermen gerekiyor.');
@@ -220,12 +224,19 @@ export default function IlerlemeScreen() {
             label="Kaydet"
             loading={addInjury.isPending}
             disabled={!injuryDraft.body_part.trim()}
-            onPress={() =>
+            onPress={() => {
+              if (!selectedClientId) {
+                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                return;
+              }
               addInjury.mutate(
                 { body_part: injuryDraft.body_part.trim(), severity: injuryDraft.severity, note: injuryDraft.note.trim() },
-                { onSuccess: () => setInjuryDraft({ body_part: '', severity: 3, note: '' }) }
-              )
-            }
+                {
+                  onSuccess: () => setInjuryDraft({ body_part: '', severity: 3, note: '' }),
+                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kayıt eklenemedi.'),
+                }
+              );
+            }}
           />
         </Panel>
 

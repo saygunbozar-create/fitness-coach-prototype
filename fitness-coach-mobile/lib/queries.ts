@@ -47,6 +47,18 @@ export function useProfileById(profileId: string | undefined | null) {
   });
 }
 
+export function useUpdateOwnName(profileId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => {
+      if (!profileId) throw new Error('profileId eksik');
+      const { error } = await supabase.from('profiles').update({ name }).eq('id', profileId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', profileId] }),
+  });
+}
+
 // ---------- Clients ----------
 
 export function useClients(trainerId: string | undefined) {
