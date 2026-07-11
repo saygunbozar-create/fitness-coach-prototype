@@ -8,6 +8,7 @@ import { useAuth } from '../../lib/auth';
 import {
   useAddPackage,
   useAddPayment,
+  useAddSessionLog,
   useClient,
   useCompletedSessionsSince,
   useDeletePackage,
@@ -16,14 +17,13 @@ import {
   usePackages,
   usePayments,
   useSessionLogs,
-  useSetSessionStatus,
   useTogglePaymentPaid,
   useUpdatePayment,
   useWorkout,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, localDateStr, nf } from '../../lib/theme';
-import type { Payment, SessionLog } from '../../lib/types';
+import type { Payment } from '../../lib/types';
 
 const todayStr = localDateStr;
 
@@ -46,6 +46,23 @@ function parseTrDate(input: string): string | null {
 function formatTrDate(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y}`;
+}
+
+function nowTimeStr(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// "14:30" -> "14:30" (validated) | null
+function parseTrTime(input: string): string | null {
+  const m = input.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!m) return null;
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+function formatTime(t: string | null): string {
+  if (!t) return '';
+  return t.slice(0, 5);
 }
 
 function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payment; onCancel: () => void; onSave: (v: { date: string; amount: number; note: string }) => void; saving: boolean }) {
@@ -96,8 +113,8 @@ export default function OdemelerScreen() {
   const addPackage = useAddPackage(selectedClientId ?? undefined);
   const deletePackage = useDeletePackage(selectedClientId ?? undefined);
   const workoutQuery = useWorkout(selectedClientId ?? undefined);
-  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined);
-  const setSessionStatus = useSetSessionStatus(selectedClientId ?? undefined);
+  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined, 60);
+  const addSessionLog = useAddSessionLog(selectedClientId ?? undefined);
   const deleteSessionLog = useDeleteSessionLog(selectedClientId ?? undefined);
 
   const [date, setDate] = useState('');
@@ -108,6 +125,9 @@ export default function OdemelerScreen() {
   const [addingPackage, setAddingPackage] = useState(false);
   const [packageDraft, setPackageDraft] = useState({ name: '', total_sessions: '', note: '' });
   const [activeDayId, setActiveDayId] = useState<string | null>(null);
+  const [addingSession, setAddingSession] = useState(false);
+  const [sessionDraft, setSessionDraft] = useState({ date: '', time: '', status: 'tamamlandi' as 'tamamlandi' | 'atlandi' });
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const payments = paymentsQuery.data ?? [];
   const totalPaid = useMemo(() => payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0), [payments]);
@@ -138,19 +158,10 @@ export default function OdemelerScreen() {
   const days = workoutQuery.data ?? [];
   const activeDay = days.find((d) => d.id === activeDayId) ?? days[0];
 
-  const last14Days = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (13 - i));
-      return localDateStr(d);
-    });
-  }, []);
-
-  const sessionByDate = useMemo(() => {
-    const map = new Map<string, SessionLog>();
-    (sessionLogsQuery.data ?? []).forEach((s) => map.set(s.date, s));
-    return map;
-  }, [sessionLogsQuery.data]);
+  const recentSessions = useMemo(
+    () => [...(sessionLogsQuery.data ?? [])].sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? ''))),
+    [sessionLogsQuery.data]
+  );
 
   if (clientQuery.isLoading || !clientQuery.data) {
     return (
@@ -308,64 +319,98 @@ export default function OdemelerScreen() {
           )}
         </Panel>
 
-        <Panel title="Seans Takvimi" right="Son 14 gün">
-          {isTrainer && days.length > 0 && (
-            <>
-              <Text style={styles.dayPickLabel}>İşaretlerken hangi program uygulandı?</Text>
+        <Panel title="Seans Kullan" right={`${recentSessions.length} kayıt`}>
+          {isTrainer && !addingSession && (
+            <Pressable style={styles.addPackageBtn} onPress={() => { setSessionDraft({ date: formatTrDate(todayStr()), time: nowTimeStr(), status: 'tamamlandi' }); setSessionError(null); setAddingSession(true); }}>
+              <Text style={styles.addPackageBtnText}>+ Seans Ekle</Text>
+            </Pressable>
+          )}
+
+          {isTrainer && addingSession && (
+            <View style={styles.packageForm}>
+              {days.length > 0 && (
+                <>
+                  <Text style={styles.dayPickLabel}>Hangi program uygulandı?</Text>
+                  <View style={styles.dayPickRow}>
+                    {days.map((d) => (
+                      <Pressable
+                        key={d.id}
+                        onPress={() => setActiveDayId(d.id)}
+                        style={[styles.dayPick, activeDay?.id === d.id && { backgroundColor: C.lime, borderColor: C.lime }]}
+                      >
+                        <Text style={[styles.dayPickText, activeDay?.id === d.id && { color: C.bg }]}>{d.day_key}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+              <View style={styles.rowGap2}>
+                <View style={{ flex: 1 }}>
+                  <AuthField label="Tarih (GG.AA.YYYY)" value={sessionDraft.date} onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: v }))} placeholder="Ör. 10.07.2026" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AuthField label="Saat (SS:DD)" value={sessionDraft.time} onChangeText={(v) => setSessionDraft((s) => ({ ...s, time: v }))} placeholder="Ör. 14:30" />
+                </View>
+              </View>
               <View style={styles.dayPickRow}>
-                {days.map((d) => (
+                {(['tamamlandi', 'atlandi'] as const).map((st) => (
                   <Pressable
-                    key={d.id}
-                    onPress={() => setActiveDayId(d.id)}
-                    style={[styles.dayPick, activeDay?.id === d.id && { backgroundColor: C.lime, borderColor: C.lime }]}
+                    key={st}
+                    onPress={() => setSessionDraft((s) => ({ ...s, status: st }))}
+                    style={[styles.dayPick, sessionDraft.status === st && { backgroundColor: st === 'tamamlandi' ? C.lime : C.red, borderColor: st === 'tamamlandi' ? C.lime : C.red }]}
                   >
-                    <Text style={[styles.dayPickText, activeDay?.id === d.id && { color: C.bg }]}>{d.day_key}</Text>
+                    <Text style={[styles.dayPickText, sessionDraft.status === st && { color: C.bg }]}>{st === 'tamamlandi' ? 'Tamamlandı' : 'Atlandı'}</Text>
                   </Pressable>
                 ))}
               </View>
-            </>
-          )}
-          <View style={styles.calendarGrid}>
-            {last14Days.map((d) => {
-              const session = sessionByDate.get(d);
-              const color = session?.status === 'tamamlandi' ? C.lime : session?.status === 'atlandi' ? C.red : C.edge;
-              return (
-                <Pressable
-                  key={d}
-                  style={[styles.calendarDay, { borderColor: color, backgroundColor: session ? `${color}22` : C.card2 }]}
-                  disabled={!isTrainer}
-                  onPress={() => {
-                    if (!session) {
-                      setSessionStatus.mutate(
-                        { date: d, status: 'tamamlandi', workout_day_id: activeDay?.id ?? null },
-                        { onError: onErr('İşaretlenemedi') }
+              {sessionError && <Text style={styles.error}>{sessionError}</Text>}
+              <View style={styles.rowGap2}>
+                <View style={{ flex: 1 }}>
+                  <PrimaryButton
+                    label="Kaydet"
+                    loading={addSessionLog.isPending}
+                    onPress={() => {
+                      const iso = parseTrDate(sessionDraft.date);
+                      const time = sessionDraft.time.trim() ? parseTrTime(sessionDraft.time) : null;
+                      if (!iso) { setSessionError('Tarihi GG.AA.YYYY biçiminde gir.'); return; }
+                      if (sessionDraft.time.trim() && !time) { setSessionError('Saati SS:DD biçiminde gir (Ör. 14:30).'); return; }
+                      setSessionError(null);
+                      addSessionLog.mutate(
+                        { date: iso, time, status: sessionDraft.status, workout_day_id: activeDay?.id ?? null },
+                        { onSuccess: () => setAddingSession(false), onError: onErr('Kaydedilemedi') }
                       );
-                    } else if (session.status === 'tamamlandi') {
-                      setSessionStatus.mutate(
-                        { date: d, status: 'atlandi', workout_day_id: activeDay?.id ?? null },
-                        { onError: onErr('İşaretlenemedi') }
-                      );
-                    } else {
-                      deleteSessionLog.mutate(session.id, { onError: onErr('İşaretlenemedi') });
-                    }
-                  }}
-                >
-                  <Text style={[styles.calendarDayText, { color: session ? color : C.greyD }]}>{d.slice(8, 10)}</Text>
+                    }}
+                  />
+                </View>
+                <Pressable style={styles.cancelBtn} onPress={() => setAddingSession(false)}>
+                  <Text style={styles.cancelBtnText}>Vazgeç</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.calendarLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: C.lime }]} />
-              <Text style={styles.legendText}>Tamamlandı</Text>
+              </View>
             </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: C.red }]} />
-              <Text style={styles.legendText}>Atlandı</Text>
-            </View>
-            {isTrainer && <Text style={styles.legendHint}>Bir güne dokun: boş → tamamlandı → atlandı → boş</Text>}
-          </View>
+          )}
+
+          {recentSessions.length === 0 ? (
+            <Text style={styles.empty}>Henüz seans kaydı yok.</Text>
+          ) : (
+            recentSessions.slice(0, 20).map((s) => (
+              <View key={s.id} style={styles.row}>
+                <View>
+                  <Text style={styles.rowAmount}>
+                    {formatTrDate(s.date)}
+                    {s.time ? ` · ${formatTime(s.time)}` : ''}
+                  </Text>
+                  <Text style={[styles.rowStatus, { color: s.status === 'tamamlandi' ? C.lime : C.orange, marginTop: 2 }]}>
+                    {s.status === 'tamamlandi' ? 'Tamamlandı' : 'Atlandı'}
+                  </Text>
+                </View>
+                {isTrainer && (
+                  <Pressable onPress={() => deleteSessionLog.mutate(s.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
+                    <Text style={styles.rowDelete}>Sil</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))
+          )}
         </Panel>
 
         <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
@@ -449,12 +494,7 @@ const styles = StyleSheet.create({
   dayPickRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
   dayPick: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
   dayPickText: { fontSize: 12, fontWeight: '700', color: C.grey },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  calendarDay: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  calendarDayText: { fontSize: 11, fontWeight: '700' },
-  calendarLegend: { gap: 4 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: C.grey },
-  legendHint: { fontSize: 10, color: C.greyD, marginTop: 4 },
+  rowGap2: { flexDirection: 'row', gap: 8, marginBottom: 14, alignItems: 'flex-start' },
+  cancelBtn: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
+  cancelBtnText: { fontSize: 13, fontWeight: '700', color: C.grey },
 });

@@ -127,9 +127,17 @@ export type SessionLog = {
   id: string;
   client_id: string;
   date: string;
+  time: string | null;
   workout_day_id: string | null;
   status: 'tamamlandi' | 'atlandi';
   note: string;
+};
+
+export type NutritionNote = {
+  id: string;
+  client_id: string;
+  note: string;
+  created_at: string;
 };
 
 export type CardioLog = {

@@ -123,6 +123,14 @@ export default function AppLayout() {
           tabBarLabel: ({ focused }) => <TabLabel text="Ödemeler" focused={focused} />,
         }}
       />
+      <Tabs.Screen
+        name="ayarlar"
+        options={{
+          title: 'Ayarlar',
+          tabBarIcon: ({ focused }) => <TabIcon glyph="⚙" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabLabel text="Ayarlar" focused={focused} />,
+        }}
+      />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
     </Tabs>
   );

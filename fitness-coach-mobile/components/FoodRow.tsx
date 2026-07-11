@@ -1,54 +1,22 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { C, nf } from '../lib/theme';
 
-export type MealItem = { food: string; qty: number; kcal: number; p: number; k: number; y: number };
+export type MealItem = { food: string; unit: string; defaultQty: number; applied: boolean; kcal: number; p: number; k: number; y: number };
 
-export function FoodRow({ item, onChange }: { item: MealItem; onChange: (delta: number) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(String(item.qty));
-
-  function commit() {
-    setEditing(false);
-    const parsed = parseFloat(text.replace(',', '.'));
-    if (!Number.isNaN(parsed) && parsed >= 0 && parsed !== item.qty) onChange(parsed - item.qty);
-  }
-
+export function FoodRow({ item, onToggle, readOnly }: { item: MealItem; onToggle: () => void; readOnly?: boolean }) {
   return (
-    <View style={styles.row}>
+    <Pressable style={[styles.row, item.applied && styles.rowApplied]} onPress={readOnly ? undefined : onToggle} disabled={readOnly}>
+      <View style={[styles.check, item.applied && styles.checkOn]}>{item.applied ? <Text style={styles.checkMark}>✓</Text> : null}</View>
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={[styles.name, item.applied && styles.nameApplied]} numberOfLines={1}>
           {item.food}
         </Text>
         <Text style={styles.detail}>
-          {nf(item.kcal * item.qty)} kcal · P {nf(item.p * item.qty)} g
+          {nf(item.defaultQty, item.defaultQty % 1 === 0 ? 0 : 1)} {item.unit} · {nf(item.kcal * item.defaultQty)} kcal · P {nf(item.p * item.defaultQty)} g
         </Text>
       </View>
-      <View style={styles.qty}>
-        <Pressable onPress={() => onChange(-0.5)} hitSlop={8}>
-          <Text style={[styles.btn, { color: C.grey }]}>−</Text>
-        </Pressable>
-        {editing ? (
-          <TextInput
-            style={styles.qtyInput}
-            value={text}
-            onChangeText={setText}
-            onBlur={commit}
-            onSubmitEditing={commit}
-            keyboardType="decimal-pad"
-            autoFocus
-            selectTextOnFocus
-          />
-        ) : (
-          <Pressable onPress={() => { setText(String(item.qty)); setEditing(true); }}>
-            <Text style={styles.qtyValue}>{item.qty}</Text>
-          </Pressable>
-        )}
-        <Pressable onPress={() => onChange(0.5)} hitSlop={8}>
-          <Text style={[styles.btn, { color: C.lime }]}>+</Text>
-        </Pressable>
-      </View>
-    </View>
+      <Text style={[styles.status, { color: item.applied ? C.lime : C.greyD }]}>{item.applied ? 'Yendi' : 'Uygulanmadı'}</Text>
+    </Pressable>
   );
 }
 
@@ -56,40 +24,30 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
     backgroundColor: C.card2,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     marginBottom: 8,
-  },
-  info: { flexShrink: 1, minWidth: 0 },
-  name: { fontSize: 13, fontWeight: '700', color: C.white },
-  detail: { fontSize: 11, color: C.greyD },
-  qty: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  btn: {
-    width: 27,
-    height: 27,
-    lineHeight: 27,
-    textAlign: 'center',
-    borderRadius: 8,
-    backgroundColor: C.card,
     borderWidth: 1,
     borderColor: C.edge,
-    fontWeight: '900',
-    fontSize: 15,
-    overflow: 'hidden',
   },
-  qtyValue: { fontSize: 13, fontWeight: '700', color: C.lime, minWidth: 26, textAlign: 'center' },
-  qtyInput: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.lime,
-    minWidth: 26,
-    textAlign: 'center',
-    padding: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lime,
+  rowApplied: { borderColor: C.lime, backgroundColor: 'rgba(198,249,78,.06)' },
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.greyD,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  checkOn: { backgroundColor: C.lime, borderColor: C.lime },
+  checkMark: { fontSize: 12, fontWeight: '900', color: C.bg },
+  info: { flex: 1, minWidth: 0 },
+  name: { fontSize: 13, fontWeight: '700', color: C.white },
+  nameApplied: { color: C.lime },
+  detail: { fontSize: 11, color: C.greyD, marginTop: 2 },
+  status: { fontSize: 10, fontWeight: '700' },
 });

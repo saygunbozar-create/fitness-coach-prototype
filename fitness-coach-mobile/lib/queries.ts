@@ -7,6 +7,7 @@ import type {
   AppNotification,
   CardioLog,
   Checkin,
+  NutritionNote,
   Client,
   ClientPackage,
   InjuryLog,
@@ -19,6 +20,7 @@ import type {
   Payment,
   PeriodizationPhase,
   PrLog,
+  Profile,
   ProgressPhoto,
   SessionLog,
   ShoppingItem,
@@ -30,6 +32,20 @@ import type {
 } from './types';
 
 const todayStr = localDateStr;
+
+// ---------- Profiles ----------
+
+export function useProfileById(profileId: string | undefined | null) {
+  return useQuery({
+    queryKey: ['profile', profileId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', profileId).single();
+      if (error) throw error;
+      return data as Profile;
+    },
+    enabled: !!profileId,
+  });
+}
 
 // ---------- Clients ----------
 
@@ -523,12 +539,14 @@ export function useMeals(clientId: string | undefined) {
         .eq('date', todayStr());
       if (logsErr) throw logsErr;
 
+      // No log for today means "not marked eaten yet" — starts at 0, not the planned default_qty,
+      // so the daily macro totals reflect what was actually logged rather than the whole plan.
       const qtyByItemId = new Map((logs as MealLog[]).map((l) => [l.meal_item_id, l.qty]));
       return (meals as Meal[]).map((m) => ({
         ...m,
         items: (items as MealItem[])
           .filter((i) => i.meal_id === m.id)
-          .map((i) => ({ ...i, todayQty: qtyByItemId.get(i.id) ?? i.default_qty })),
+          .map((i) => ({ ...i, todayQty: qtyByItemId.get(i.id) ?? 0 })),
       })) as MealWithItems[];
     },
     enabled: !!clientId,
@@ -1142,7 +1160,8 @@ export function useSessionLogs(clientId: string | undefined, days = 14) {
         .select('*')
         .eq('client_id', clientId)
         .gte('date', localDateStr(since))
-        .order('date');
+        .order('date')
+        .order('time', { ascending: true, nullsFirst: true });
       if (error) throw error;
       return data as SessionLog[];
     },
@@ -1159,7 +1178,8 @@ export function useSessionHistory(clientId: string | undefined) {
         .select('*')
         .eq('client_id', clientId)
         .eq('status', 'tamamlandi')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .order('time', { ascending: false, nullsFirst: false });
       if (error) throw error;
       return data as SessionLog[];
     },
@@ -1167,14 +1187,12 @@ export function useSessionHistory(clientId: string | undefined) {
   });
 }
 
-export function useSetSessionStatus(clientId: string | undefined) {
+export function useAddSessionLog(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { date: string; status: 'tamamlandi' | 'atlandi'; workout_day_id: string | null }) => {
+    mutationFn: async (input: { date: string; time: string | null; status: 'tamamlandi' | 'atlandi'; workout_day_id: string | null }) => {
       if (!clientId) throw new Error('clientId eksik');
-      const { error } = await supabase
-        .from('session_logs')
-        .upsert({ client_id: clientId, ...input }, { onConflict: 'client_id,date' });
+      const { error } = await supabase.from('session_logs').insert({ client_id: clientId, ...input });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1322,5 +1340,46 @@ export function useMarkAllNotificationsRead(profileId: string | undefined) {
       qc.invalidateQueries({ queryKey: ['notifications', profileId] });
       qc.invalidateQueries({ queryKey: ['notifications_unread_count', profileId] });
     },
+  });
+}
+
+// ---------- Beslenme Notları ----------
+
+export function useNutritionNotes(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['nutrition_notes', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('nutrition_notes')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as NutritionNote[];
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useAddNutritionNote(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (note: string) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('nutrition_notes').insert({ client_id: clientId, note });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nutrition_notes', clientId] }),
+  });
+}
+
+export function useDeleteNutritionNote(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('nutrition_notes').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nutrition_notes', clientId] }),
   });
 }

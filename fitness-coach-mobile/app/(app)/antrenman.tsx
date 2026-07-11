@@ -360,12 +360,15 @@ export default function AntrenmanScreen() {
 
         <Panel title="Program Geçmişi" right={`${(sessionHistoryQuery.data ?? []).length} kayıt`}>
           {(sessionHistoryQuery.data ?? []).length === 0 ? (
-            <Text style={styles.empty}>Henüz tamamlanan seans yok. Seans işaretlemek için Ödemeler ekranındaki takvimi kullan.</Text>
+            <Text style={styles.empty}>Henüz tamamlanan seans yok. Seans eklemek için Ödemeler ekranındaki "Seans Kullan" bölümünü kullan.</Text>
           ) : (
             <>
               {(showAllHistory ? sessionHistoryQuery.data! : sessionHistoryQuery.data!.slice(0, 10)).map((s) => (
                 <View key={s.id} style={styles.historyRow}>
-                  <Text style={styles.historyDate}>{formatTrDate(s.date)}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatTrDate(s.date)}
+                    {s.time ? ` · ${s.time.slice(0, 5)}` : ''}
+                  </Text>
                   <Text style={styles.historyLabel}>
                     {s.workout_day_id ? dayLabelById.get(s.workout_day_id) ?? 'Program' : 'Antrenman tamamlandı'}
                   </Text>

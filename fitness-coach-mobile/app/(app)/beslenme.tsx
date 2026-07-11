@@ -11,15 +11,18 @@ import { useAuth } from '../../lib/auth';
 import {
   useAddMeal,
   useAddMealItem,
+  useAddNutritionNote,
   useAddShoppingItem,
   useAddSupplementItem,
   useClient,
   useDeleteMeal,
   useDeleteMealItem,
+  useDeleteNutritionNote,
   useDeleteShoppingItem,
   useDeleteSupplementItem,
   useFoodLibrary,
   useMeals,
+  useNutritionNotes,
   useSeedFoodLibrary,
   useShoppingItems,
   useSupplementItems,
@@ -55,6 +58,9 @@ export default function BeslenmeScreen() {
   const addShoppingItem = useAddShoppingItem(selectedClientId ?? undefined);
   const toggleShoppingItem = useToggleShoppingItem(selectedClientId ?? undefined);
   const deleteShoppingItem = useDeleteShoppingItem(selectedClientId ?? undefined);
+  const notesQuery = useNutritionNotes(selectedClientId ?? undefined);
+  const addNote = useAddNutritionNote(selectedClientId ?? undefined);
+  const deleteNote = useDeleteNutritionNote(selectedClientId ?? undefined);
 
   const [editMode, setEditMode] = useState(false);
   const [addingMeal, setAddingMeal] = useState(false);
@@ -62,6 +68,7 @@ export default function BeslenmeScreen() {
   const [addingItemForMeal, setAddingItemForMeal] = useState<string | null>(null);
   const [supplementDraft, setSupplementDraft] = useState({ name: '', dose: '', timing: '' });
   const [shoppingDraft, setShoppingDraft] = useState({ name: '', quantity: '' });
+  const [noteDraft, setNoteDraft] = useState('');
 
   useEffect(() => {
     if (isTrainer && foodLibraryQuery.isSuccess && foodLibraryQuery.data?.length === 0 && !seedFoodLibrary.isPending) {
@@ -99,6 +106,7 @@ export default function BeslenmeScreen() {
   const meals = mealsQuery.data ?? [];
   const supplements = supplementsQuery.data ?? [];
   const shoppingItems = shoppingQuery.data ?? [];
+  const notes = notesQuery.data ?? [];
 
   return (
     <View style={styles.flex}>
@@ -121,6 +129,39 @@ export default function BeslenmeScreen() {
           <Bar label="Protein" val={totals.p} target={client.macro_p} unit="g" color={C.blue} />
           <Bar label="Karbonhidrat" val={totals.k} target={client.macro_k} unit="g" color={C.orange} />
           <Bar label="Yağ" val={totals.y} target={client.macro_y} unit="g" color={C.red} />
+        </Panel>
+
+        <Panel title="Notlar" right={`${notes.length} not`}>
+          {notes.length === 0 ? (
+            <Text style={styles.empty}>Henüz not yok.</Text>
+          ) : (
+            notes.map((n) => (
+              <View key={n.id} style={styles.noteRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.noteText}>{n.note}</Text>
+                  <Text style={styles.noteDate}>{new Date(n.created_at).toLocaleDateString('tr-TR')}</Text>
+                </View>
+                {isTrainer && (
+                  <Pressable onPress={() => deleteNote.mutate(n.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
+                    <Text style={styles.listDelete}>Sil</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))
+          )}
+          {isTrainer && (
+            <View style={styles.inlineForm}>
+              <AuthField label="Yeni Not" value={noteDraft} onChangeText={setNoteDraft} placeholder="Ör. Bu hafta şeker tüketimine dikkat et" />
+              <PrimaryButton
+                label="Not Ekle"
+                loading={addNote.isPending}
+                disabled={!noteDraft.trim()}
+                onPress={() =>
+                  addNote.mutate(noteDraft.trim(), { onSuccess: () => setNoteDraft(''), onError: onErr('Not eklenemedi') })
+                }
+              />
+            </View>
+          )}
         </Panel>
 
         {meals.map((m) => {
@@ -150,12 +191,14 @@ export default function BeslenmeScreen() {
                     />
                   );
                 }
+                const applied = it.todayQty > 0;
                 return (
                   <FoodRow
                     key={it.id}
-                    item={{ food: it.food, qty: it.todayQty, kcal: it.kcal, p: it.p, k: it.k, y: it.y }}
-                    onChange={(delta) => {
-                      const next = Math.max(0, Math.round((it.todayQty + delta) * 2) / 2);
+                    item={{ food: it.food, unit: it.unit, defaultQty: it.default_qty, applied, kcal: it.kcal, p: it.p, k: it.k, y: it.y }}
+                    readOnly={isTrainer}
+                    onToggle={() => {
+                      const next = applied ? 0 : it.default_qty;
                       updateQty.mutate({ mealItemId: it.id, qty: next }, { onError: onErr('Kaydedilemedi') });
                     }}
                   />
@@ -352,6 +395,18 @@ const styles = StyleSheet.create({
   listMeta: { color: C.greyD, fontSize: 11, marginTop: 2 },
   listDelete: { color: C.red, fontSize: 11, fontWeight: '700' },
   inlineForm: { marginTop: 4 },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: C.card2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  noteText: { color: C.white, fontSize: 13, lineHeight: 18 },
+  noteDate: { color: C.greyD, fontSize: 10, marginTop: 4 },
   rowGap: { flexDirection: 'row', gap: 8 },
   shopCheckRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   checkbox: {
