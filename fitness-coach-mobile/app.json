@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Coachbook",
+    "slug": "fitness-coach-mobile",
+    "scheme": "fitnesscoach",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0D12",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fitnesscoach.app"
+    },
+    "android": {
+      "package": "com.fitnesscoach.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0D12",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#C6F94E"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "İlerleme fotoğraflarını galeriden seçebilmen için galeri erişimine izin ver.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2afc98d4-1a78-4868-86b3-cfcc1990e66a"
+      }
+    },
+    "owner": "silverspring",
+    "updates": {
+      "url": "https://u.expo.dev/2afc98d4-1a78-4868-86b3-cfcc1990e66a"
+    }
+  }
+}

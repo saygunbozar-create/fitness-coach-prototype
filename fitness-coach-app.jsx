@@ -202,11 +202,11 @@ function LineChart({ proj, actual, h = 170 }) {
 }
 
 // ————— Sekmeler —————
-function Dashboard({ client, workout }) {
+function Dashboard({ client, workout, meals }) {
   const week = Object.values(workout);
   const totalSets = week.reduce((a, d) => a + d.rows.reduce((x, r) => x + r.set, 0), 0);
   const totalVol = week.reduce((a, d) => a + d.rows.reduce((x, r) => x + r.set * r.rep * r.kg, 0), 0);
-  const kcalToday = 2579;
+  const kcalToday = meals.reduce((a, m) => a + m.items.reduce((x, it) => x + it.kcal * it.qty, 0), 0);
   const pct = (kcalToday / client.kcalTarget) * 100;
   const kpis = [
     ["Antrenman Günü", week.length + " gün"],
@@ -527,7 +527,7 @@ export default function App() {
 
         {/* içerik */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {tab === "panel" && <Dashboard client={client} workout={workout} />}
+          {tab === "panel" && <Dashboard client={client} workout={workout} meals={meals} />}
           {tab === "antrenman" && <Workout workout={workout} setWorkout={setWorkout} />}
           {tab === "beslenme" && <Nutrition client={client} meals={meals} setMeals={setMeals} />}
           {tab === "ilerleme" && <Progress client={client} />}
