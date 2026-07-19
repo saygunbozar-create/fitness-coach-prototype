@@ -11,13 +11,14 @@ import { initNotificationChannel } from '../lib/notifications';
 import { queryClient } from '../lib/queryClient';
 import { useIsDesktopWeb } from '../lib/responsive';
 import { SelectedClientProvider } from '../lib/selectedClient';
+import { Sentry } from '../lib/sentry';
 import { C } from '../lib/theme';
 
 // Bu rotalarda (giriş, kayıt, şifre sıfırlama) masaüstünde bile her zaman dar/ortalı "telefon
 // sütunu" gösteriliyor — sidebar'lı geniş yerleşim sadece giriş yapılmış (app) ekranlarına özel.
 const ALWAYS_NARROW_PATHS = new Set(['/', '/login', '/signup-trainer', '/signup-client', '/forgot-password', '/reset-password']);
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Kalam_400Regular, Kalam_700Bold });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const pathname = usePathname();
@@ -80,3 +81,5 @@ const styles = StyleSheet.create({
   webOuterWide: { alignItems: 'stretch', backgroundColor: C.bg },
   webInner: { flex: 1, width: '100%', maxWidth: 480 },
 });
+
+export default Sentry.wrap(RootLayout);
