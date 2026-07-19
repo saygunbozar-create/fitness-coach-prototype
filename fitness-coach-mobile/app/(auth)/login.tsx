@@ -24,7 +24,7 @@ export default function Login() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>FITNESS COACH</Text>
+        <Text style={styles.brand}>COACHBOOK</Text>
         <Text style={styles.title}>Giriş Yap</Text>
 
         <AuthField label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
@@ -33,6 +33,10 @@ export default function Login() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton label="Giriş Yap" onPress={onSubmit} loading={loading} disabled={!email || !password} />
+
+        <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+          Şifremi unuttum
+        </Link>
 
         <View style={styles.links}>
           <Link href="/(auth)/signup-trainer" style={styles.link}>
@@ -53,6 +57,7 @@ const styles = StyleSheet.create({
   brand: { fontSize: 10, fontWeight: '700', letterSpacing: 4, color: C.greyD, marginBottom: 6 },
   title: { fontSize: 26, fontWeight: '800', color: C.white, marginBottom: 24 },
   error: { color: C.red, fontSize: 12, marginBottom: 12 },
+  forgotLink: { color: C.grey, fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 16 },
   links: { marginTop: 20, gap: 10, alignItems: 'center' },
   link: { color: C.lime, fontSize: 13, fontWeight: '600' },
 });

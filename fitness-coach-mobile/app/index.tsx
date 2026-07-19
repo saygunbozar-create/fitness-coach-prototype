@@ -15,7 +15,7 @@ export default function Index() {
   }
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
-  return <Redirect href="/(app)/panel" />;
+  return <Redirect href={profile.role === 'trainer' ? '/(app)/panel' : '/(app)/antrenman'} />;
 }
 
 const styles = StyleSheet.create({

@@ -13,7 +13,7 @@ export function ScreenHeader({ title, clientName, showPill }: { title: string; c
   return (
     <View style={[styles.row, { paddingTop: insets.top + 12 }]}>
       <View>
-        <Text style={styles.brand}>FITNESS COACH</Text>
+        <Text style={styles.brand}>COACHBOOK</Text>
         <Text style={styles.title}>{title}</Text>
       </View>
       <View style={styles.right}>

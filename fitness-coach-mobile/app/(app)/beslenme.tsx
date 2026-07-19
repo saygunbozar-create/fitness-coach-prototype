@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
 import { Bar } from '../../components/Bar';
 import { FoodRow } from '../../components/FoodRow';
 import { MealItemEditRow } from '../../components/MealItemEditRow';
+import { MonthlyNutritionPlan } from '../../components/MonthlyNutritionPlan';
+import { EmptyClientState } from '../../components/EmptyClientState';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -34,7 +37,7 @@ import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
 
 function onErr(title: string) {
-  return (e: any) => Alert.alert(title, e.message ?? 'Bir hata oluştu.');
+  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
 }
 
 export default function BeslenmeScreen() {
@@ -72,7 +75,7 @@ export default function BeslenmeScreen() {
 
   useEffect(() => {
     if (isTrainer && foodLibraryQuery.isSuccess && foodLibraryQuery.data?.length === 0 && !seedFoodLibrary.isPending) {
-      seedFoodLibrary.mutate();
+      seedFoodLibrary.mutate(undefined, { onError: onErr('Besin kütüphanesi oluşturulamadı') });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTrainer, foodLibraryQuery.isSuccess, foodLibraryQuery.data?.length]);
@@ -93,6 +96,15 @@ export default function BeslenmeScreen() {
       { kcal: 0, p: 0, k: 0, y: 0 }
     );
   }, [mealsQuery.data]);
+
+  if (isTrainer && !selectedClientId) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title="Beslenme" />
+        <EmptyClientState />
+      </View>
+    );
+  }
 
   if (clientQuery.isLoading || mealsQuery.isLoading || !clientQuery.data) {
     return (
@@ -294,7 +306,7 @@ export default function BeslenmeScreen() {
                 loading={addSupplement.isPending}
                 disabled={!supplementDraft.name.trim()}
                 onPress={() => {
-                  if (!selectedClientId) { Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
+                  if (!selectedClientId) { showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
                   addSupplement.mutate(
                     { name: supplementDraft.name.trim(), dose: supplementDraft.dose.trim(), timing: supplementDraft.timing.trim(), sort_order: supplements.length },
                     { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }), onError: onErr('Takviye eklenemedi') }
@@ -347,7 +359,7 @@ export default function BeslenmeScreen() {
                 loading={addShoppingItem.isPending}
                 disabled={!shoppingDraft.name.trim()}
                 onPress={() => {
-                  if (!selectedClientId) { Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
+                  if (!selectedClientId) { showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
                   addShoppingItem.mutate(
                     { name: shoppingDraft.name.trim(), quantity: shoppingDraft.quantity.trim(), sort_order: shoppingItems.length },
                     { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }), onError: onErr('Ürün eklenemedi') }
@@ -357,6 +369,8 @@ export default function BeslenmeScreen() {
             </View>
           )}
         </Panel>
+
+        <MonthlyNutritionPlan clientId={client.id} isTrainer={isTrainer} trainerId={isTrainer ? profile?.id : undefined} />
       </ScrollView>
     </View>
   );

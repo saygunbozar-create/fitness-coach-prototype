@@ -22,34 +22,65 @@ export type Client = {
   macro_y: number;
   pr: number;
   status: 'pending' | 'active';
+  is_active: boolean;
+  birthday: string | null;
+  height: number;
+  gender: string;
 };
 
 export type WeightLog = { id: string; client_id: string; date: string; weight: number };
 
-export type WorkoutDay = { id: string; client_id: string; day_key: string; label: string; sort_order: number };
+export type WorkoutProgram = { id: string; client_id: string; name: string; shared: boolean; sort_order: number; created_at: string };
+
+export type WorkoutDay = {
+  id: string;
+  client_id: string;
+  program_id: string;
+  day_key: string;
+  label: string;
+  sort_order: number;
+  notes: string | null;
+};
 
 export type WorkoutExercise = {
   id: string;
   workout_day_id: string;
   ex: string;
   grp: string;
-  set_count: number;
+  sort_order: number;
+};
+
+export type WorkoutSet = {
+  id: string;
+  workout_exercise_id: string;
+  set_number: number;
   rep_count: number;
   kg: number;
-  sort_order: number;
 };
 
 export type WorkoutLog = {
   id: string;
   workout_exercise_id: string;
   date: string;
-  set_count: number;
+  set_number: number;
   rep_count: number;
   kg: number;
   done: boolean;
 };
 
-export type Meal = { id: string; client_id: string; name: string; sort_order: number };
+export type ProgramLesson = {
+  id: string;
+  client_id: string;
+  program_id: string;
+  lesson_number: number;
+  workout_day_id: string | null;
+  log_date: string | null;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type Meal = { id: string; client_id: string; name: string; sort_order: number; plan_date: string | null };
 
 export type MealItem = {
   id: string;
@@ -86,9 +117,15 @@ export type Measurement = {
   chest: number | null;
   waist: number | null;
   hip: number | null;
+  shoulder: number | null;
+  arm_left: number | null;
+  arm_right: number | null;
+  thigh_left: number | null;
+  thigh_right: number | null;
+  calf: number | null;
+  // Eski tek taraflı alanlar — artık yazılmıyor, sadece eski kayıtlarda okunabilir kalsın diye tipte duruyor.
   arm: number | null;
   thigh: number | null;
-  calf: number | null;
 };
 
 export type ProgressPhoto = { id: string; client_id: string; date: string; storage_path: string; note: string };
@@ -111,15 +148,6 @@ export type ClientPackage = {
   name: string;
   total_sessions: number;
   start_date: string;
-  note: string;
-};
-
-export type PeriodizationPhase = {
-  id: string;
-  client_id: string;
-  name: string;
-  start_date: string;
-  end_date: string | null;
   note: string;
 };
 
@@ -149,6 +177,27 @@ export type CardioLog = {
   distance_km: number;
   steps: number;
   calories: number;
+};
+
+export type WellnessSurvey = {
+  id: string;
+  client_id: string;
+  period: string;
+  name: string;
+  answers: Record<string, number>;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LessonScheduleEntry = {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  date: string;
+  time: string;
+  notified: boolean;
+  created_at: string;
 };
 
 export type AppNotification = {

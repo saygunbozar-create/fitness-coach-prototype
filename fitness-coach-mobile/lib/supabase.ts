@@ -16,6 +16,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // true olması sadece web derlemesinde bir şey yapar (Supabase JS bunu native'de
+    // window/URL olmadığı için zaten no-op geçer) — şifre sıfırlama linkindeki
+    // access_token'ı URL'den otomatik okuyup oturum açması için gerekli.
+    detectSessionInUrl: true,
   },
 });

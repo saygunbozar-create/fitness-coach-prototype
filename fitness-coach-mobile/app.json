@@ -1,9 +1,12 @@
 {
   "expo": {
-    "name": "Fitness Coach",
+    "name": "Coachbook",
     "slug": "fitness-coach-mobile",
     "scheme": "fitnesscoach",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -32,7 +35,15 @@
         {
           "color": "#C6F94E"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "İlerleme fotoğraflarını galeriden seçebilmen için galeri erişimine izin ver.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {},
@@ -40,6 +51,9 @@
         "projectId": "2afc98d4-1a78-4868-86b3-cfcc1990e66a"
       }
     },
-    "owner": "silverspring"
+    "owner": "silverspring",
+    "updates": {
+      "url": "https://u.expo.dev/2afc98d4-1a78-4868-86b3-cfcc1990e66a"
+    }
   }
 }

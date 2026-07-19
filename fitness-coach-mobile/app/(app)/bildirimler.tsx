@@ -1,10 +1,15 @@
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../lib/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../../lib/queries';
 import { C } from '../../lib/theme';
 import type { AppNotification } from '../../lib/types';
+
+function onErr(title: string) {
+  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+}
 
 function relativeTime(iso: string): string {
   const d = new Date(iso);
@@ -22,9 +27,17 @@ function relativeTime(iso: string): string {
 
 const TYPE_ICON: Record<string, string> = {
   checkin_submitted: '📋',
+  checkin_reminder: '⏰',
+  survey_reminder: '📝',
+  session_completed: '✅',
+  program_shared: '📤',
+  lesson_reminder: '⏰',
   payment_due: '💰',
   payment_added: '💳',
+  payment_paid: '🧾',
+  lesson_completed: '📓',
   package_added: '📦',
+  client_birthday: '🎉',
 };
 
 export default function BildirimlerScreen() {
@@ -42,7 +55,7 @@ export default function BildirimlerScreen() {
       <Pressable
         key={n.id}
         style={[styles.row, !n.read && styles.rowUnread]}
-        onPress={() => !n.read && markRead.mutate(n.id)}
+        onPress={() => !n.read && markRead.mutate(n.id, { onError: onErr('İşaretlenemedi') })}
       >
         <Text style={styles.icon}>{TYPE_ICON[n.type] ?? '🔔'}</Text>
         <View style={{ flex: 1 }}>
@@ -63,7 +76,7 @@ export default function BildirimlerScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>Bildirimler</Text>
         {unreadCount > 0 ? (
-          <Pressable onPress={() => markAllRead.mutate()} hitSlop={8}>
+          <Pressable onPress={() => markAllRead.mutate(undefined, { onError: onErr('İşaretlenemedi') })} hitSlop={8}>
             <Text style={styles.markAll}>Tümünü okundu işaretle</Text>
           </Pressable>
         ) : (

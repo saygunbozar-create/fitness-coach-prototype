@@ -11,6 +11,10 @@ export type WaterReminderPrefs = { enabled: boolean; intervalHours: number };
 
 const DEFAULT_PREFS: WaterReminderPrefs = { enabled: false, intervalHours: 2 };
 
+// Hatırlatmalar yalnızca bu saat aralığında gönderilir — gece rahatsız etmemesi için.
+const WATER_WINDOW_START_HOUR = 8;
+const WATER_WINDOW_END_HOUR = 22;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -64,18 +68,33 @@ export async function enableWaterReminder(intervalHours: number): Promise<'ok' |
   if (status !== 'granted') return 'denied';
 
   await cancelScheduled();
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Su içme zamanı 💧',
-      body: 'Formunu korumak için bir bardak su içmeyi unutma.',
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, Math.round(intervalHours * 3600)),
-      repeats: true,
-    },
-  });
-  await AsyncStorage.setItem(NOTIFICATION_IDS_KEY, JSON.stringify([id]));
+
+  // Tek bir "her X saatte tekrarla" bildirimi yerine, 08:00–22:00 aralığındaki her
+  // saat için ayrı bir günlük (DAILY) bildirim kuruyoruz. Android'de tekrarlayan
+  // TIME_INTERVAL bildirimleri güvenilir çalışmıyor; sabit saatli DAILY tetikleyiciler
+  // her iki platformda da tutarlı çalışıyor, ve gece saatlerine hiç düşmüyor.
+  const hours: number[] = [];
+  for (let h = WATER_WINDOW_START_HOUR; h <= WATER_WINDOW_END_HOUR; h += intervalHours) {
+    hours.push(h);
+  }
+
+  const ids = await Promise.all(
+    hours.map((hour) =>
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Su içme zamanı 💧',
+          body: 'Formunu korumak için bir bardak su içmeyi unutma.',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute: 0,
+          channelId: Platform.OS === 'android' ? 'water-reminder' : undefined,
+        },
+      })
+    )
+  );
+  await AsyncStorage.setItem(NOTIFICATION_IDS_KEY, JSON.stringify(ids));
   await setWaterReminderPrefs({ enabled: true, intervalHours });
   return 'ok';
 }
@@ -99,6 +118,7 @@ export async function registerPushToken(profileId: string) {
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
   const tokenResponse = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
   if (tokenResponse.data) {
-    await supabase.from('profiles').update({ push_token: tokenResponse.data }).eq('id', profileId);
+    const { error } = await supabase.from('profiles').update({ push_token: tokenResponse.data }).eq('id', profileId);
+    if (error) console.warn('Push token kaydedilemedi:', error.message);
   }
 }

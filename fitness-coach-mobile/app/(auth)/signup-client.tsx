@@ -18,7 +18,7 @@ export default function SignupClient() {
   async function onSubmit() {
     setError(null);
     setLoading(true);
-    const { error: err } = await signUpClient(email.trim(), password, name.trim());
+    const { error: err } = await signUpClient(email.trim().toLowerCase(), password, name.trim());
     setLoading(false);
     if (err) setError(err);
     else setDone(true);
@@ -27,7 +27,7 @@ export default function SignupClient() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>FITNESS COACH</Text>
+        <Text style={styles.brand}>COACHBOOK</Text>
         <Text style={styles.title}>Danışan Kaydı</Text>
         <Text style={styles.hint}>
           Antrenörünün seni eklediği e-posta adresiyle kayıt ol — hesabın otomatik olarak antrenörüne bağlanır.

@@ -1,12 +1,17 @@
+import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
-import { LineChart } from '../../components/LineChart';
+import { EmptyClientState } from '../../components/EmptyClientState';
+import { HBar } from '../../components/HBar';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { Stepper } from '../../components/Stepper';
+import { TrendChart } from '../../components/TrendChart';
+import { LineChart } from '../../components/LineChart';
 import { useAuth } from '../../lib/auth';
 import {
   useAddInjuryLog,
@@ -18,14 +23,17 @@ import {
   useLatestCheckin,
   useLogCardio,
   useLogMeasurement,
+  useLogWeight,
   useMeasurements,
   useProgressPhotos,
   useSaveCheckin,
   useUploadProgressPhoto,
   useWeightLogs,
+  useWellnessSurveys,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, nf } from '../../lib/theme';
+import { C, checkinWeekStart, formatDateInputTr, localDateStr, monthPeriodStr, nf } from '../../lib/theme';
+import { monthLabelTr } from '../../lib/wellnessSurvey';
 
 const WEEKS = 12;
 const FIELDS: { key: 'uyku' | 'enerji' | 'aclik' | 'stres' | 'motivasyon'; label: string }[] = [
@@ -36,14 +44,28 @@ const FIELDS: { key: 'uyku' | 'enerji' | 'aclik' | 'stres' | 'motivasyon'; label
   { key: 'motivasyon', label: 'Motivasyon' },
 ];
 
-const MEASURE_FIELDS: { key: 'chest' | 'waist' | 'hip' | 'arm' | 'thigh' | 'calf'; label: string }[] = [
+const MEASURE_FIELDS: { key: 'chest' | 'waist' | 'hip' | 'shoulder' | 'arm_left' | 'arm_right' | 'thigh_left' | 'thigh_right' | 'calf'; label: string }[] = [
   { key: 'chest', label: 'Göğüs (cm)' },
   { key: 'waist', label: 'Bel (cm)' },
   { key: 'hip', label: 'Kalça (cm)' },
-  { key: 'arm', label: 'Kol (cm)' },
-  { key: 'thigh', label: 'Bacak (cm)' },
+  { key: 'shoulder', label: 'Omuz (cm)' },
+  { key: 'arm_left', label: 'Sol Kol (cm)' },
+  { key: 'arm_right', label: 'Sağ Kol (cm)' },
+  { key: 'thigh_left', label: 'Sol Bacak (cm)' },
+  { key: 'thigh_right', label: 'Sağ Bacak (cm)' },
   { key: 'calf', label: 'Baldır (cm)' },
 ];
+
+// "10.05.2026" -> "2026-05-10"
+function parseTrDate(input: string): string | null {
+  const m = input.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return null;
+  const [, d, mo, y] = m;
+  const dd = d.padStart(2, '0');
+  const mm = mo.padStart(2, '0');
+  if (+dd < 1 || +dd > 31 || +mm < 1 || +mm > 12) return null;
+  return `${y}-${mm}-${dd}`;
+}
 
 export default function IlerlemeScreen() {
   const { profile } = useAuth();
@@ -51,6 +73,7 @@ export default function IlerlemeScreen() {
   const { selectedClientId } = useSelectedClient();
   const clientQuery = useClient(selectedClientId ?? undefined);
   const weightLogsQuery = useWeightLogs(selectedClientId ?? undefined);
+  const logWeight = useLogWeight(selectedClientId ?? undefined);
   const checkinQuery = useLatestCheckin(selectedClientId ?? undefined);
   const saveCheckin = useSaveCheckin(selectedClientId ?? undefined);
   const measurementsQuery = useMeasurements(selectedClientId ?? undefined);
@@ -63,11 +86,98 @@ export default function IlerlemeScreen() {
   const injuryQuery = useInjuryLogs(selectedClientId ?? undefined);
   const addInjury = useAddInjuryLog(selectedClientId ?? undefined);
   const deleteInjury = useDeleteInjuryLog(selectedClientId ?? undefined);
+  const surveysQuery = useWellnessSurveys(selectedClientId ?? undefined);
 
+  const [weightInput, setWeightInput] = useState('');
+  const [weightDateInput, setWeightDateInput] = useState('');
   const [draft, setDraft] = useState({ uyku: 5, enerji: 5, aclik: 5, stres: 5, motivasyon: 5 });
-  const [measureDraft, setMeasureDraft] = useState({ chest: '', waist: '', hip: '', arm: '', thigh: '', calf: '' });
+  const [measureDraft, setMeasureDraft] = useState({
+    chest: '',
+    waist: '',
+    hip: '',
+    shoulder: '',
+    arm_left: '',
+    arm_right: '',
+    thigh_left: '',
+    thigh_right: '',
+    calf: '',
+  });
+  const [measureDateInput, setMeasureDateInput] = useState('');
   const [cardioDraft, setCardioDraft] = useState({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
   const [injuryDraft, setInjuryDraft] = useState({ body_part: '', severity: 3, note: '' });
+  const [viewingPhoto, setViewingPhoto] = useState<{ url: string | null; date: string } | null>(null);
+
+  // Boş tarih alanı = bugün, doluysa girilen (geçmişe dönük olabilir) tarih.
+  const weightDateIso = weightDateInput.trim() ? parseTrDate(weightDateInput) : localDateStr();
+  const measureDateIso = measureDateInput.trim() ? parseTrDate(measureDateInput) : localDateStr();
+
+  // Kardiyo/Ölçüm/Kilo kayıtları client_id+date üzerinden upsert ediliyor (o günün TÜM satırını
+  // değiştiriyor) — form boş bir alanla açılıp öyle kaydedilirse, o tarihte zaten girilmiş diğer
+  // alanlar sessizce 0'a düşerdi. Seçili tarihe ait bir kayıt varsa formu onunla dolduruyoruz,
+  // böylece sadece değiştirilen alan güncellenmiş, diğerleri korunmuş olur. Bu artık SADECE
+  // bugün için değil, geçmişe dönük seçilen herhangi bir tarih için de çalışıyor.
+  const todayCardio = (cardioQuery.data ?? []).find((c) => c.date === localDateStr());
+  const selectedMeasurement = measureDateIso ? (measurementsQuery.data ?? []).find((m) => m.date === measureDateIso) : undefined;
+  const selectedWeightLog = weightDateIso ? (weightLogsQuery.data ?? []).find((w) => w.date === weightDateIso) : undefined;
+
+  useEffect(() => {
+    if (todayCardio) {
+      setCardioDraft({
+        cardio_type: todayCardio.cardio_type ?? '',
+        duration_minutes: todayCardio.duration_minutes ? String(todayCardio.duration_minutes) : '',
+        distance_km: todayCardio.distance_km ? String(todayCardio.distance_km) : '',
+        steps: todayCardio.steps ? String(todayCardio.steps) : '',
+        calories: todayCardio.calories ? String(todayCardio.calories) : '',
+      });
+    } else {
+      setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayCardio?.date, selectedClientId]);
+
+  // Ölçüm/kilo formunun önizlemesi iki farklı durumu AYIRIYOR:
+  //  • Danışan değişti  → formu sıfırla + tarih alanını boşalt (bugüne dön). Aksi halde önceki
+  //    danışanın taslağı sızardı.
+  //  • Sadece tarih değişti → o tarihe ait KAYIT VARSA yükle. Kayıt yoksa forma DOKUNMA — böylece
+  //    önce değeri girip sonra (kayıtsız) bir geçmiş tarih yazan kullanıcının değeri silinmez.
+  //    (Tarih yarım/geçersizken de dokunma.)
+  const prevClientMeasureRef = useRef(selectedClientId);
+  useEffect(() => {
+    const clientSwitched = prevClientMeasureRef.current !== selectedClientId;
+    prevClientMeasureRef.current = selectedClientId;
+    if (measureDateInput.trim() && !measureDateIso) return;
+    if (selectedMeasurement) {
+      setMeasureDraft({
+        chest: selectedMeasurement.chest != null ? String(selectedMeasurement.chest) : '',
+        waist: selectedMeasurement.waist != null ? String(selectedMeasurement.waist) : '',
+        hip: selectedMeasurement.hip != null ? String(selectedMeasurement.hip) : '',
+        shoulder: selectedMeasurement.shoulder != null ? String(selectedMeasurement.shoulder) : '',
+        arm_left: selectedMeasurement.arm_left != null ? String(selectedMeasurement.arm_left) : '',
+        arm_right: selectedMeasurement.arm_right != null ? String(selectedMeasurement.arm_right) : '',
+        thigh_left: selectedMeasurement.thigh_left != null ? String(selectedMeasurement.thigh_left) : '',
+        thigh_right: selectedMeasurement.thigh_right != null ? String(selectedMeasurement.thigh_right) : '',
+        calf: selectedMeasurement.calf != null ? String(selectedMeasurement.calf) : '',
+      });
+    } else if (clientSwitched) {
+      setMeasureDraft({ chest: '', waist: '', hip: '', shoulder: '', arm_left: '', arm_right: '', thigh_left: '', thigh_right: '', calf: '' });
+      setMeasureDateInput('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measureDateIso, selectedMeasurement?.date, selectedClientId]);
+
+  const prevClientWeightRef = useRef(selectedClientId);
+  useEffect(() => {
+    const clientSwitched = prevClientWeightRef.current !== selectedClientId;
+    prevClientWeightRef.current = selectedClientId;
+    if (weightDateInput.trim() && !weightDateIso) return;
+    if (selectedWeightLog) {
+      setWeightInput(String(selectedWeightLog.weight));
+    } else if (clientSwitched) {
+      setWeightInput('');
+      setWeightDateInput('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weightDateIso, selectedWeightLog?.date, selectedClientId]);
 
   const client = clientQuery.data;
 
@@ -83,6 +193,15 @@ export default function IlerlemeScreen() {
     return logs.length ? logs.map((l) => l.weight) : [client.start_weight];
   }, [weightLogsQuery.data, client]);
 
+  if (isTrainer && !selectedClientId) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title="İlerleme" />
+        <EmptyClientState />
+      </View>
+    );
+  }
+
   if (clientQuery.isLoading || !client) {
     return (
       <View style={styles.loading}>
@@ -97,22 +216,31 @@ export default function IlerlemeScreen() {
   const low = entries.some(([, v]) => v <= 4);
   const weeklyDelta = proj.length > 1 ? proj[1] - proj[0] : 0;
 
+  const currentWeekStart = checkinWeekStart();
+  const checkedInThisWeek = !!checkin && checkin.date >= currentWeekStart;
+  const daysUntilNextSaturday = ((6 - new Date().getDay() + 7) % 7) || 7;
+
   const measurements = measurementsQuery.data ?? [];
   const latestMeasurement = measurements[measurements.length - 1];
   const prevMeasurement = measurements[measurements.length - 2];
+  const measureTrendPoints = measurements.filter((m) => m.waist != null).map((m) => ({ date: m.date, value: m.waist as number }));
 
   const cardioWeek = [...(cardioQuery.data ?? [])].reverse();
-  const maxSteps = Math.max(1, ...cardioWeek.map((c) => c.steps));
+  const cardioTrendPoints = cardioWeek.map((c) => ({ date: c.date, value: c.steps }));
   const avgSteps = cardioWeek.length ? Math.round(cardioWeek.reduce((a, c) => a + c.steps, 0) / cardioWeek.length) : 0;
+
+  const surveys = surveysQuery.data ?? [];
+  const thisMonthPeriod = monthPeriodStr();
+  const thisMonthSurvey = surveys.find((s) => s.period === thisMonthPeriod);
 
   async function pickPhoto() {
     if (!selectedClientId) {
-      Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+      showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
       return;
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('İzin gerekli', 'Fotoğraf eklemek için galeri izni vermen gerekiyor.');
+      showAlert('İzin gerekli', 'Fotoğraf eklemek için galeri izni vermen gerekiyor.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
@@ -120,7 +248,7 @@ export default function IlerlemeScreen() {
     const asset = result.assets[0];
     uploadPhoto.mutate(
       { uri: asset.uri, mimeType: asset.mimeType },
-      { onError: (e: any) => Alert.alert('Yüklenemedi', e.message ?? 'Fotoğraf yüklenirken bir hata oldu.') }
+      { onError: (e: any) => showAlert('Yüklenemedi', e.message ?? 'Fotoğraf yüklenirken bir hata oldu.') }
     );
   }
 
@@ -130,13 +258,20 @@ export default function IlerlemeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Panel title="Haftalık Check-in" right={checkin ? `Ortalama ${nf(avg, 1)} / 10` : 'Henüz kayıt yok'}>
           {checkin && (
-            <View style={styles.ciBars}>
+            <Text style={[styles.noteText, !checkedInThisWeek && { color: C.orange }]}>
+              {(() => {
+                const [y, m, d] = checkin.date.split('-');
+                const dateStr = `${d}.${m}.${y}`;
+                if (checkedInThisWeek) return `Bu haftadan: ${dateStr}`;
+                const weeksAgo = Math.max(1, Math.round((Date.now() - new Date(checkin.date).getTime()) / (7 * 24 * 60 * 60 * 1000)));
+                return `Son check-in: ${dateStr} (${weeksAgo} hafta önce — güncel değil)`;
+              })()}
+            </Text>
+          )}
+          {checkin && (
+            <View style={styles.hBarGroup}>
               {entries.map(([k, v]) => (
-                <View key={k} style={styles.ciCol}>
-                  <Text style={styles.ciValue}>{v}</Text>
-                  <View style={[styles.ciBar, { height: `${v * 10}%`, backgroundColor: v <= 4 ? C.red : C.lime }]} />
-                  <Text style={styles.ciLabel}>{k}</Text>
-                </View>
+                <HBar key={k} label={k} value={v} />
               ))}
             </View>
           )}
@@ -148,31 +283,41 @@ export default function IlerlemeScreen() {
             </View>
           )}
 
-          {!isTrainer && (
-            <>
-              <View style={styles.formGrid}>
-                {FIELDS.map((f) => (
-                  <View key={f.key} style={styles.formItem}>
-                    <Stepper
-                      label={f.label}
-                      value={draft[f.key]}
-                      onChange={(d) => setDraft((s) => ({ ...s, [f.key]: Math.min(10, Math.max(1, s[f.key] + d)) }))}
-                      step={1}
-                    />
-                  </View>
-                ))}
-              </View>
-              <PrimaryButton
-                label="Bugünün check-in'ini kaydet"
-                loading={saveCheckin.isPending}
-                onPress={() =>
-                  saveCheckin.mutate(draft, {
-                    onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Check-in kaydedilemedi.'),
-                  })
-                }
-              />
-            </>
-          )}
+          <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'checkin' } })}>
+            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+          </Pressable>
+
+          {!isTrainer &&
+            (checkedInThisWeek ? (
+              <Text style={styles.noteText}>
+                Bu haftanın check-in'ini gönderdin. Bir sonraki check-in Cumartesi günü açılacak
+                {daysUntilNextSaturday === 1 ? ' (yarın).' : ` (${daysUntilNextSaturday} gün sonra).`}
+              </Text>
+            ) : (
+              <>
+                <View style={styles.formGrid}>
+                  {FIELDS.map((f) => (
+                    <View key={f.key} style={styles.formItem}>
+                      <Stepper
+                        label={f.label}
+                        value={draft[f.key]}
+                        onChange={(d) => setDraft((s) => ({ ...s, [f.key]: Math.min(10, Math.max(1, s[f.key] + d)) }))}
+                        step={1}
+                      />
+                    </View>
+                  ))}
+                </View>
+                <PrimaryButton
+                  label="Bu haftanın check-in'ini kaydet"
+                  loading={saveCheckin.isPending}
+                  onPress={() =>
+                    saveCheckin.mutate(draft, {
+                      onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Check-in kaydedilemedi.'),
+                    })
+                  }
+                />
+              </>
+            ))}
           {isTrainer && !checkin && <Text style={styles.noteText}>Danışan henüz check-in göndermedi.</Text>}
         </Panel>
 
@@ -191,7 +336,7 @@ export default function IlerlemeScreen() {
                   <Text style={styles.listMeta}>{log.date}</Text>
                 </View>
                 <Pressable
-                  onPress={() => deleteInjury.mutate(log.id, { onError: (e: any) => Alert.alert('Silinemedi', e.message ?? 'Kayıt silinemedi.') })}
+                  onPress={() => deleteInjury.mutate(log.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') })}
                   hitSlop={8}
                 >
                   <Text style={styles.listDelete}>Sil</Text>
@@ -226,14 +371,14 @@ export default function IlerlemeScreen() {
             disabled={!injuryDraft.body_part.trim()}
             onPress={() => {
               if (!selectedClientId) {
-                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
                 return;
               }
               addInjury.mutate(
                 { body_part: injuryDraft.body_part.trim(), severity: injuryDraft.severity, note: injuryDraft.note.trim() },
                 {
                   onSuccess: () => setInjuryDraft({ body_part: '', severity: 3, note: '' }),
-                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kayıt eklenemedi.'),
+                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kayıt eklenemedi.'),
                 }
               );
             }}
@@ -242,6 +387,9 @@ export default function IlerlemeScreen() {
 
         <Panel title="Kilo Projeksiyonu" right="7700 kcal ≈ 1 kg">
           {proj.length > 0 && <LineChart proj={proj} actual={actual} />}
+          <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'weight' } })}>
+            <Text style={styles.historyBtnText}>Kilo Geçmişini Gör</Text>
+          </Pressable>
           <View style={styles.chips}>
             {[
               [`${nf(weeklyDelta * WEEKS, 1)} kg`, `${WEEKS} haftada`],
@@ -254,20 +402,55 @@ export default function IlerlemeScreen() {
               </View>
             ))}
           </View>
+
+          <View style={styles.logRow}>
+            <View style={{ flex: 1 }}>
+              <AuthField
+                label="Kilo (kg)"
+                value={weightInput}
+                onChangeText={setWeightInput}
+                keyboardType="decimal-pad"
+                placeholder="Ör. 79.5"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AuthField
+                label="Tarih (boş = bugün)"
+                value={weightDateInput}
+                onChangeText={(v) => setWeightDateInput((prev) => formatDateInputTr(v, prev))}
+                placeholder="GG.AA.YYYY"
+                keyboardType="number-pad"
+                maxLength={10}
+              />
+            </View>
+          </View>
+          {weightDateInput.trim() && !weightDateIso && <Text style={styles.dateError}>Tarihi GG.AA.YYYY biçiminde gir.</Text>}
+          <PrimaryButton
+            label="Kaydet"
+            loading={logWeight.isPending}
+            disabled={!weightInput || (!!weightDateInput.trim() && !weightDateIso)}
+            onPress={() => {
+              const v = parseFloat(weightInput.replace(',', '.'));
+              if (!Number.isNaN(v) && weightDateIso) {
+                logWeight.mutate(
+                  { weight: v, date: weightDateIso },
+                  { onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kilo kaydedilemedi.') }
+                );
+              }
+            }}
+          />
         </Panel>
 
         <Panel title="Kardiyo & Adım" right={cardioWeek.length ? `Ort. ${nf(avgSteps)} adım` : 'Henüz kayıt yok'}>
-          {cardioWeek.length > 0 && (
-            <View style={styles.ciBars}>
-              {cardioWeek.map((c) => (
-                <View key={c.id} style={styles.ciCol}>
-                  <Text style={styles.stepValue}>{c.steps > 999 ? `${(c.steps / 1000).toFixed(1)}k` : c.steps}</Text>
-                  <View style={[styles.ciBar, { height: `${Math.max(4, (c.steps / maxSteps) * 100)}%`, backgroundColor: C.blue }]} />
-                  <Text style={styles.ciLabel}>{c.date.slice(5)}</Text>
-                </View>
-              ))}
-            </View>
+          {cardioTrendPoints.length > 0 ? (
+            <TrendChart points={cardioTrendPoints} color={C.blue} formatValue={(v) => nf(v)} h={130} />
+          ) : (
+            <Text style={styles.noteText}>Henüz kayıt yok.</Text>
           )}
+
+          <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'cardio' } })}>
+            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+          </Pressable>
 
           <View style={styles.formGrid}>
             <View style={styles.measureFormItem}>
@@ -318,9 +501,16 @@ export default function IlerlemeScreen() {
           <PrimaryButton
             label="Bugünün kardiyosunu kaydet"
             loading={logCardio.isPending}
+            disabled={
+              !cardioDraft.cardio_type.trim() &&
+              !cardioDraft.duration_minutes &&
+              !cardioDraft.distance_km &&
+              !cardioDraft.steps &&
+              !cardioDraft.calories
+            }
             onPress={() => {
               if (!selectedClientId) {
-                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
                 return;
               }
               const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
@@ -334,7 +524,7 @@ export default function IlerlemeScreen() {
                 },
                 {
                   onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }),
-                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kardiyo kaydı kaydedilemedi.'),
+                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kardiyo kaydı kaydedilemedi.'),
                 }
               );
             }}
@@ -364,6 +554,23 @@ export default function IlerlemeScreen() {
             </View>
           )}
 
+          {measureTrendPoints.length > 0 ? (
+            <TrendChart points={measureTrendPoints} color={C.orange} formatValue={(v) => `${nf(v, 1)} cm`} h={130} />
+          ) : null}
+
+          <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'measurement' } })}>
+            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+          </Pressable>
+
+          <AuthField
+            label="Tarih (boş = bugün)"
+            value={measureDateInput}
+            onChangeText={(v) => setMeasureDateInput((prev) => formatDateInputTr(v, prev))}
+            placeholder="GG.AA.YYYY"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          {measureDateInput.trim() && !measureDateIso && <Text style={styles.dateError}>Tarihi GG.AA.YYYY biçiminde gir.</Text>}
           <View style={styles.formGrid}>
             {MEASURE_FIELDS.map((f) => (
               <View key={f.key} style={styles.measureFormItem}>
@@ -378,26 +585,33 @@ export default function IlerlemeScreen() {
             ))}
           </View>
           <PrimaryButton
-            label="Bugünün ölçümünü kaydet"
+            label="Ölçümü Kaydet"
             loading={logMeasurement.isPending}
+            disabled={MEASURE_FIELDS.every((f) => !measureDraft[f.key]) || (!!measureDateInput.trim() && !measureDateIso)}
             onPress={() => {
               if (!selectedClientId) {
-                Alert.alert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
                 return;
               }
-              const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
+              if (!measureDateIso) return;
+              // Boş alan = null (0 değil) — böylece takip edilmeyen bölgeler özet/grafiklerde
+              // "0,0 cm" gibi görünmez, "—" ve "veri yok" olur.
+              const n = (s: string) => (s.trim() === '' ? null : parseFloat(s.replace(',', '.')) || 0);
               logMeasurement.mutate(
                 {
                   chest: n(measureDraft.chest),
                   waist: n(measureDraft.waist),
                   hip: n(measureDraft.hip),
-                  arm: n(measureDraft.arm),
-                  thigh: n(measureDraft.thigh),
+                  shoulder: n(measureDraft.shoulder),
+                  arm_left: n(measureDraft.arm_left),
+                  arm_right: n(measureDraft.arm_right),
+                  thigh_left: n(measureDraft.thigh_left),
+                  thigh_right: n(measureDraft.thigh_right),
                   calf: n(measureDraft.calf),
+                  date: measureDateIso,
                 },
                 {
-                  onSuccess: () => setMeasureDraft({ chest: '', waist: '', hip: '', arm: '', thigh: '', calf: '' }),
-                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Ölçüm kaydedilemedi.'),
+                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Ölçüm kaydedilemedi.'),
                 }
               );
             }}
@@ -413,13 +627,54 @@ export default function IlerlemeScreen() {
               <Pressable
                 key={p.id}
                 style={styles.photoWrap}
-                onLongPress={() => deletePhoto.mutate(p, { onError: (e: any) => Alert.alert('Silinemedi', e.message ?? 'Fotoğraf silinemedi.') })}
+                onPress={() => setViewingPhoto({ url: p.url, date: p.date })}
+                onLongPress={() =>
+                  showAlert('Fotoğrafı Sil', `${p.date} tarihli fotoğraf silinsin mi?`, [
+                    { text: 'Vazgeç', style: 'cancel' },
+                    {
+                      text: 'Sil',
+                      style: 'destructive',
+                      onPress: () => deletePhoto.mutate(p, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Fotoğraf silinemedi.') }),
+                    },
+                  ])
+                }
               >
                 {p.url ? <Image source={{ uri: p.url }} style={styles.photo} /> : <View style={[styles.photo, styles.photoFallback]} />}
                 <Text style={styles.photoDate}>{p.date}</Text>
               </Pressable>
             ))}
           </View>
+        </Panel>
+
+        <Modal visible={!!viewingPhoto} transparent animationType="fade" onRequestClose={() => setViewingPhoto(null)}>
+          <Pressable style={styles.photoViewerBackdrop} onPress={() => setViewingPhoto(null)}>
+            {viewingPhoto?.url ? <Image source={{ uri: viewingPhoto.url }} style={styles.photoViewerImage} resizeMode="contain" /> : null}
+            <Text style={styles.photoViewerDate}>{viewingPhoto?.date}</Text>
+            <Pressable style={styles.photoViewerClose} onPress={() => setViewingPhoto(null)} hitSlop={12}>
+              <Text style={styles.photoViewerCloseText}>✕</Text>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        <Panel title="Aylık Değerlendirme Anketi" right={monthLabelTr(thisMonthPeriod)}>
+          {surveysQuery.isLoading ? (
+            <Text style={styles.noteText}>Yükleniyor…</Text>
+          ) : (
+            <>
+              <Text style={styles.noteText}>
+                {isTrainer
+                  ? `${surveys.length} ay dolduruldu.`
+                  : thisMonthSurvey
+                    ? 'Bu ayın anketini doldurdun. İstersen düzenleyebilirsin.'
+                    : 'Bu ayın anketini henüz doldurmadın.'}
+              </Text>
+              <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/anket', params: { period: thisMonthPeriod } })}>
+                <Text style={styles.historyBtnText}>
+                  {isTrainer ? 'Anketleri Gör' : thisMonthSurvey ? 'Anketi Görüntüle / Düzenle' : 'Anketi Doldur'}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </Panel>
       </ScrollView>
     </View>
@@ -430,12 +685,20 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: C.bg },
   loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingTop: 4 },
-  ciBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, height: 150, marginBottom: 8 },
-  ciCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
-  ciValue: { fontSize: 12, fontWeight: '700', color: C.white, marginBottom: 4 },
-  ciBar: { width: '100%', borderTopLeftRadius: 8, borderTopRightRadius: 8 },
-  ciLabel: { fontSize: 9, color: C.grey, marginTop: 5, textAlign: 'center' },
-  stepValue: { fontSize: 10, fontWeight: '700', color: C.white, marginBottom: 4 },
+  hBarGroup: { marginBottom: 8 },
+  historyBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: C.edge,
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginBottom: 14,
+  },
+  historyBtnText: { fontSize: 11, fontWeight: '700', color: C.lime },
+  logRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  dateError: { color: C.red, fontSize: 11, marginBottom: 10 },
+  trainerHint: { color: C.greyD, fontSize: 11, marginTop: 6, lineHeight: 16, fontStyle: 'italic' },
   note: { backgroundColor: C.card2, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 14 },
   noteText: { fontSize: 11, color: C.grey },
   formGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
@@ -457,6 +720,11 @@ const styles = StyleSheet.create({
   photo: { width: '100%', aspectRatio: 1, borderRadius: 10, backgroundColor: C.card2 },
   photoFallback: { alignItems: 'center', justifyContent: 'center' },
   photoDate: { fontSize: 9, color: C.greyD, marginTop: 3, textAlign: 'center' },
+  photoViewerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
+  photoViewerImage: { width: '100%', height: '80%' },
+  photoViewerDate: { color: C.grey, fontSize: 13, fontWeight: '700', marginTop: 14 },
+  photoViewerClose: { position: 'absolute', top: 50, right: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: C.card2, alignItems: 'center', justifyContent: 'center' },
+  photoViewerCloseText: { color: C.white, fontSize: 16, fontWeight: '700' },
   injuryRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

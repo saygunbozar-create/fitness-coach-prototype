@@ -7,11 +7,13 @@ export function Stepper({
   value,
   onChange,
   step = 1,
+  disabled,
 }: {
   label: string;
   value: number;
   onChange: (delta: number) => void;
   step?: number;
+  disabled?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(String(value));
@@ -23,8 +25,8 @@ export function Stepper({
   }
 
   return (
-    <View style={styles.stp}>
-      <Pressable onPress={() => onChange(-step)} hitSlop={8}>
+    <View style={[styles.stp, disabled && { opacity: 0.5 }]}>
+      <Pressable onPress={() => onChange(-step)} hitSlop={8} disabled={disabled}>
         <Text style={[styles.btn, { color: C.grey }]}>−</Text>
       </Pressable>
       <View style={styles.mid}>
@@ -40,13 +42,13 @@ export function Stepper({
             selectTextOnFocus
           />
         ) : (
-          <Pressable onPress={() => { setText(String(value)); setEditing(true); }}>
+          <Pressable onPress={() => { if (disabled) return; setText(String(value)); setEditing(true); }}>
             <Text style={styles.midValue}>{value}</Text>
           </Pressable>
         )}
         <Text style={styles.midLabel}>{label}</Text>
       </View>
-      <Pressable onPress={() => onChange(step)} hitSlop={8}>
+      <Pressable onPress={() => onChange(step)} hitSlop={8} disabled={disabled}>
         <Text style={[styles.btn, { color: C.lime }]}>+</Text>
       </Pressable>
     </View>

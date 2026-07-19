@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { EmptyClientState } from '../../components/EmptyClientState';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -19,16 +21,16 @@ import {
   useSessionLogs,
   useTogglePaymentPaid,
   useUpdatePayment,
-  useWorkout,
+  useWorkoutDaysList,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, localDateStr, nf } from '../../lib/theme';
+import { C, formatDateInputTr, formatTimeInputTr, localDateStr, nf } from '../../lib/theme';
 import type { Payment } from '../../lib/types';
 
 const todayStr = localDateStr;
 
 function onErr(title: string) {
-  return (e: any) => Alert.alert(title, e.message ?? 'Bir hata oluştu.');
+  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
 }
 
 // "10.05.2026" -> "2026-05-10"
@@ -70,12 +72,21 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
   const [amount, setAmount] = useState(String(payment.amount));
   const [note, setNote] = useState(payment.note);
   const [error, setError] = useState(false);
+  const [amountError, setAmountError] = useState(false);
 
   return (
     <View style={styles.editCard}>
-      <AuthField label="Tarih (GG.AA.YYYY)" value={date} onChangeText={(v) => { setDate(v); setError(false); }} placeholder="Ör. 10.05.2026" />
+      <AuthField
+        label="Tarih (GG.AA.YYYY)"
+        value={date}
+        onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setError(false); }}
+        placeholder="Ör. 10.05.2026"
+        keyboardType="number-pad"
+        maxLength={10}
+      />
       {error && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir</Text>}
-      <AuthField label="Tutar (₺)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+      <AuthField label="Tutar (₺)" value={amount} onChangeText={(v) => { setAmount(v); setAmountError(false); }} keyboardType="decimal-pad" />
+      {amountError && <Text style={styles.error}>Geçerli bir tutar gir</Text>}
       <AuthField label="Not" value={note} onChangeText={setNote} />
       <View style={styles.editActions}>
         <Pressable
@@ -85,7 +96,7 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
             const iso = parseTrDate(date);
             const v = parseFloat(amount.replace(',', '.'));
             if (!iso) { setError(true); return; }
-            if (Number.isNaN(v)) return;
+            if (Number.isNaN(v)) { setAmountError(true); return; }
             onSave({ date: iso, amount: v, note });
           }}
         >
@@ -112,7 +123,7 @@ export default function OdemelerScreen() {
   const packagesQuery = usePackages(selectedClientId ?? undefined);
   const addPackage = useAddPackage(selectedClientId ?? undefined);
   const deletePackage = useDeletePackage(selectedClientId ?? undefined);
-  const workoutQuery = useWorkout(selectedClientId ?? undefined);
+  const workoutDaysQuery = useWorkoutDaysList(selectedClientId ?? undefined);
   const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined, 60);
   const addSessionLog = useAddSessionLog(selectedClientId ?? undefined);
   const deleteSessionLog = useDeleteSessionLog(selectedClientId ?? undefined);
@@ -121,6 +132,7 @@ export default function OdemelerScreen() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [dateError, setDateError] = useState(false);
+  const [amountError, setAmountError] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addingPackage, setAddingPackage] = useState(false);
   const [packageDraft, setPackageDraft] = useState({ name: '', total_sessions: '', note: '' });
@@ -128,6 +140,24 @@ export default function OdemelerScreen() {
   const [addingSession, setAddingSession] = useState(false);
   const [sessionDraft, setSessionDraft] = useState({ date: '', time: '', status: 'tamamlandi' as 'tamamlandi' | 'atlandi' });
   const [sessionError, setSessionError] = useState<string | null>(null);
+
+  // Danışan değişince tüm form taslaklarını sıfırla — Ödemeler sekmesi mount kalırken (masaüstü
+  // sidebar / danışan değiştirme) bir danışan için yazılan tutar/paket/seans taslağı, mutasyonlar
+  // submit anında selectedClientId'ye bağlandığı için yanlışlıkla BAŞKA danışana yazılabilirdi.
+  useEffect(() => {
+    setDate('');
+    setAmount('');
+    setNote('');
+    setDateError(false);
+    setAmountError(false);
+    setEditingId(null);
+    setAddingPackage(false);
+    setPackageDraft({ name: '', total_sessions: '', note: '' });
+    setAddingSession(false);
+    setSessionDraft({ date: '', time: '', status: 'tamamlandi' });
+    setSessionError(null);
+    setActiveDayId(null);
+  }, [selectedClientId]);
 
   const payments = paymentsQuery.data ?? [];
   const totalPaid = useMemo(() => payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0), [payments]);
@@ -155,13 +185,22 @@ export default function OdemelerScreen() {
   const usedSessions = useMemo(() => completedSessionsQuery.data ?? [], [completedSessionsQuery.data]);
   const remaining = packages.length ? Math.max(0, totalPurchased - usedSessions.length) : 0;
 
-  const days = workoutQuery.data ?? [];
+  const days = workoutDaysQuery.data ?? [];
   const activeDay = days.find((d) => d.id === activeDayId) ?? days[0];
 
   const recentSessions = useMemo(
     () => [...(sessionLogsQuery.data ?? [])].sort((a, b) => (b.date + (b.time ?? '')).localeCompare(a.date + (a.time ?? ''))),
     [sessionLogsQuery.data]
   );
+
+  if (isTrainer && !selectedClientId) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title="Ödemeler" />
+        <EmptyClientState />
+      </View>
+    );
+  }
 
   if (clientQuery.isLoading || !clientQuery.data) {
     return (
@@ -173,7 +212,11 @@ export default function OdemelerScreen() {
 
   function submit() {
     const v = parseFloat(amount.replace(',', '.'));
-    if (Number.isNaN(v)) return;
+    if (Number.isNaN(v)) {
+      setAmountError(true);
+      return;
+    }
+    setAmountError(false);
     const iso = date.trim() ? parseTrDate(date) : todayStr();
     if (!iso) {
       setDateError(true);
@@ -219,7 +262,16 @@ export default function OdemelerScreen() {
             <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
           )}
           {isTrainer && (
-            <Pressable onPress={() => deletePayment.mutate(p.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
+            <Pressable
+              disabled={deletePayment.isPending}
+              onPress={() =>
+                showAlert('Ödemeyi Sil', `${nf(p.amount)} ₺ tutarındaki ödeme kaydı silinsin mi?`, [
+                  { text: 'Vazgeç', style: 'cancel' },
+                  { text: 'Sil', style: 'destructive', onPress: () => deletePayment.mutate(p.id, { onError: onErr('Silinemedi') }) },
+                ])
+              }
+              hitSlop={8}
+            >
               <Text style={styles.rowDelete}>Sil</Text>
             </Pressable>
           )}
@@ -259,7 +311,16 @@ export default function OdemelerScreen() {
                 </View>
               )}
               {isTrainer && (
-                <Pressable onPress={() => deletePackage.mutate(currentPackage.id, { onError: onErr('Paket silinemedi') })} hitSlop={8}>
+                <Pressable
+                  disabled={deletePackage.isPending}
+                  onPress={() =>
+                    showAlert('Paketi Sil', `"${currentPackage.name}" paketi silinsin mi?`, [
+                      { text: 'Vazgeç', style: 'cancel' },
+                      { text: 'Sil', style: 'destructive', onPress: () => deletePackage.mutate(currentPackage.id, { onError: onErr('Paket silinemedi') }) },
+                    ])
+                  }
+                  hitSlop={8}
+                >
                   <Text style={styles.rowDelete}>Bu paketi sil</Text>
                 </Pressable>
               )}
@@ -277,7 +338,16 @@ export default function OdemelerScreen() {
                     {p.name} · {p.total_sessions} seans · {p.start_date}
                   </Text>
                   {isTrainer && (
-                    <Pressable onPress={() => deletePackage.mutate(p.id, { onError: onErr('Paket silinemedi') })} hitSlop={8}>
+                    <Pressable
+                      disabled={deletePackage.isPending}
+                      onPress={() =>
+                        showAlert('Paketi Sil', `"${p.name}" paketi silinsin mi?`, [
+                          { text: 'Vazgeç', style: 'cancel' },
+                          { text: 'Sil', style: 'destructive', onPress: () => deletePackage.mutate(p.id, { onError: onErr('Paket silinemedi') }) },
+                        ])
+                      }
+                      hitSlop={8}
+                    >
                       <Text style={styles.rowDelete}>Sil</Text>
                     </Pressable>
                   )}
@@ -309,7 +379,10 @@ export default function OdemelerScreen() {
                 disabled={!packageDraft.name.trim() || !packageDraft.total_sessions}
                 onPress={() => {
                   const total = parseInt(packageDraft.total_sessions, 10);
-                  if (!total || total <= 0) return;
+                  if (!total || total <= 0) {
+                    showAlert('Geçersiz Seans Sayısı', 'Toplam seans sayısı için 0\'dan büyük bir tam sayı gir.');
+                    return;
+                  }
                   addPackage.mutate(
                     { name: packageDraft.name.trim(), total_sessions: total, note: packageDraft.note.trim() },
                     {
@@ -350,10 +423,24 @@ export default function OdemelerScreen() {
               )}
               <View style={styles.rowGap2}>
                 <View style={{ flex: 1 }}>
-                  <AuthField label="Tarih (GG.AA.YYYY)" value={sessionDraft.date} onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: v }))} placeholder="Ör. 10.07.2026" />
+                  <AuthField
+                    label="Tarih (GG.AA.YYYY)"
+                    value={sessionDraft.date}
+                    onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: formatDateInputTr(v, s.date) }))}
+                    placeholder="Ör. 10.07.2026"
+                    keyboardType="number-pad"
+                    maxLength={10}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AuthField label="Saat (SS:DD)" value={sessionDraft.time} onChangeText={(v) => setSessionDraft((s) => ({ ...s, time: v }))} placeholder="Ör. 14:30" />
+                  <AuthField
+                    label="Saat (SS:DD)"
+                    value={sessionDraft.time}
+                    onChangeText={(v) => setSessionDraft((s) => ({ ...s, time: formatTimeInputTr(v, s.time) }))}
+                    placeholder="Ör. 14:30"
+                    keyboardType="number-pad"
+                    maxLength={5}
+                  />
                 </View>
               </View>
               <View style={styles.dayPickRow}>
@@ -408,7 +495,16 @@ export default function OdemelerScreen() {
                   </Text>
                 </View>
                 {isTrainer && (
-                  <Pressable onPress={() => deleteSessionLog.mutate(s.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
+                  <Pressable
+                    disabled={deleteSessionLog.isPending}
+                    onPress={() =>
+                      showAlert('Seansı Sil', `${formatTrDate(s.date)} tarihli seans kaydı silinsin mi?`, [
+                        { text: 'Vazgeç', style: 'cancel' },
+                        { text: 'Sil', style: 'destructive', onPress: () => deleteSessionLog.mutate(s.id, { onError: onErr('Silinemedi') }) },
+                      ])
+                    }
+                    hitSlop={8}
+                  >
                     <Text style={styles.rowDelete}>Sil</Text>
                   </Pressable>
                 )}
@@ -417,21 +513,32 @@ export default function OdemelerScreen() {
           )}
         </Panel>
 
-        <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
-          <Text style={styles.total}>{nf(totalPaid)} ₺</Text>
-          {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
-        </Panel>
+        {isTrainer && (
+          <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
+            <Text style={styles.total}>{nf(totalPaid)} ₺</Text>
+            {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
+          </Panel>
+        )}
 
         {isTrainer && (
           <Panel title="Yeni Ödeme Ekle" right="geçmiş veya ileri tarihli olabilir">
             <AuthField
               label="Tarih (GG.AA.YYYY, boş = bugün)"
               value={date}
-              onChangeText={(v) => { setDate(v); setDateError(false); }}
+              onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setDateError(false); }}
               placeholder="Ör. 10.05.2026"
+              keyboardType="number-pad"
+              maxLength={10}
             />
             {dateError && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir (Ör. 10.05.2026)</Text>}
-            <AuthField label="Tutar (₺)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="Ör. 3000" />
+            <AuthField
+              label="Tutar (₺)"
+              value={amount}
+              onChangeText={(v) => { setAmount(v); setAmountError(false); }}
+              keyboardType="decimal-pad"
+              placeholder="Ör. 3000"
+            />
+            {amountError && <Text style={styles.error}>Geçerli bir tutar gir</Text>}
             <AuthField label="Not (paket, ay vb.)" value={note} onChangeText={setNote} placeholder="Ör. Haziran paketi" />
             <PrimaryButton label="Ödeme Ekle" loading={addPayment.isPending} disabled={!amount} onPress={submit} />
           </Panel>

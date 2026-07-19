@@ -27,7 +27,7 @@ export default function SignupTrainer() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>FITNESS COACH</Text>
+        <Text style={styles.brand}>COACHBOOK</Text>
         <Text style={styles.title}>Antrenör Kaydı</Text>
 
         {done ? (

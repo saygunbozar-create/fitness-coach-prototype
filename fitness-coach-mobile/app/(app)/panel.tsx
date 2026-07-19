@@ -1,293 +1,347 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showAlert } from '../../lib/alert';
+import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { Ring } from '../../components/Ring';
-import { LineChart } from '../../components/LineChart';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { AuthField } from '../../components/AuthField';
 import { useAuth } from '../../lib/auth';
-import { disableWaterReminder, enableWaterReminder, getWaterReminderPrefs, type WaterReminderPrefs } from '../../lib/notifications';
 import {
-  useCheckinsInRange,
-  useClient,
-  useLogWeight,
-  useMeals,
-  usePayments,
-  usePrLogs,
-  useSessionLogs,
-  useWeightLogs,
-  useWorkout,
+  useAddLessonEntry,
+  useClients,
+  useDeleteLessonEntry,
+  useLessonSchedule,
+  useLogSessionFromSchedule,
+  useMonthlyPaymentsSummary,
+  useSessionLogsForWeek,
+  useUnlogSessionFromSchedule,
+  useWeeklyCompletedSessionCount,
 } from '../../lib/queries';
-import { useSelectedClient } from '../../lib/selectedClient';
-import { C, localDateStr, nf } from '../../lib/theme';
+import { useIsDesktopWeb } from '../../lib/responsive';
+import { addDaysToDateStr, C, formatDateInputTr, formatTimeInputTr, localDateStr, mondayOfWeek, nf } from '../../lib/theme';
 
-const REMINDER_INTERVALS = [1, 2, 3, 4];
+const TR_WEEKDAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 
-function WaterReminderCard() {
-  const [prefs, setPrefs] = useState<WaterReminderPrefs>({ enabled: false, intervalHours: 2 });
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+function formatTrDateShort(iso: string): string {
+  const [, m, d] = iso.split('-');
+  return `${parseInt(d, 10)}.${m}`;
+}
 
-  useEffect(() => {
-    getWaterReminderPrefs().then(setPrefs);
-  }, []);
+// "10.05.2026" -> "2026-05-10"
+function parseTrDateFull(input: string): string | null {
+  const m = input.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return null;
+  const [, d, mo, y] = m;
+  const dd = d.padStart(2, '0');
+  const mm = mo.padStart(2, '0');
+  if (+dd < 1 || +dd > 31 || +mm < 1 || +mm > 12) return null;
+  return `${y}-${mm}-${dd}`;
+}
 
-  async function toggle(next: boolean) {
-    setBusy(true);
-    setNotice(null);
-    if (next) {
-      const result = await enableWaterReminder(prefs.intervalHours);
-      if (result === 'denied') {
-        setNotice('Bildirim izni verilmedi. Telefon ayarlarından izin vermen gerekiyor.');
-      } else if (result === 'unsupported') {
-        setNotice('Bildirimler web önizlemede desteklenmiyor, telefonda dene.');
-      } else {
-        setPrefs((p) => ({ ...p, enabled: true }));
+function parseTrTimeShort(input: string): string | null {
+  const m = input.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!m) return null;
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+function LessonScheduleCard() {
+  const { profile } = useAuth();
+  const clientsQuery = useClients(profile?.id);
+  const [weekStart, setWeekStart] = useState(() => mondayOfWeek());
+  const weekEnd = addDaysToDateStr(weekStart, 6);
+  const lessonsQuery = useLessonSchedule(profile?.id, weekStart, weekEnd);
+  const addLesson = useAddLessonEntry(profile?.id);
+  const deleteLesson = useDeleteLessonEntry(profile?.id);
+  const sessionLogsWeekQuery = useSessionLogsForWeek(profile?.id, weekStart, weekEnd);
+  const logSession = useLogSessionFromSchedule(profile?.id);
+  const unlogSession = useUnlogSessionFromSchedule(profile?.id);
+
+  const [addingLesson, setAddingLesson] = useState(false);
+  const [lessonClientId, setLessonClientId] = useState<string | null>(null);
+  const [lessonDate, setLessonDate] = useState('');
+  const [lessonTime, setLessonTime] = useState('');
+  const [lessonError, setLessonError] = useState<string | null>(null);
+
+  const clients = clientsQuery.data ?? [];
+  const lessons = lessonsQuery.data ?? [];
+  const days = Array.from({ length: 7 }, (_, i) => addDaysToDateStr(weekStart, i));
+
+  // "Seans Kullan" ile eklenen seans, dersin saatini de sakladığı için eşleştirmeyi
+  // danışan+tarih+SAAT ile yapıyoruz. Böylece: (a) aynı gün birden fazla dersi olan danışanda
+  // her ders bağımsız işaretlenir, (b) "Geri Al" sadece o dersin saatine ait seansı siler —
+  // aynı gün Ödemeler'den elle girilmiş (farklı/saatsiz) bir seansı yanlışlıkla silmez.
+  const sessionKey = (clientId: string, date: string, time: string | null) => `${clientId}:${date}:${(time ?? '').slice(0, 5)}`;
+  const usedByKey = new Map((sessionLogsWeekQuery.data ?? []).map((s) => [sessionKey(s.client_id, s.date, s.time), s]));
+
+  function submitLesson() {
+    setLessonError(null);
+    const isoDate = parseTrDateFull(lessonDate);
+    const isoTime = parseTrTimeShort(lessonTime);
+    if (!lessonClientId) {
+      setLessonError('Bir danışan seç.');
+      return;
+    }
+    if (!isoDate) {
+      setLessonError('Tarih GG.AA.YYYY formatında olmalı.');
+      return;
+    }
+    if (!isoTime) {
+      setLessonError('Saat SS:DD formatında olmalı.');
+      return;
+    }
+    addLesson.mutate(
+      { client_id: lessonClientId, date: isoDate, time: isoTime },
+      {
+        onSuccess: () => {
+          setLessonClientId(null);
+          setLessonDate('');
+          setLessonTime('');
+          setAddingLesson(false);
+        },
+        onError: (e: any) => showAlert('Eklenemedi', e.message ?? 'Ders eklenemedi.'),
       }
-    } else {
-      await disableWaterReminder();
-      setPrefs((p) => ({ ...p, enabled: false }));
-    }
-    setBusy(false);
-  }
-
-  async function changeInterval(hours: number) {
-    setPrefs((p) => ({ ...p, intervalHours: hours }));
-    if (prefs.enabled) {
-      setBusy(true);
-      await enableWaterReminder(hours);
-      setBusy(false);
-    }
+    );
   }
 
   return (
-    <Panel title="Su İçme Hatırlatıcısı" right="💧">
-      <View style={styles.waterRow}>
-        <Text style={styles.waterLabel}>{prefs.enabled ? `Her ${prefs.intervalHours} saatte bir hatırlatılıyor` : 'Kapalı'}</Text>
-        <Switch
-          value={prefs.enabled}
-          onValueChange={toggle}
-          disabled={busy}
-          trackColor={{ false: C.edge, true: C.lime }}
-          thumbColor={C.white}
-        />
+    <Panel title="Haftalık Ders Takvimi" right={`${formatTrDateShort(weekStart)} – ${formatTrDateShort(weekEnd)}`}>
+      <View style={styles.weekNavRow}>
+        <Pressable onPress={() => setWeekStart((s) => addDaysToDateStr(s, -7))} hitSlop={8}>
+          <Text style={styles.weekNavBtn}>‹ Önceki hafta</Text>
+        </Pressable>
+        <Pressable onPress={() => setWeekStart(mondayOfWeek())} hitSlop={8}>
+          <Text style={styles.weekNavToday}>Bu hafta</Text>
+        </Pressable>
+        <Pressable onPress={() => setWeekStart((s) => addDaysToDateStr(s, 7))} hitSlop={8}>
+          <Text style={styles.weekNavBtn}>Sonraki hafta ›</Text>
+        </Pressable>
       </View>
-      <View style={styles.periodRow}>
-        {REMINDER_INTERVALS.map((h) => (
-          <Pressable
-            key={h}
-            onPress={() => changeInterval(h)}
-            disabled={busy}
-            style={[styles.periodBtn, prefs.intervalHours === h && { backgroundColor: C.lime, borderColor: C.lime }]}
-          >
-            <Text style={[styles.periodBtnText, prefs.intervalHours === h && { color: C.bg }]}>{h} saat</Text>
-          </Pressable>
-        ))}
-      </View>
-      {notice && <Text style={styles.waterNotice}>{notice}</Text>}
-      {Platform.OS === 'web' && !notice && <Text style={styles.waterNotice}>Gerçek bildirim için telefonda dene.</Text>}
+
+      {lessonsQuery.isLoading ? (
+        <ActivityIndicator color={C.lime} />
+      ) : (
+        days.map((dayStr, i) => {
+          const dayLessons = lessons.filter((l) => l.date === dayStr);
+          return (
+            <View key={dayStr} style={styles.dayBlock}>
+              <Text style={styles.dayBlockTitle}>
+                {TR_WEEKDAYS[i]} · {formatTrDateShort(dayStr)}
+              </Text>
+              {dayLessons.length === 0 ? (
+                <Text style={styles.dayBlockEmpty}>Ders yok</Text>
+              ) : (
+                dayLessons.map((l) => {
+                  const used = usedByKey.get(sessionKey(l.client_id, l.date, l.time));
+                  return (
+                    <View key={l.id} style={styles.lessonRow}>
+                      <Text style={styles.lessonText}>
+                        {l.time.slice(0, 5)} · {l.clientName}
+                      </Text>
+                      <View style={styles.lessonActions}>
+                        {used ? (
+                          <Pressable
+                            style={styles.useSessionBtnOn}
+                            onPress={() =>
+                              showAlert('Seansı Geri Al', `${l.clientName} için kullanılan seans geri alınsın mı?`, [
+                                { text: 'Vazgeç', style: 'cancel' },
+                                {
+                                  text: 'Geri Al',
+                                  style: 'destructive',
+                                  onPress: () =>
+                                    unlogSession.mutate(
+                                      { id: used.id, client_id: l.client_id },
+                                      { onError: (e: any) => showAlert('Geri alınamadı', e.message ?? 'Bir hata oluştu.') }
+                                    ),
+                                },
+                              ])
+                            }
+                          >
+                            <Text style={styles.useSessionBtnOnText}>✓ Kullanıldı</Text>
+                          </Pressable>
+                        ) : (
+                          <Pressable
+                            style={styles.useSessionBtn}
+                            onPress={() =>
+                              logSession.mutate(
+                                { client_id: l.client_id, date: l.date, time: l.time },
+                                { onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Seans kullanılamadı.') }
+                              )
+                            }
+                          >
+                            <Text style={styles.useSessionBtnText}>Seans Kullan</Text>
+                          </Pressable>
+                        )}
+                        <Pressable onPress={() => deleteLesson.mutate(l.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Silinemedi.') })} hitSlop={8}>
+                          <Text style={styles.lessonDelete}>✕</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          );
+        })
+      )}
+
+      {!addingLesson ? (
+        <Pressable style={styles.addLessonBtn} onPress={() => setAddingLesson(true)}>
+          <Text style={styles.addLessonBtnText}>+ Ders Ekle</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.addDayCard}>
+          <Text style={styles.label}>Danışan</Text>
+          <View style={styles.clientPickRow}>
+            {clients.map((c) => (
+              <Pressable
+                key={c.id}
+                style={[styles.clientPick, lessonClientId === c.id && styles.clientPickOn]}
+                onPress={() => setLessonClientId(c.id)}
+              >
+                <Text style={[styles.clientPickText, lessonClientId === c.id && styles.clientPickTextOn]}>{c.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.rowGap}>
+            <View style={{ flex: 1 }}>
+              <AuthField
+                label="Tarih (GG.AA.YYYY)"
+                value={lessonDate}
+                onChangeText={(v) => setLessonDate((prev) => formatDateInputTr(v, prev))}
+                placeholder="Ör. 13.07.2026"
+                keyboardType="number-pad"
+                maxLength={10}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AuthField
+                label="Saat (SS:DD)"
+                value={lessonTime}
+                onChangeText={(v) => setLessonTime((prev) => formatTimeInputTr(v, prev))}
+                placeholder="Ör. 14:30"
+                keyboardType="number-pad"
+                maxLength={5}
+              />
+            </View>
+          </View>
+          {lessonError && <Text style={styles.lessonErrorText}>{lessonError}</Text>}
+          <View style={styles.rowGap}>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Kaydet" loading={addLesson.isPending} onPress={submitLesson} />
+            </View>
+            <Pressable
+              style={styles.cancelBtn}
+              onPress={() => {
+                setAddingLesson(false);
+                setLessonError(null);
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </Panel>
   );
 }
 
-const WEEKS = 12;
-const REPORT_PERIODS = [
-  { label: 'Haftalık', days: 7 },
-  { label: 'Aylık', days: 30 },
-  { label: 'Yıl Sonu', days: 365 },
-];
+function TrainerReportCard() {
+  const { profile } = useAuth();
+  const [amountHidden, setAmountHidden] = useState(false);
+
+  const weekStart = mondayOfWeek();
+  const weekEnd = addDaysToDateStr(weekStart, 6);
+  const now = new Date();
+  const monthStart = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthEnd = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const todayStr = localDateStr();
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const weeklySessionsQuery = useWeeklyCompletedSessionCount(profile?.id, weekStart, weekEnd);
+  const monthlyPaymentsQuery = useMonthlyPaymentsSummary(profile?.id, monthStart, monthEnd);
+  const todayLessonsQuery = useLessonSchedule(profile?.id, todayStr, todayStr);
+
+  const upcomingToday = (todayLessonsQuery.data ?? []).filter((l) => l.time.slice(0, 5) >= nowTime);
+  const loading = weeklySessionsQuery.isLoading || monthlyPaymentsQuery.isLoading;
+
+  return (
+    <Panel title="Rapor" right="Genel Bakış">
+      {loading ? (
+        <ActivityIndicator color={C.lime} />
+      ) : (
+        <>
+          <View style={styles.reportGrid}>
+            <View style={styles.reportStat}>
+              <Text style={styles.reportStatValue}>{weeklySessionsQuery.data ?? 0}</Text>
+              <Text style={styles.reportStatLabel}>Bu hafta tamamlanan ders</Text>
+            </View>
+            <View style={styles.reportStat}>
+              <View style={styles.reportStatValueRow}>
+                <Text style={styles.reportStatValue}>
+                  {amountHidden ? '••••• ₺' : `${nf(monthlyPaymentsQuery.data?.total ?? 0)} ₺`}
+                </Text>
+                <Pressable onPress={() => setAmountHidden((h) => !h)} hitSlop={8}>
+                  <Text style={[styles.eyeIcon, amountHidden && styles.eyeIconOff]}>👁</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.reportStatLabel}>Bu ay toplam ödeme</Text>
+            </View>
+          </View>
+          {monthlyPaymentsQuery.data && !amountHidden && (
+            <Text style={styles.reportSub}>
+              {nf(monthlyPaymentsQuery.data.paid)} ₺ alındı · {nf(monthlyPaymentsQuery.data.pending)} ₺ bekliyor
+            </Text>
+          )}
+        </>
+      )}
+
+      <Text style={styles.reportSectionTitle}>Bugünkü Yaklaşan Dersler</Text>
+      {todayLessonsQuery.isLoading ? (
+        <ActivityIndicator color={C.lime} />
+      ) : upcomingToday.length === 0 ? (
+        <Text style={styles.dayBlockEmpty}>Bugün için yaklaşan ders yok.</Text>
+      ) : (
+        upcomingToday.map((l) => (
+          <View key={l.id} style={styles.lessonRow}>
+            <Text style={styles.lessonText}>
+              {l.time.slice(0, 5)} · {l.clientName}
+            </Text>
+          </View>
+        ))
+      )}
+    </Panel>
+  );
+}
 
 export default function PanelScreen() {
   const { profile } = useAuth();
-  const { selectedClientId } = useSelectedClient();
-  const clientQuery = useClient(selectedClientId ?? undefined);
-  const workoutQuery = useWorkout(selectedClientId ?? undefined);
-  const mealsQuery = useMeals(selectedClientId ?? undefined);
-  const weightLogsQuery = useWeightLogs(selectedClientId ?? undefined);
-  const prLogsQuery = usePrLogs(selectedClientId ?? undefined);
-  const paymentsQuery = usePayments(selectedClientId ?? undefined);
-  const logWeight = useLogWeight(selectedClientId ?? undefined);
-  const [weightInput, setWeightInput] = useState('');
-  const [reportDays, setReportDays] = useState(7);
-  const sessionLogsQuery = useSessionLogs(selectedClientId ?? undefined, reportDays);
-  const checkinsRangeQuery = useCheckinsInRange(selectedClientId ?? undefined, reportDays);
+  const isTrainer = profile?.role === 'trainer';
+  const isDesktopWeb = useIsDesktopWeb();
 
-  const client = clientQuery.data;
-
-  const kpis = useMemo(() => {
-    const days = workoutQuery.data ?? [];
-    const sets = days.reduce((a, d) => a + d.exercises.reduce((x, r) => x + r.set_count, 0), 0);
-    const vol = days.reduce((a, d) => a + d.exercises.reduce((x, r) => x + r.set_count * r.rep_count * r.kg, 0), 0);
-    return { days: days.length, sets, vol };
-  }, [workoutQuery.data]);
-
-  const kcalToday = useMemo(() => {
-    const meals = mealsQuery.data ?? [];
-    return meals.reduce((a, m) => a + m.items.reduce((x, it) => x + it.kcal * it.todayQty, 0), 0);
-  }, [mealsQuery.data]);
-
-  const proj = useMemo(() => {
-    if (!client) return [];
-    const weeklyDelta = ((client.kcal_target - client.tdee) * 7) / 7700;
-    return Array.from({ length: WEEKS + 1 }, (_, i) => client.start_weight + weeklyDelta * i);
-  }, [client]);
-
-  const actual = useMemo(() => {
-    const logs = weightLogsQuery.data ?? [];
-    if (!client) return [];
-    return logs.length ? logs.map((l) => l.weight) : [client.start_weight];
-  }, [weightLogsQuery.data, client]);
-
-  const report = useMemo(() => {
-    const since = new Date();
-    since.setDate(since.getDate() - reportDays);
-    const sinceStr = localDateStr(since);
-
-    const weightsInRange = (weightLogsQuery.data ?? []).filter((l) => l.date >= sinceStr);
-    const weightChange = weightsInRange.length >= 2 ? weightsInRange[weightsInRange.length - 1].weight - weightsInRange[0].weight : 0;
-
-    const paymentsInRange = (paymentsQuery.data ?? []).filter((p) => p.date >= sinceStr);
-    const totalPaid = paymentsInRange.reduce((a, p) => a + p.amount, 0);
-
-    const prsInRange = (prLogsQuery.data ?? []).filter((p) => p.date >= sinceStr).length;
-
-    const sessions = sessionLogsQuery.data ?? [];
-    const completed = sessions.filter((s) => s.status === 'tamamlandi').length;
-    const skipped = sessions.filter((s) => s.status === 'atlandi').length;
-
-    const checkins = checkinsRangeQuery.data ?? [];
-    const avgMood = checkins.length
-      ? checkins.reduce((a, c) => a + (c.uyku + c.enerji + c.motivasyon - c.stres - c.aclik) / 5, 0) / checkins.length
-      : null;
-
-    return { weightChange, totalPaid, prsInRange, completed, skipped, avgMood, weightEntries: weightsInRange.length };
-  }, [reportDays, weightLogsQuery.data, paymentsQuery.data, prLogsQuery.data, sessionLogsQuery.data, checkinsRangeQuery.data]);
-
-  if (clientQuery.isLoading || !client) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={C.lime} size="large" />
-      </View>
-    );
-  }
-
-  const currentWeight = actual[actual.length - 1] ?? client.start_weight;
-  const diff = currentWeight - client.start_weight;
-  const pct = client.kcal_target > 0 ? (kcalToday / client.kcal_target) * 100 : 0;
-  const prLogs = prLogsQuery.data ?? [];
-  const bestPr = prLogs.length ? Math.max(...prLogs.map((l) => l.weight)) : client.pr;
+  if (profile && !isTrainer) return <Redirect href="/(app)/antrenman" />;
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Panel" clientName={client.name} showPill={profile?.role === 'trainer'} />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Panel title="Kontrol Paneli" right={client.goal}>
-          <View style={styles.kpiGrid}>
-            {[
-              ['Antrenman Günü', `${kpis.days} gün`],
-              ['Toplam Set', String(kpis.sets)],
-              ['Haftalık Hacim', `${nf(kpis.vol)} kg`],
-              ['En Yüksek 1RM', `${nf(bestPr, 1)} kg`],
-            ].map(([l, v]) => (
-              <View key={l} style={styles.kpi}>
-                <Text style={styles.kpiLabel}>{l}</Text>
-                <Text style={styles.kpiValue}>{v}</Text>
-              </View>
-            ))}
-          </View>
-        </Panel>
-
-        <Panel title="Bugünkü Kalori" right={`Hedef ${nf(client.kcal_target)} kcal`}>
-          <View style={styles.calRow}>
-            <Ring pct={pct} />
-            <View style={styles.calInfo}>
-              <Text style={styles.calValue}>{nf(kcalToday)} kcal alındı</Text>
-              <Text style={[styles.calNote, pct > 105 && { color: C.orange }]}>
-                {pct > 105 ? `Hedefin ${nf(kcalToday - client.kcal_target)} kcal üzerinde` : 'Hedef aralığında'}
-              </Text>
-              <Text style={styles.calTdee}>TDEE: {nf(client.tdee)} kcal · otomatik</Text>
+      <ScreenHeader title="Panel" />
+      <ScrollView contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}>
+        {isDesktopWeb ? (
+          // Geniş ekranda takvim + rapor yan yana — mobilde ikisi de tek sütun halinde alt alta kalır.
+          <View style={styles.desktopRow}>
+            <View style={styles.desktopColWide}>
+              <LessonScheduleCard />
+            </View>
+            <View style={styles.desktopColNarrow}>
+              <TrainerReportCard />
             </View>
           </View>
-        </Panel>
-
-        <Panel title="Kilo Durumu" right={`${WEEKS} haftalık plan`}>
-          <View style={styles.weightRow}>
-            <Text style={styles.weightBig}>{nf(currentWeight, 1)} kg</Text>
-            <Text style={[styles.weightDiff, { color: diff <= 0 ? C.lime : C.orange }]}>
-              {diff > 0 ? '+' : ''}
-              {nf(diff, 1)} kg
-            </Text>
-          </View>
-          {proj.length > 0 && <LineChart proj={proj} actual={actual} />}
-          <View style={styles.legendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, { backgroundColor: C.lime }]} />
-              <Text style={styles.legendText}>Gerçekleşen</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatchDashed]} />
-              <Text style={styles.legendText}>Projeksiyon</Text>
-            </View>
-          </View>
-
-          <View style={styles.logRow}>
-            <View style={{ flex: 1 }}>
-              <AuthField
-                label="Bugünün kilosunu gir"
-                value={weightInput}
-                onChangeText={setWeightInput}
-                keyboardType="decimal-pad"
-                placeholder="Ör. 79.5"
-              />
-            </View>
-          </View>
-          <PrimaryButton
-            label="Kaydet"
-            loading={logWeight.isPending}
-            disabled={!weightInput}
-            onPress={() => {
-              const v = parseFloat(weightInput.replace(',', '.'));
-              if (!Number.isNaN(v)) {
-                logWeight.mutate(v, {
-                  onSuccess: () => setWeightInput(''),
-                  onError: (e: any) => Alert.alert('Kaydedilemedi', e.message ?? 'Kilo kaydedilemedi.'),
-                });
-              }
-            }}
-          />
-        </Panel>
-
-        {profile?.role !== 'trainer' && <WaterReminderCard />}
-
-        <Panel title="Rapor" right={REPORT_PERIODS.find((p) => p.days === reportDays)?.label}>
-          <View style={styles.periodRow}>
-            {REPORT_PERIODS.map((p) => (
-              <Pressable
-                key={p.days}
-                onPress={() => setReportDays(p.days)}
-                style={[styles.periodBtn, reportDays === p.days && { backgroundColor: C.lime, borderColor: C.lime }]}
-              >
-                <Text style={[styles.periodBtnText, reportDays === p.days && { color: C.bg }]}>{p.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.kpiGrid}>
-            {[
-              ['Kilo Değişimi', report.weightEntries >= 2 ? `${report.weightChange > 0 ? '+' : ''}${nf(report.weightChange, 1)} kg` : '—'],
-              ['Tamamlanan Seans', String(report.completed)],
-              ['Atlanan Seans', String(report.skipped)],
-              ['Yeni PR', String(report.prsInRange)],
-              ['Toplam Ödeme', `${nf(report.totalPaid)} ₺`],
-              ['Ort. Ruh Hali', report.avgMood != null ? nf(report.avgMood, 1) : '—'],
-            ].map(([l, v]) => (
-              <View key={l} style={styles.kpi}>
-                <Text style={styles.kpiLabel}>{l}</Text>
-                <Text style={styles.kpiValue}>{v}</Text>
-              </View>
-            ))}
-          </View>
-        </Panel>
+        ) : (
+          <>
+            <LessonScheduleCard />
+            <TrainerReportCard />
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -297,28 +351,53 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: C.bg },
   loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingTop: 4 },
-  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  kpi: { width: '47%', backgroundColor: C.card2, borderLeftWidth: 3, borderLeftColor: C.lime, borderRadius: 12, padding: 10 },
-  kpiLabel: { fontSize: 11, color: C.grey, marginBottom: 4 },
-  kpiValue: { fontSize: 17, fontWeight: '800', color: C.lime },
-  calRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  calInfo: { flex: 1, gap: 3 },
-  calValue: { color: C.white, fontWeight: '700', fontSize: 14 },
-  calNote: { color: C.grey, fontSize: 12 },
-  calTdee: { color: C.greyD, fontSize: 11 },
-  weightRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 4 },
-  weightBig: { fontSize: 28, fontWeight: '800', color: C.white },
-  weightDiff: { fontSize: 13, fontWeight: '700' },
-  legendRow: { flexDirection: 'row', gap: 16, marginTop: 6, marginBottom: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendSwatch: { width: 16, height: 3 },
-  legendSwatchDashed: { width: 16, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: C.greyD },
-  legendText: { fontSize: 11, color: C.grey },
-  logRow: { flexDirection: 'row', gap: 10 },
-  periodRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  periodBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
-  periodBtnText: { fontSize: 12, fontWeight: '700', color: C.grey },
-  waterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  waterLabel: { fontSize: 13, color: C.white, fontWeight: '600', flex: 1, marginRight: 10 },
-  waterNotice: { fontSize: 11, color: C.orange, marginTop: 8 },
+  contentDesktop: { padding: 28, paddingTop: 20 },
+  desktopRow: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' },
+  desktopColWide: { flex: 2, minWidth: 0 },
+  desktopColNarrow: { flex: 1, minWidth: 0 },
+  weekNavRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  weekNavBtn: { fontSize: 11, fontWeight: '700', color: C.grey },
+  weekNavToday: { fontSize: 11, fontWeight: '700', color: C.lime },
+  dayBlock: { marginBottom: 10 },
+  dayBlockTitle: { fontSize: 11, fontWeight: '700', color: C.greyD, marginBottom: 4 },
+  dayBlockEmpty: { fontSize: 11, color: C.greyD, fontStyle: 'italic', paddingLeft: 2 },
+  lessonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: C.card2,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  lessonText: { fontSize: 12, fontWeight: '600', color: C.white },
+  lessonActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  lessonDelete: { fontSize: 12, color: C.red, paddingHorizontal: 4 },
+  useSessionBtn: { backgroundColor: C.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  useSessionBtnText: { fontSize: 10, fontWeight: '800', color: C.bg },
+  useSessionBtnOn: { backgroundColor: C.card, borderWidth: 1, borderColor: C.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  useSessionBtnOnText: { fontSize: 10, fontWeight: '800', color: C.lime },
+  addLessonBtn: { borderWidth: 2, borderColor: C.edge, borderStyle: 'dashed', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  addLessonBtnText: { fontSize: 13, color: C.greyD, fontWeight: '600' },
+  addDayCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.edge, padding: 14, marginTop: 8 },
+  label: { fontSize: 12, fontWeight: '700', color: C.grey, marginBottom: 6 },
+  clientPickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  clientPick: { borderWidth: 1, borderColor: C.edge, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.card2 },
+  clientPickOn: { backgroundColor: C.lime, borderColor: C.lime },
+  clientPickText: { fontSize: 11, fontWeight: '700', color: C.grey },
+  clientPickTextOn: { color: C.bg },
+  rowGap: { flexDirection: 'row', gap: 8 },
+  lessonErrorText: { color: C.red, fontSize: 11, marginBottom: 8 },
+  cancelBtn: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
+  cancelBtnText: { fontSize: 12, fontWeight: '700', color: C.grey },
+  reportGrid: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  reportStat: { flex: 1, backgroundColor: C.card2, borderLeftWidth: 3, borderLeftColor: C.lime, borderRadius: 12, padding: 10 },
+  reportStatValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  eyeIcon: { fontSize: 13, opacity: 0.9 },
+  eyeIconOff: { opacity: 0.4 },
+  reportStatValue: { fontSize: 18, fontWeight: '800', color: C.lime },
+  reportStatLabel: { fontSize: 11, color: C.grey, marginTop: 4 },
+  reportSub: { fontSize: 11, color: C.greyD, marginBottom: 14 },
+  reportSectionTitle: { fontSize: 12, fontWeight: '700', color: C.grey, marginTop: 4, marginBottom: 8 },
 });

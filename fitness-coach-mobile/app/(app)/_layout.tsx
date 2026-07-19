@@ -1,9 +1,11 @@
 import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DesktopSidebar } from '../../components/DesktopSidebar';
 import { useAuth } from '../../lib/auth';
 import { registerPushToken } from '../../lib/notifications';
 import { useClientByProfile, useClients } from '../../lib/queries';
+import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
 
@@ -19,6 +21,7 @@ export default function AppLayout() {
   const { session, profile, loading, signOut } = useAuth();
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const isTrainer = profile?.role === 'trainer';
+  const isDesktopWeb = useIsDesktopWeb();
 
   const clientsQuery = useClients(isTrainer ? profile?.id : undefined);
   const ownClientQuery = useClientByProfile(!isTrainer ? profile?.id : undefined);
@@ -28,7 +31,9 @@ export default function AppLayout() {
     const stillExists = selectedClientId && clientsQuery.data.some((c) => c.id === selectedClientId);
     if (!stillExists) {
       // Handles both the initial pick and re-picking after the selected client got deleted.
-      setSelectedClientId(clientsQuery.data[0]?.id ?? null);
+      // Prefer an active client so the trainer doesn't land on a paused one by default.
+      const active = clientsQuery.data.find((c) => c.is_active);
+      setSelectedClientId((active ?? clientsQuery.data[0])?.id ?? null);
     }
   }, [isTrainer, selectedClientId, clientsQuery.data, setSelectedClientId]);
 
@@ -39,7 +44,9 @@ export default function AppLayout() {
   }, [isTrainer, ownClientQuery.data, selectedClientId, setSelectedClientId]);
 
   useEffect(() => {
-    if (profile?.id && Platform.OS !== 'web') registerPushToken(profile.id);
+    if (profile?.id && Platform.OS !== 'web') {
+      registerPushToken(profile.id).catch((e) => console.warn('Push token kaydı başarısız:', e?.message ?? e));
+    }
   }, [profile?.id]);
 
   if (!isTrainer && profile && ownClientQuery.isError) {
@@ -71,11 +78,11 @@ export default function AppLayout() {
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
 
-  return (
+  const tabs = (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: C.card2, borderTopColor: C.edge, height: 64, paddingTop: 6 },
+        tabBarStyle: isDesktopWeb ? { display: 'none' } : { backgroundColor: C.card2, borderTopColor: C.edge, height: 64, paddingTop: 6 },
         tabBarShowLabel: true,
       }}
     >
@@ -83,6 +90,7 @@ export default function AppLayout() {
         name="panel"
         options={{
           title: 'Panel',
+          href: isTrainer ? undefined : null,
           tabBarIcon: ({ focused }) => <TabIcon glyph="▦" focused={focused} />,
           tabBarLabel: ({ focused }) => <TabLabel text="Panel" focused={focused} />,
         }}
@@ -137,7 +145,20 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
+      <Tabs.Screen name="ilerleme-gecmis" options={{ href: null }} />
+      <Tabs.Screen name="anket" options={{ href: null }} />
+      <Tabs.Screen name="hesap-duzenle" options={{ href: null }} />
     </Tabs>
+  );
+
+  // Geniş masaüstü web'de alttaki Tabs çubuğu gizlenip yerine sol sidebar konuyor — Tabs
+  // navigator'ının kendisi (rota/ekran state'i) hiç değişmiyor, sadece görsel çubuğu gizli.
+  if (!isDesktopWeb) return tabs;
+  return (
+    <View style={styles.desktopShell}>
+      <DesktopSidebar />
+      <View style={styles.desktopContent}>{tabs}</View>
+    </View>
   );
 }
 
@@ -145,4 +166,6 @@ const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { color: C.grey, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   signOutLink: { color: C.lime, fontSize: 14, fontWeight: '700' },
+  desktopShell: { flex: 1, flexDirection: 'row', backgroundColor: C.bg },
+  desktopContent: { flex: 1, minWidth: 0 },
 });
