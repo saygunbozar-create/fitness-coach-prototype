@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { Panel } from '../../components/Panel';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -10,6 +10,23 @@ import { useClientByProfile, useClients, useDeleteOwnAccount, useProfileById } f
 import { C } from '../../lib/theme';
 
 const REMINDER_INTERVALS = [1, 2, 3, 4];
+const LEGAL_BASE_URL = 'https://coachbook-roan.vercel.app/legal';
+
+function LegalCard() {
+  return (
+    <Panel title="Yasal" right="📄">
+      <Pressable style={styles.legalRow} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/privacy-policy.html`)} hitSlop={4}>
+        <Text style={styles.legalLink}>Gizlilik Politikası</Text>
+      </Pressable>
+      <Pressable style={styles.legalRow} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/kullanim-sartlari.html`)} hitSlop={4}>
+        <Text style={styles.legalLink}>Kullanım Şartları</Text>
+      </Pressable>
+      <Pressable style={[styles.legalRow, { borderBottomWidth: 0 }]} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/kvkk-aydinlatma-metni.html`)} hitSlop={4}>
+        <Text style={styles.legalLink}>KVKK Aydınlatma Metni</Text>
+      </Pressable>
+    </Panel>
+  );
+}
 
 function WaterReminderCard() {
   const [prefs, setPrefs] = useState<WaterReminderPrefs>({ enabled: false, intervalHours: 2 });
@@ -171,6 +188,8 @@ export default function AyarlarScreen() {
           </Text>
         </Panel>
 
+        <LegalCard />
+
         <DeleteAccountCard />
       </ScrollView>
     </View>
@@ -205,4 +224,6 @@ const styles = StyleSheet.create({
   deleteHint: { fontSize: 11, color: C.grey, lineHeight: 16, marginBottom: 12 },
   deleteBtn: { borderWidth: 1, borderColor: C.red, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   deleteBtnText: { fontSize: 13, fontWeight: '700', color: C.red },
+  legalRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.edge },
+  legalLink: { fontSize: 13, fontWeight: '600', color: C.lime },
 });

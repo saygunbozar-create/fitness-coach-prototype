@@ -2,6 +2,7 @@ import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { AuthField } from '../../components/AuthField';
+import { ConsentCheckbox } from '../../components/ConsentCheckbox';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
 import { C } from '../../lib/theme';
@@ -11,6 +12,7 @@ export default function SignupTrainer() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,7 @@ export default function SignupTrainer() {
   async function onSubmit() {
     setError(null);
     setLoading(true);
-    const { error: err } = await signUpTrainer(email.trim(), password, name.trim());
+    const { error: err } = await signUpTrainer(email.trim(), password, name.trim(), consent);
     setLoading(false);
     if (err) setError(err);
     else setDone(true);
@@ -40,8 +42,9 @@ export default function SignupTrainer() {
             <AuthField label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ör. Ahmet Yılmaz" />
             <AuthField label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
             <AuthField label="Şifre" value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" />
+            <ConsentCheckbox checked={consent} onToggle={() => setConsent((v) => !v)} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <PrimaryButton label="Kayıt Ol" onPress={onSubmit} loading={loading} disabled={!name || !email || !password} />
+            <PrimaryButton label="Kayıt Ol" onPress={onSubmit} loading={loading} disabled={!name || !email || !password || !consent} />
           </>
         )}
 

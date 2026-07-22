@@ -5,6 +5,7 @@ export type Profile = {
   role: Role;
   name: string;
   trainer_id: string | null;
+  consent_accepted_at: string | null;
 };
 
 export type Client = {

@@ -8,8 +8,8 @@ type AuthState = {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpTrainer: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
-  signUpClient: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  signUpTrainer: (email: string, password: string, name: string, consent: boolean) => Promise<{ error: string | null }>;
+  signUpClient: (email: string, password: string, name: string, consent: boolean) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -84,20 +84,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  async function signUpTrainer(email: string, password: string, name: string) {
+  async function signUpTrainer(email: string, password: string, name: string, consent: boolean) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'trainer', name } },
+      options: { data: { role: 'trainer', name, consent } },
     });
     return { error: error?.message ?? null };
   }
 
-  async function signUpClient(email: string, password: string, name: string) {
+  async function signUpClient(email: string, password: string, name: string, consent: boolean) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'client', name } },
+      options: { data: { role: 'client', name, consent } },
     });
     return { error: error?.message ?? null };
   }
