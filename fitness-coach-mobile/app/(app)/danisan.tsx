@@ -8,7 +8,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { useAddClient, useClients, useDeleteClient, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
+import { useAddClient, useClients, useDeleteClient, useDeletedAccounts, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, formatDateInputTr } from '../../lib/theme';
@@ -112,6 +112,7 @@ export default function DanisanScreen() {
   const updateClient = useUpdateClient(profile?.id);
   const deleteClient = useDeleteClient(profile?.id);
   const toggleActive = useToggleClientActive(profile?.id);
+  const deletedAccountsQuery = useDeletedAccounts(profile?.id);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
@@ -441,6 +442,23 @@ export default function DanisanScreen() {
             <Text style={styles.addCliText}>+ Yeni danışan ekle</Text>
           </Pressable>
         ))}
+
+        {!!deletedAccountsQuery.data?.length && (
+          <Panel title="Silinen Hesaplar" right={`${deletedAccountsQuery.data.length} kayıt`}>
+            <Text style={styles.deletedHint}>
+              Bir danışan kendi hesabını sildiğinde burada görünür. Bu liste hesap tekrar oluşturulsa bile silinmez.
+            </Text>
+            {deletedAccountsQuery.data.map((d) => (
+              <View key={d.id} style={styles.deletedRow}>
+                <Text style={styles.deletedName}>{d.name || '(isim yok)'}</Text>
+                <Text style={styles.deletedMeta}>{d.email}</Text>
+                <Text style={styles.deletedMeta}>
+                  {new Date(d.deleted_at).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}
+                </Text>
+              </View>
+            ))}
+          </Panel>
+        )}
       </ScrollView>
     </View>
   );
@@ -466,4 +484,14 @@ const styles = StyleSheet.create({
   rowGap: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   cancelBtn: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },
   cancelBtnText: { fontSize: 13, fontWeight: '700', color: C.grey },
+  deletedHint: { fontSize: 11, color: C.greyD, lineHeight: 16, marginBottom: 10, fontStyle: 'italic' },
+  deletedRow: {
+    backgroundColor: C.card2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  deletedName: { color: C.white, fontWeight: '700', fontSize: 13, marginBottom: 2 },
+  deletedMeta: { color: C.greyD, fontSize: 11 },
 });
