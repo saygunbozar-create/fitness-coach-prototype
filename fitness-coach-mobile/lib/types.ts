@@ -152,15 +152,6 @@ export type ClientPackage = {
   note: string;
 };
 
-export type DeletedAccountLog = {
-  id: string;
-  role: 'trainer' | 'client';
-  name: string;
-  email: string;
-  trainer_id: string | null;
-  deleted_at: string;
-};
-
 export type SessionLog = {
   id: string;
   client_id: string;

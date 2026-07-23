@@ -10,7 +10,6 @@ import type {
   NutritionNote,
   Client,
   ClientPackage,
-  DeletedAccountLog,
   InjuryLog,
   LessonScheduleEntry,
   LibraryExercise,
@@ -2215,21 +2214,5 @@ export function useDeleteOwnAccount() {
       const { error } = await supabase.rpc('delete_own_account');
       if (error) throw error;
     },
-  });
-}
-
-export function useDeletedAccounts(trainerId: string | undefined) {
-  return useQuery({
-    queryKey: ['deleted_accounts', trainerId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deleted_account_log')
-        .select('*')
-        .eq('trainer_id', trainerId)
-        .order('deleted_at', { ascending: false });
-      if (error) throw error;
-      return data as DeletedAccountLog[];
-    },
-    enabled: !!trainerId,
   });
 }
