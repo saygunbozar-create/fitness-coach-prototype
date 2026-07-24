@@ -2225,6 +2225,25 @@ export function useBookAppointment(trainerId: string | undefined, clientId: stri
   });
 }
 
+// "Sadece antrenör iptal etsin" kararı korunuyor: bu satırı silmiyor/yeni bir randevu
+// oluşturmuyor, sadece mevcut randevunun tarih/saatini günceller. RLS (lesson_schedule_
+// client_reschedule) sadece booked_by_client=true olan, danışanın kendi satırlarında
+// çalışmasına izin veriyor — elle eklenmiş bir ders taşınamaz.
+export function useRescheduleAppointment(trainerId: string | undefined, clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; date: string; time: string }) => {
+      const { error } = await supabase.from('lesson_schedule').update({ date: input.date, time: input.time }).eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my_appointments', clientId] });
+      qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] });
+      qc.invalidateQueries({ queryKey: ['taken_slots', trainerId] });
+    },
+  });
+}
+
 export function useMyUpcomingAppointments(clientId: string | undefined) {
   return useQuery({
     queryKey: ['my_appointments', clientId],

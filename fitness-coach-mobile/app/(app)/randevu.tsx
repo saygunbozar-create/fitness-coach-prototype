@@ -13,6 +13,7 @@ import {
   useClient,
   useDeleteAvailabilityRule,
   useMyUpcomingAppointments,
+  useRescheduleAppointment,
   useTakenSlots,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
@@ -288,9 +289,73 @@ function ClientAppointmentScreen() {
       <ScreenHeader title="Randevu Al" />
       <ScrollView contentContainerStyle={styles.content}>
         <ClientBookingPanel trainerId={client.trainer_id} clientId={client.id} />
-        <MyAppointmentsPanel clientId={client.id} />
+        <MyAppointmentsPanel trainerId={client.trainer_id} clientId={client.id} />
       </ScrollView>
     </View>
+  );
+}
+
+// Tarih şeridi + boş saat ızgarası — hem ilk randevuyu alırken hem de mevcut bir randevuyu
+// yeniden planlarken (bkz. MyAppointmentsPanel) aynı bileşen kullanılıyor.
+function SlotPicker({
+  trainerId,
+  rules,
+  selectedDate,
+  onSelectDate,
+  onPickSlot,
+  picking,
+}: {
+  trainerId: string;
+  rules: AvailabilityRule[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  onPickSlot: (time: string) => void;
+  picking?: boolean;
+}) {
+  const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
+  const takenQuery = useTakenSlots(trainerId, selectedDate);
+  const slots = useMemo(() => generateSlotsForDate(rules, selectedDate), [rules, selectedDate]);
+  const taken = new Set(takenQuery.data ?? []);
+
+  return (
+    <>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateStrip}>
+        {upcomingDays.map((d) => {
+          const available = hasAnyAvailability(rules, d);
+          const on = d === selectedDate;
+          const [, , dayNum] = d.split('-');
+          return (
+            <Pressable
+              key={d}
+              disabled={!available}
+              style={[styles.dateCard, on && styles.dateCardOn, !available && styles.dateCardOff]}
+              onPress={() => onSelectDate(d)}
+            >
+              <Text style={[styles.dateDow, on && styles.dateDowOn]}>{DAY_FULL[isoWeekday(d)].slice(0, 3)}</Text>
+              <Text style={[styles.dateNum, on && styles.dateNumOn]}>{parseInt(dayNum, 10)}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.fieldLabel}>{formatTrDateLong(selectedDate)} — boş saatler</Text>
+      {takenQuery.isLoading ? (
+        <ActivityIndicator color={C.lime} />
+      ) : slots.length === 0 ? (
+        <Text style={styles.noteText}>Bu gün için açık saat yok.</Text>
+      ) : (
+        <View style={styles.slotGrid}>
+          {slots.map((s) => {
+            const isTaken = taken.has(s);
+            return (
+              <Pressable key={s} disabled={isTaken || picking} style={[styles.slot, isTaken && styles.slotTaken]} onPress={() => onPickSlot(s)}>
+                <Text style={[styles.slotText, isTaken && styles.slotTextTaken]}>{s}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </>
   );
 }
 
@@ -301,11 +366,7 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const [selectedDate, setSelectedDate] = useState(() => upcomingDays.find((d) => hasAnyAvailability(rules, d)) ?? upcomingDays[0]);
 
-  const takenQuery = useTakenSlots(trainerId, selectedDate);
   const bookAppointment = useBookAppointment(trainerId, clientId);
-
-  const slots = useMemo(() => generateSlotsForDate(rules, selectedDate), [rules, selectedDate]);
-  const taken = new Set(takenQuery.data ?? []);
 
   function confirmBooking(time: string) {
     showAlert('Randevuyu Onayla', `${formatTrDateLong(selectedDate)} · ${time} için randevu alınsın mı?`, [
@@ -328,56 +389,53 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
       ) : (
         <>
           <Text style={styles.fieldLabel}>Tarih seç</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateStrip}>
-            {upcomingDays.map((d) => {
-              const available = hasAnyAvailability(rules, d);
-              const on = d === selectedDate;
-              const [, , dayNum] = d.split('-');
-              return (
-                <Pressable
-                  key={d}
-                  disabled={!available}
-                  style={[styles.dateCard, on && styles.dateCardOn, !available && styles.dateCardOff]}
-                  onPress={() => setSelectedDate(d)}
-                >
-                  <Text style={[styles.dateDow, on && styles.dateDowOn]}>{DAY_FULL[isoWeekday(d)].slice(0, 3)}</Text>
-                  <Text style={[styles.dateNum, on && styles.dateNumOn]}>{parseInt(dayNum, 10)}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <Text style={styles.fieldLabel}>{formatTrDateLong(selectedDate)} — boş saatler</Text>
-          {takenQuery.isLoading ? (
-            <ActivityIndicator color={C.lime} />
-          ) : slots.length === 0 ? (
-            <Text style={styles.noteText}>Bu gün için açık saat yok.</Text>
-          ) : (
-            <View style={styles.slotGrid}>
-              {slots.map((s) => {
-                const isTaken = taken.has(s);
-                return (
-                  <Pressable
-                    key={s}
-                    disabled={isTaken || bookAppointment.isPending}
-                    style={[styles.slot, isTaken && styles.slotTaken]}
-                    onPress={() => confirmBooking(s)}
-                  >
-                    <Text style={[styles.slotText, isTaken && styles.slotTextTaken]}>{s}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          <SlotPicker
+            trainerId={trainerId}
+            rules={rules}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            onPickSlot={confirmBooking}
+            picking={bookAppointment.isPending}
+          />
         </>
       )}
     </Panel>
   );
 }
 
-function MyAppointmentsPanel({ clientId }: { clientId: string }) {
+function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clientId: string }) {
   const appointmentsQuery = useMyUpcomingAppointments(clientId);
+  const rulesQuery = useAvailabilityRules(trainerId);
+  const reschedule = useRescheduleAppointment(trainerId, clientId);
   const appointments = appointmentsQuery.data ?? [];
+  const rules = rulesQuery.data ?? [];
+
+  const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState(upcomingDays[0]);
+
+  function openReschedule(id: string) {
+    setReschedulingId(id);
+    setRescheduleDate(upcomingDays.find((d) => hasAnyAvailability(rules, d)) ?? upcomingDays[0]);
+  }
+
+  function confirmReschedule(id: string, oldLabel: string, time: string) {
+    showAlert('Randevuyu Taşı', `${oldLabel} yerine ${formatTrDateLong(rescheduleDate)} · ${time} olsun mu?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Taşı',
+        onPress: () =>
+          reschedule.mutate(
+            { id, date: rescheduleDate, time },
+            {
+              onSuccess: () => setReschedulingId(null),
+              onError: (e: any) =>
+                showAlert('Taşınamadı', e.message?.includes('duplicate') ? 'Bu saat az önce başka biri tarafından alındı.' : e.message ?? 'Randevu taşınamadı.'),
+            }
+          ),
+      },
+    ]);
+  }
 
   return (
     <Panel title="Randevularım" right={`${appointments.length} kayıt`}>
@@ -385,13 +443,32 @@ function MyAppointmentsPanel({ clientId }: { clientId: string }) {
         <Text style={styles.noteText}>Yaklaşan randevun yok.</Text>
       ) : (
         appointments.map((a) => (
-          <View key={a.id} style={styles.apptRow}>
-            <Text style={styles.apptDate}>{formatTrDateLong(a.date)}</Text>
-            <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
+          <View key={a.id} style={styles.apptBlock}>
+            <View style={styles.apptRow}>
+              <View>
+                <Text style={styles.apptDate}>{formatTrDateLong(a.date)}</Text>
+                <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
+              </View>
+              <Pressable onPress={() => (reschedulingId === a.id ? setReschedulingId(null) : openReschedule(a.id))} hitSlop={8}>
+                <Text style={styles.apptChange}>{reschedulingId === a.id ? 'Vazgeç' : 'Değiştir'}</Text>
+              </Pressable>
+            </View>
+            {reschedulingId === a.id && (
+              <View style={styles.rescheduleBox}>
+                <SlotPicker
+                  trainerId={trainerId}
+                  rules={rules}
+                  selectedDate={rescheduleDate}
+                  onSelectDate={setRescheduleDate}
+                  onPickSlot={(time) => confirmReschedule(a.id, `${formatTrDateLong(a.date)} · ${a.time.slice(0, 5)}`, time)}
+                  picking={reschedule.isPending}
+                />
+              </View>
+            )}
           </View>
         ))
       )}
-      <Text style={styles.trainerHint}>Değiştirmek veya iptal etmek için antrenörünle iletişime geç.</Text>
+      <Text style={styles.trainerHint}>İptal etmek için antrenörünle iletişime geç.</Text>
     </Panel>
   );
 }
@@ -439,7 +516,10 @@ const styles = StyleSheet.create({
   slotText: { fontSize: 12.5, fontWeight: '700', color: C.white },
   slotTextTaken: { textDecorationLine: 'line-through', color: C.greyD },
 
-  apptRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.edge },
+  apptBlock: { borderBottomWidth: 1, borderBottomColor: C.edge, paddingVertical: 8 },
+  apptRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   apptDate: { fontSize: 12.5, color: C.white, fontWeight: '600' },
-  apptTime: { fontSize: 12.5, color: C.lime, fontWeight: '800' },
+  apptTime: { fontSize: 12.5, color: C.lime, fontWeight: '800', marginTop: 2 },
+  apptChange: { fontSize: 11, fontWeight: '700', color: C.lime },
+  rescheduleBox: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.edge },
 });
