@@ -332,6 +332,17 @@ export function useLogWeight(clientId: string | undefined) {
   });
 }
 
+export function useDeleteWeightLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('weight_logs').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['weight_logs', clientId] }),
+  });
+}
+
 // ---------- Antrenman Programları ----------
 
 export function useWorkoutPrograms(clientId: string | undefined) {
@@ -1397,6 +1408,20 @@ export function useSaveCheckin(clientId: string | undefined) {
   });
 }
 
+export function useDeleteCheckin(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('checkins').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['checkin', clientId] });
+      qc.invalidateQueries({ queryKey: ['checkins_range', clientId] });
+    },
+  });
+}
+
 // ---------- Payments ----------
 
 export function usePayments(clientId: string | undefined) {
@@ -1491,6 +1516,17 @@ export function useLogMeasurement(clientId: string | undefined) {
       const { error } = await supabase
         .from('measurements')
         .upsert({ client_id: clientId, date: date ?? todayStr(), ...rest }, { onConflict: 'client_id,date' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['measurements', clientId] }),
+  });
+}
+
+export function useDeleteMeasurement(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('measurements').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['measurements', clientId] }),
@@ -1632,6 +1668,17 @@ export function useLogCardio(clientId: string | undefined) {
       const { error } = await supabase
         .from('cardio_logs')
         .upsert({ client_id: clientId, date: todayStr(), ...input }, { onConflict: 'client_id,date' });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] }),
+  });
+}
+
+export function useDeleteCardioLog(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('cardio_logs').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] }),

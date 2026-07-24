@@ -2,9 +2,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { showAlert } from '../../lib/alert';
 import { HBar } from '../../components/HBar';
 import { TrendChart } from '../../components/TrendChart';
-import { useCardioLogs, useCheckinsInRange, useMeasurements, useWeightLogs } from '../../lib/queries';
+import {
+  useCardioLogs,
+  useCheckinsInRange,
+  useDeleteCardioLog,
+  useDeleteCheckin,
+  useDeleteMeasurement,
+  useDeleteWeightLog,
+  useMeasurements,
+  useWeightLogs,
+} from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
 
@@ -58,6 +68,18 @@ export default function IlerlemeGecmisScreen() {
   const cardioQuery = useCardioLogs(type === 'cardio' ? selectedClientId ?? undefined : undefined, 365);
   const measurementsQuery = useMeasurements(type === 'measurement' ? selectedClientId ?? undefined : undefined);
   const weightQuery = useWeightLogs(type === 'weight' ? selectedClientId ?? undefined : undefined);
+
+  const deleteCheckin = useDeleteCheckin(selectedClientId ?? undefined);
+  const deleteCardio = useDeleteCardioLog(selectedClientId ?? undefined);
+  const deleteMeasurement = useDeleteMeasurement(selectedClientId ?? undefined);
+  const deleteWeight = useDeleteWeightLog(selectedClientId ?? undefined);
+
+  function confirmDelete(dateLabel: string, onConfirm: () => void) {
+    showAlert('Kaydı Sil', `${dateLabel} tarihli kayıt silinsin mi?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
 
   const isLoading =
     (type === 'checkin' && checkinsQuery.isLoading) ||
@@ -119,7 +141,15 @@ export default function IlerlemeGecmisScreen() {
               )}
               {[...checkins].reverse().map((c) => (
                 <View key={c.id} style={styles.card}>
-                  <Text style={styles.cardDate}>{c.date}</Text>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.cardDate}>{c.date}</Text>
+                    <Pressable
+                      onPress={() => confirmDelete(c.date, () => deleteCheckin.mutate(c.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') }))}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.cardDelete}>Sil</Text>
+                    </Pressable>
+                  </View>
                   {CHECKIN_FIELDS.map((f) => (
                     <HBar key={f.key} label={f.label} value={c[f.key]} />
                   ))}
@@ -150,7 +180,15 @@ export default function IlerlemeGecmisScreen() {
                 <View key={c.id} style={styles.card}>
                   <View style={styles.cardTopRow}>
                     <Text style={styles.cardDate}>{c.date}</Text>
-                    {c.cardio_type ? <Text style={styles.cardTag}>{c.cardio_type}</Text> : null}
+                    <View style={styles.cardTopRight}>
+                      {c.cardio_type ? <Text style={styles.cardTag}>{c.cardio_type}</Text> : null}
+                      <Pressable
+                        onPress={() => confirmDelete(c.date, () => deleteCardio.mutate(c.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') }))}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.cardDelete}>Sil</Text>
+                      </Pressable>
+                    </View>
                   </View>
                   <View style={styles.statRow}>
                     <Text style={styles.statText}>{nf(c.steps)} adım</Text>
@@ -174,7 +212,15 @@ export default function IlerlemeGecmisScreen() {
                 <View key={w.id} style={styles.card}>
                   <View style={styles.cardTopRow}>
                     <Text style={styles.cardDate}>{w.date}</Text>
-                    <Text style={styles.cardTag}>{nf(w.weight, 1)} kg</Text>
+                    <View style={styles.cardTopRight}>
+                      <Text style={styles.cardTag}>{nf(w.weight, 1)} kg</Text>
+                      <Pressable
+                        onPress={() => confirmDelete(w.date, () => deleteWeight.mutate(w.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') }))}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.cardDelete}>Sil</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               ))}
@@ -201,7 +247,15 @@ export default function IlerlemeGecmisScreen() {
               )}
               {[...measurements].reverse().map((m) => (
                 <View key={m.id} style={styles.card}>
-                  <Text style={styles.cardDate}>{m.date}</Text>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.cardDate}>{m.date}</Text>
+                    <Pressable
+                      onPress={() => confirmDelete(m.date, () => deleteMeasurement.mutate(m.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') }))}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.cardDelete}>Sil</Text>
+                    </Pressable>
+                  </View>
                   <View style={styles.measureRow}>
                     {MEASURE_FIELDS.map((f) => (
                       <View key={f.key} style={styles.measureCell}>
@@ -243,8 +297,10 @@ const styles = StyleSheet.create({
   pillTextOn: { color: C.bg },
   card: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 14, padding: 12, marginTop: 12 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cardTopRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardDate: { fontSize: 12, fontWeight: '800', color: C.white, marginBottom: 8 },
   cardTag: { fontSize: 11, color: C.blue, fontWeight: '700' },
+  cardDelete: { fontSize: 11, fontWeight: '700', color: C.red },
   statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statText: { fontSize: 11, color: C.grey },
   measureRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
