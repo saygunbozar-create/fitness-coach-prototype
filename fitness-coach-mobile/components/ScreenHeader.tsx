@@ -1,13 +1,16 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MobileDrawerTrigger } from './MobileDrawer';
 import { useAuth } from '../lib/auth';
 import { useUnreadNotificationCount } from '../lib/queries';
+import { useIsDesktopWeb } from '../lib/responsive';
 import { C } from '../lib/theme';
 
 export function ScreenHeader({ title, clientName, showPill }: { title: string; clientName?: string; showPill?: boolean }) {
   const { signOut, profile } = useAuth();
   const insets = useSafeAreaInsets();
+  const isDesktopWeb = useIsDesktopWeb();
   const unreadQuery = useUnreadNotificationCount(profile?.id);
   const unread = unreadQuery.data ?? 0;
   return (
@@ -34,9 +37,13 @@ export function ScreenHeader({ title, clientName, showPill }: { title: string; c
             </View>
           )}
         </Pressable>
-        <Pressable onPress={signOut} hitSlop={8}>
-          <Text style={styles.logout}>Çıkış</Text>
-        </Pressable>
+        {isDesktopWeb ? (
+          <Pressable onPress={signOut} hitSlop={8}>
+            <Text style={styles.logout}>Çıkış</Text>
+          </Pressable>
+        ) : (
+          <MobileDrawerTrigger />
+        )}
       </View>
     </View>
   );

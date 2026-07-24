@@ -2,7 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DesktopSidebar } from '../../components/DesktopSidebar';
-import { PopupTabBar } from '../../components/PopupTabBar';
+import { MobileDrawer } from '../../components/MobileDrawer';
 import { useAuth } from '../../lib/auth';
 import { registerPushToken } from '../../lib/notifications';
 import { useClientByProfile, useClients } from '../../lib/queries';
@@ -72,10 +72,7 @@ export default function AppLayout() {
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
 
   const tabs = (
-    <Tabs
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => (isDesktopWeb ? null : <PopupTabBar {...props} isTrainer={isTrainer} />)}
-    >
+    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
       <Tabs.Screen name="panel" options={{ title: 'Panel', href: isTrainer ? undefined : null }} />
       <Tabs.Screen name="antrenman" options={{ title: 'Antrenman' }} />
       <Tabs.Screen name="beslenme" options={{ title: 'Beslenme' }} />
@@ -92,7 +89,17 @@ export default function AppLayout() {
 
   // Geniş masaüstü web'de alttaki Tabs çubuğu gizlenip yerine sol sidebar konuyor — Tabs
   // navigator'ının kendisi (rota/ekran state'i) hiç değişmiyor, sadece görsel çubuğu gizli.
-  if (!isDesktopWeb) return tabs;
+  // Mobilde ise gezinme, ScreenHeader'daki hamburger ikonuyla açılan MobileDrawer'a taşındı —
+  // tek instance burada render ediliyor, açık/kapalı durumu lib/mobileDrawer.ts'teki paylaşılan
+  // store'dan geliyor (bkz. o dosyadaki not: Context yerine store kullanmamızın nedeni).
+  if (!isDesktopWeb) {
+    return (
+      <>
+        {tabs}
+        <MobileDrawer />
+      </>
+    );
+  }
   return (
     <View style={styles.desktopShell}>
       <DesktopSidebar />
