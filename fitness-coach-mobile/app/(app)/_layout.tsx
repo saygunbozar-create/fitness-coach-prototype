@@ -79,6 +79,7 @@ export default function AppLayout() {
       <Tabs.Screen name="ilerleme" options={{ title: 'İlerleme' }} />
       <Tabs.Screen name="danisan" options={{ title: 'Danışan', href: isTrainer ? undefined : null }} />
       <Tabs.Screen name="odemeler" options={{ title: 'Ödemeler' }} />
+      <Tabs.Screen name="randevu" options={{ title: 'Randevu' }} />
       <Tabs.Screen name="ayarlar" options={{ title: 'Ayarlar' }} />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
       <Tabs.Screen name="ilerleme-gecmis" options={{ href: null }} />

@@ -199,6 +199,19 @@ export type LessonScheduleEntry = {
   time: string;
   notified: boolean;
   created_at: string;
+  booked_by_client: boolean;
+};
+
+export type AvailabilityRule = {
+  id: string;
+  trainer_id: string;
+  days_of_week: number[]; // 1=Pazartesi .. 7=Pazar
+  start_time: string;
+  end_time: string;
+  session_minutes: number;
+  start_date: string;
+  end_date: string;
+  created_at: string;
 };
 
 export type AppNotification = {

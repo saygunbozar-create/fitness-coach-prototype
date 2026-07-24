@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/(app)/ilerleme', label: 'İlerleme', glyph: '↗' },
   { path: '/(app)/danisan', label: 'Danışan', glyph: '◉', trainerOnly: true },
   { path: '/(app)/odemeler', label: 'Ödemeler', glyph: '₺' },
+  { path: '/(app)/randevu', label: 'Randevu', glyph: '◷' },
 ];
 
 // Masaüstü web'e özel sol gezinme çubuğu — (app)/_layout.tsx içinde SADECE geniş web ekranında

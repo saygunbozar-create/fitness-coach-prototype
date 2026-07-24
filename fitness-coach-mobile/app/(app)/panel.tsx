@@ -135,9 +135,16 @@ function LessonScheduleCard() {
                   const used = usedByKey.get(sessionKey(l.client_id, l.date, l.time));
                   return (
                     <View key={l.id} style={styles.lessonRow}>
-                      <Text style={styles.lessonText}>
-                        {l.time.slice(0, 5)} · {l.clientName}
-                      </Text>
+                      <View style={styles.lessonInfo}>
+                        <Text style={styles.lessonText}>
+                          {l.time.slice(0, 5)} · {l.clientName}
+                        </Text>
+                        {l.booked_by_client && (
+                          <View style={styles.bookedBadge}>
+                            <Text style={styles.bookedBadgeText}>Randevu</Text>
+                          </View>
+                        )}
+                      </View>
                       <View style={styles.lessonActions}>
                         {used ? (
                           <Pressable
@@ -372,6 +379,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   lessonText: { fontSize: 12, fontWeight: '600', color: C.white },
+  lessonInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  bookedBadge: { backgroundColor: 'rgba(198,249,78,.12)', borderWidth: 1, borderColor: 'rgba(198,249,78,.4)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  bookedBadgeText: { fontSize: 9, fontWeight: '800', color: C.lime, textTransform: 'uppercase', letterSpacing: 0.3 },
   lessonActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   lessonDelete: { fontSize: 12, color: C.red, paddingHorizontal: 4 },
   useSessionBtn: { backgroundColor: C.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },

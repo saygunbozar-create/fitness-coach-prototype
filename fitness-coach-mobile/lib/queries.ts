@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import { localDateStr } from './theme';
 import type {
   AppNotification,
+  AvailabilityRule,
   CardioLog,
   Checkin,
   NutritionNote,
@@ -2137,6 +2138,108 @@ export function useDeleteLessonEntry(trainerId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] }),
+  });
+}
+
+// ---------- Randevu Sistemi ----------
+// Antrenör "müsaitlik kuralları" tanımlar (hangi günler + saat aralığı + seans süresi + bitiş
+// tarihi), danışan bu kurallardan türeyen tekil saat dilimlerinden boş olan birini seçip
+// randevu alır. Randevu doğrudan lesson_schedule'a (Haftalık Ders Takvimi) düşer — ayrı bir
+// "rezervasyon" tablosu yok, booked_by_client bayrağıyla elle eklenen derslerden ayrılıyor.
+
+export function useAvailabilityRules(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['availability_rules', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('*')
+        .eq('trainer_id', trainerId)
+        .order('created_at');
+      if (error) throw error;
+      return data as AvailabilityRule[];
+    },
+    enabled: !!trainerId,
+  });
+}
+
+export function useAddAvailabilityRule(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      days_of_week: number[];
+      start_time: string;
+      end_time: string;
+      session_minutes: number;
+      start_date: string;
+      end_date: string;
+    }) => {
+      if (!trainerId) throw new Error('trainerId eksik');
+      const { error } = await supabase.from('availability_rules').insert({ trainer_id: trainerId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['availability_rules', trainerId] }),
+  });
+}
+
+export function useDeleteAvailabilityRule(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('availability_rules').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['availability_rules', trainerId] }),
+  });
+}
+
+// Seçilen günde dolu olan saatleri döner (kimin aldığını değil) — bkz. get_taken_slots
+// SECURITY DEFINER fonksiyonu, danışana sadece kendi antrenörünün doluluğunu gösterir.
+export function useTakenSlots(trainerId: string | undefined, date: string | undefined) {
+  return useQuery({
+    queryKey: ['taken_slots', trainerId, date],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_taken_slots', { p_trainer_id: trainerId, p_date: date });
+      if (error) throw error;
+      return (data as { slot_time: string }[]).map((r) => r.slot_time.slice(0, 5));
+    },
+    enabled: !!trainerId && !!date,
+  });
+}
+
+export function useBookAppointment(trainerId: string | undefined, clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { date: string; time: string }) => {
+      if (!trainerId || !clientId) throw new Error('Danışan/antrenör bilgisi eksik');
+      const { error } = await supabase
+        .from('lesson_schedule')
+        .insert({ trainer_id: trainerId, client_id: clientId, ...input, booked_by_client: true });
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({ queryKey: ['taken_slots', trainerId, input.date] });
+      qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] });
+      qc.invalidateQueries({ queryKey: ['my_appointments', clientId] });
+    },
+  });
+}
+
+export function useMyUpcomingAppointments(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['my_appointments', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lesson_schedule')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('date', todayStr())
+        .order('date')
+        .order('time');
+      if (error) throw error;
+      return data as LessonScheduleEntry[];
+    },
+    enabled: !!clientId,
   });
 }
 
