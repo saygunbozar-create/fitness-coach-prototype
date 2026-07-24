@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import { localDateStr } from './theme';
 import type {
   AppNotification,
+  AvailabilityException,
   AvailabilityRule,
   CardioLog,
   Checkin,
@@ -2190,6 +2191,50 @@ export function useDeleteAvailabilityRule(trainerId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['availability_rules', trainerId] }),
+  });
+}
+
+// Belirli bir tarih+saat aralığını kapatır (ör. "Perşembe 12:00-16:00 vardiyam var") — haftalık
+// kuralı silmeden sadece o aralığı randevu ızgarasından çıkarır. Zaten alınmış bir randevuyla
+// çakışsa bile kayıt oluşur (mevcut randevu silinmez); danışana açık kalan çakışan randevuları
+// kapatmak antrenörün Panel'deki takvimden elle iptal etmesini gerektirir.
+export function useAvailabilityExceptions(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['availability_exceptions', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('availability_exceptions')
+        .select('*')
+        .eq('trainer_id', trainerId)
+        .order('date')
+        .order('start_time');
+      if (error) throw error;
+      return data as AvailabilityException[];
+    },
+    enabled: !!trainerId,
+  });
+}
+
+export function useAddAvailabilityException(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { date: string; start_time: string; end_time: string; note: string }) => {
+      if (!trainerId) throw new Error('trainerId eksik');
+      const { error } = await supabase.from('availability_exceptions').insert({ trainer_id: trainerId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['availability_exceptions', trainerId] }),
+  });
+}
+
+export function useDeleteAvailabilityException(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('availability_exceptions').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['availability_exceptions', trainerId] }),
   });
 }
 

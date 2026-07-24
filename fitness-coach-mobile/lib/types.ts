@@ -214,6 +214,16 @@ export type AvailabilityRule = {
   created_at: string;
 };
 
+export type AvailabilityException = {
+  id: string;
+  trainer_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  note: string;
+  created_at: string;
+};
+
 export type AppNotification = {
   id: string;
   profile_id: string;

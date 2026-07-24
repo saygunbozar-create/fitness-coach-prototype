@@ -7,10 +7,13 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import {
+  useAddAvailabilityException,
   useAddAvailabilityRule,
+  useAvailabilityExceptions,
   useAvailabilityRules,
   useBookAppointment,
   useClient,
+  useDeleteAvailabilityException,
   useDeleteAvailabilityRule,
   useMyUpcomingAppointments,
   useRescheduleAppointment,
@@ -18,7 +21,7 @@ import {
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, TR_MONTHS } from '../../lib/theme';
-import type { AvailabilityRule } from '../../lib/types';
+import type { AvailabilityException, AvailabilityRule } from '../../lib/types';
 
 const DAY_CHIPS: { iso: number; short: string }[] = [
   { iso: 1, short: 'Pzt' },
@@ -87,19 +90,32 @@ function formatTrDateShort(dateStr: string): string {
   return `${parseInt(d, 10)}.${m}`;
 }
 
-function generateSlotsForDate(rules: AvailabilityRule[], dateStr: string): string[] {
+function timeToMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Bir kuraldan türeyen slotları, o güne ait kapatılmış (availability_exceptions) aralıklarla
+// çakışanları eleyerek üretir — "Perşembe 12:00-16:00 vardiyam var" gibi geçici kapatmalar
+// haftalık kuralı silmeden sadece o tarihte devre dışı bırakır.
+function generateSlotsForDate(rules: AvailabilityRule[], exceptions: AvailabilityException[], dateStr: string): string[] {
   const dow = isoWeekday(dateStr);
   const applicable = rules.filter((r) => r.days_of_week.includes(dow) && dateStr >= r.start_date && dateStr <= r.end_date);
+  const blocks = exceptions.filter((e) => e.date === dateStr).map((e) => ({ start: timeToMinutes(e.start_time), end: timeToMinutes(e.end_time) }));
   const set = new Set<string>();
   for (const r of applicable) {
-    const [sh, sm] = r.start_time.slice(0, 5).split(':').map(Number);
-    const [eh, em] = r.end_time.slice(0, 5).split(':').map(Number);
-    let cur = sh * 60 + sm;
-    const end = eh * 60 + em;
+    let cur = timeToMinutes(r.start_time);
+    const end = timeToMinutes(r.end_time);
     while (cur + r.session_minutes <= end) {
-      const h = Math.floor(cur / 60);
-      const min = cur % 60;
-      set.add(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+      const slotEnd = cur + r.session_minutes;
+      const blocked = blocks.some((b) => cur < b.end && slotEnd > b.start);
+      if (!blocked) set.add(minutesToTime(cur));
       cur += r.session_minutes;
     }
   }
@@ -121,6 +137,7 @@ export default function RandevuScreen() {
         <ScreenHeader title="Müsaitlik" />
         <ScrollView contentContainerStyle={styles.content}>
           <TrainerAvailabilityPanel trainerId={profile?.id} />
+          <TrainerExceptionsPanel trainerId={profile?.id} />
         </ScrollView>
       </View>
     );
@@ -270,6 +287,132 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
   );
 }
 
+function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }) {
+  const exceptionsQuery = useAvailabilityExceptions(trainerId);
+  const addException = useAddAvailabilityException(trainerId);
+  const deleteException = useDeleteAvailabilityException(trainerId);
+  const exceptions = (exceptionsQuery.data ?? []).filter((e) => e.date >= localDateStr());
+
+  const [dateInput, setDateInput] = useState('');
+  const [startTime, setStartTime] = useState('12:00');
+  const [endTime, setEndTime] = useState('16:00');
+  const [note, setNote] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const parsedDate = parseTrDate(dateInput);
+  const conflictQuery = useTakenSlots(trainerId, parsedDate ?? undefined);
+
+  function submit() {
+    setFormError(null);
+    if (!parsedDate) {
+      setFormError('Tarihi GG.AA.YYYY biçiminde gir.');
+      return;
+    }
+    const start = parseTrTime(startTime);
+    const end = parseTrTime(endTime);
+    if (!start || !end || start >= end) {
+      setFormError('Saat aralığını kontrol et (başlangıç bitişten önce olmalı).');
+      return;
+    }
+    const startMin = timeToMinutes(start);
+    const endMin = timeToMinutes(end);
+    const conflicts = (conflictQuery.data ?? []).filter((t) => timeToMinutes(t) >= startMin && timeToMinutes(t) < endMin).length;
+
+    const doSubmit = () =>
+      addException.mutate(
+        { date: parsedDate, start_time: start, end_time: end, note: note.trim() },
+        {
+          onSuccess: () => {
+            setDateInput('');
+            setNote('');
+          },
+          onError: (e: any) => showAlert('Eklenemedi', e.message ?? 'Kapatma eklenemedi.'),
+        }
+      );
+
+    if (conflicts > 0) {
+      showAlert(
+        'Bu aralıkta randevu var',
+        `${formatTrDateLong(parsedDate)} · ${start}–${end} aralığında ${conflicts} randevu zaten alınmış. Bu kapatma o randevuları silmez — iptal etmek istersen Panel'deki takvimden elle silmen gerekir. Yine de kapatılsın mı?`,
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          { text: 'Yine de Kapat', onPress: doSubmit },
+        ]
+      );
+    } else {
+      doSubmit();
+    }
+  }
+
+  return (
+    <Panel title="Kapalı Saatler" right={`${exceptions.length} kapatma`}>
+      <Text style={styles.noteText}>
+        Genel müsaitliğinin içinde belirli bir tarihte ders veremeyeceğin bir aralık varsa (vardiya, özel iş vb.) burada kapatabilirsin — haftalık kuralın kendisi
+        değişmez.
+      </Text>
+      <View style={{ height: 12 }} />
+      <AuthField
+        label="Tarih (GG.AA.YYYY)"
+        value={dateInput}
+        onChangeText={(v) => setDateInput((prev) => formatDateInputTr(v, prev))}
+        placeholder="Ör. 30.07.2026"
+        keyboardType="number-pad"
+        maxLength={10}
+      />
+      <View style={styles.rowGap}>
+        <View style={{ flex: 1 }}>
+          <AuthField
+            label="Başlangıç Saati"
+            value={startTime}
+            onChangeText={(v) => setStartTime((prev) => formatTimeInputTr(v, prev))}
+            placeholder="12:00"
+            keyboardType="number-pad"
+            maxLength={5}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AuthField
+            label="Bitiş Saati"
+            value={endTime}
+            onChangeText={(v) => setEndTime((prev) => formatTimeInputTr(v, prev))}
+            placeholder="16:00"
+            keyboardType="number-pad"
+            maxLength={5}
+          />
+        </View>
+      </View>
+      <AuthField label="Not (opsiyonel)" value={note} onChangeText={setNote} placeholder="Ör. Vardiya" />
+      {formError && <Text style={styles.errorText}>{formError}</Text>}
+
+      <PrimaryButton label="Bu Saatleri Kapat" loading={addException.isPending} onPress={submit} />
+
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Yaklaşan kapatmalar</Text>
+      {exceptions.length === 0 ? (
+        <Text style={styles.noteText}>Kapatılmış bir saat aralığı yok.</Text>
+      ) : (
+        exceptions.map((e) => (
+          <View key={e.id} style={styles.ruleCard}>
+            <View style={[styles.ruleDot, { backgroundColor: C.orange }]} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.ruleDays}>{formatTrDateLong(e.date)}</Text>
+              <Text style={styles.ruleMeta}>
+                {e.start_time.slice(0, 5)}–{e.end_time.slice(0, 5)}
+                {e.note ? ` · ${e.note}` : ''}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => deleteException.mutate(e.id, { onError: (err: any) => showAlert('Silinemedi', err.message ?? 'Kapatma kaldırılamadı.') })}
+              hitSlop={8}
+            >
+              <Text style={styles.ruleDelete}>Aç</Text>
+            </Pressable>
+          </View>
+        ))
+      )}
+    </Panel>
+  );
+}
+
 function ClientAppointmentScreen() {
   const { profile } = useAuth();
   const { selectedClientId } = useSelectedClient();
@@ -300,6 +443,7 @@ function ClientAppointmentScreen() {
 function SlotPicker({
   trainerId,
   rules,
+  exceptions,
   selectedDate,
   onSelectDate,
   onPickSlot,
@@ -307,6 +451,7 @@ function SlotPicker({
 }: {
   trainerId: string;
   rules: AvailabilityRule[];
+  exceptions: AvailabilityException[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onPickSlot: (time: string) => void;
@@ -314,7 +459,7 @@ function SlotPicker({
 }) {
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const takenQuery = useTakenSlots(trainerId, selectedDate);
-  const slots = useMemo(() => generateSlotsForDate(rules, selectedDate), [rules, selectedDate]);
+  const slots = useMemo(() => generateSlotsForDate(rules, exceptions, selectedDate), [rules, exceptions, selectedDate]);
   const taken = new Set(takenQuery.data ?? []);
 
   return (
@@ -361,7 +506,9 @@ function SlotPicker({
 
 function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; clientId: string }) {
   const rulesQuery = useAvailabilityRules(trainerId);
+  const exceptionsQuery = useAvailabilityExceptions(trainerId);
   const rules = rulesQuery.data ?? [];
+  const exceptions = exceptionsQuery.data ?? [];
 
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const [selectedDate, setSelectedDate] = useState(() => upcomingDays.find((d) => hasAnyAvailability(rules, d)) ?? upcomingDays[0]);
@@ -392,6 +539,7 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
           <SlotPicker
             trainerId={trainerId}
             rules={rules}
+            exceptions={exceptions}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             onPickSlot={confirmBooking}
@@ -406,9 +554,11 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
 function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clientId: string }) {
   const appointmentsQuery = useMyUpcomingAppointments(clientId);
   const rulesQuery = useAvailabilityRules(trainerId);
+  const exceptionsQuery = useAvailabilityExceptions(trainerId);
   const reschedule = useRescheduleAppointment(trainerId, clientId);
   const appointments = appointmentsQuery.data ?? [];
   const rules = rulesQuery.data ?? [];
+  const exceptions = exceptionsQuery.data ?? [];
 
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
@@ -458,6 +608,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
                 <SlotPicker
                   trainerId={trainerId}
                   rules={rules}
+                  exceptions={exceptions}
                   selectedDate={rescheduleDate}
                   onSelectDate={setRescheduleDate}
                   onPickSlot={(time) => confirmReschedule(a.id, `${formatTrDateLong(a.date)} · ${a.time.slice(0, 5)}`, time)}
