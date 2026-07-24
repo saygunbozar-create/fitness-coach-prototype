@@ -2119,11 +2119,35 @@ export function useSessionLogsForWeek(trainerId: string | undefined, weekStart: 
 }
 
 // Ders takvimindeki bir satırdan tek dokunuşla seansı "tamamlandı" işaretler — Ödemeler'deki
-// paket sayacı aynı session_logs tablosundan beslendiği için otomatik düşer.
+// paket sayacı aynı session_logs tablosundan beslendiği için otomatik düşer. Kaydetmeden önce
+// Ödemeler'deki "Kalan" ile birebir aynı formülle (satın alınan toplam - tamamlanan seans sayısı,
+// paket yoksa 0) kontrol ediyoruz, yoksa paketi olmayan/seansı biten bir danışan için de tek
+// dokunuşla seans düşülebiliyordu.
 export function useLogSessionFromSchedule(trainerId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { client_id: string; date: string; time: string | null }) => {
+      const { data: packages, error: pkgErr } = await supabase
+        .from('client_packages')
+        .select('total_sessions, start_date')
+        .eq('client_id', input.client_id);
+      if (pkgErr) throw pkgErr;
+      if (!packages || packages.length === 0) {
+        throw new Error('Bu danışanın aktif bir paketi yok.');
+      }
+      const totalPurchased = packages.reduce((a, p) => a + p.total_sessions, 0);
+      const earliestStart = packages.reduce((min, p) => (p.start_date < min ? p.start_date : min), packages[0].start_date);
+      const { count, error: countErr } = await supabase
+        .from('session_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', input.client_id)
+        .eq('status', 'tamamlandi')
+        .gte('date', earliestStart);
+      if (countErr) throw countErr;
+      const remaining = Math.max(0, totalPurchased - (count ?? 0));
+      if (remaining <= 0) {
+        throw new Error('Bu danışanın kalan seansı yok.');
+      }
       const { error } = await supabase
         .from('session_logs')
         .insert({ client_id: input.client_id, date: input.date, time: input.time, status: 'tamamlandi', workout_day_id: null });
