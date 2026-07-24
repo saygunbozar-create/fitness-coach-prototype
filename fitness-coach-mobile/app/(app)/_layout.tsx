@@ -2,20 +2,13 @@ import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DesktopSidebar } from '../../components/DesktopSidebar';
+import { PopupTabBar } from '../../components/PopupTabBar';
 import { useAuth } from '../../lib/auth';
 import { registerPushToken } from '../../lib/notifications';
 import { useClientByProfile, useClients } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
-
-function TabIcon({ glyph, focused }: { glyph: string; focused: boolean }) {
-  return <Text style={{ fontSize: 16, color: focused ? C.lime : C.greyD }}>{glyph}</Text>;
-}
-
-function TabLabel({ text, focused }: { text: string; focused: boolean }) {
-  return <Text style={{ fontSize: 10, fontWeight: '700', color: focused ? C.lime : C.greyD }}>{text}</Text>;
-}
 
 export default function AppLayout() {
   const { session, profile, loading, signOut } = useAuth();
@@ -80,70 +73,16 @@ export default function AppLayout() {
 
   const tabs = (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: isDesktopWeb ? { display: 'none' } : { backgroundColor: C.card2, borderTopColor: C.edge, height: 64, paddingTop: 6 },
-        tabBarShowLabel: true,
-      }}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => (isDesktopWeb ? null : <PopupTabBar {...props} isTrainer={isTrainer} />)}
     >
-      <Tabs.Screen
-        name="panel"
-        options={{
-          title: 'Panel',
-          href: isTrainer ? undefined : null,
-          tabBarIcon: ({ focused }) => <TabIcon glyph="▦" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Panel" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="antrenman"
-        options={{
-          title: 'Antrenman',
-          tabBarIcon: ({ focused }) => <TabIcon glyph="⬢" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Antrenman" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="beslenme"
-        options={{
-          title: 'Beslenme',
-          tabBarIcon: ({ focused }) => <TabIcon glyph="◈" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Beslenme" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ilerleme"
-        options={{
-          title: 'İlerleme',
-          tabBarIcon: ({ focused }) => <TabIcon glyph="↗" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="İlerleme" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="danisan"
-        options={{
-          title: 'Danışan',
-          href: isTrainer ? undefined : null,
-          tabBarIcon: ({ focused }) => <TabIcon glyph="◉" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Danışan" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="odemeler"
-        options={{
-          title: 'Ödemeler',
-          tabBarIcon: ({ focused }) => <TabIcon glyph="₺" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Ödemeler" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ayarlar"
-        options={{
-          title: 'Ayarlar',
-          tabBarIcon: ({ focused }) => <TabIcon glyph="⚙" focused={focused} />,
-          tabBarLabel: ({ focused }) => <TabLabel text="Ayarlar" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="panel" options={{ title: 'Panel', href: isTrainer ? undefined : null }} />
+      <Tabs.Screen name="antrenman" options={{ title: 'Antrenman' }} />
+      <Tabs.Screen name="beslenme" options={{ title: 'Beslenme' }} />
+      <Tabs.Screen name="ilerleme" options={{ title: 'İlerleme' }} />
+      <Tabs.Screen name="danisan" options={{ title: 'Danışan', href: isTrainer ? undefined : null }} />
+      <Tabs.Screen name="odemeler" options={{ title: 'Ödemeler' }} />
+      <Tabs.Screen name="ayarlar" options={{ title: 'Ayarlar' }} />
       <Tabs.Screen name="bildirimler" options={{ href: null }} />
       <Tabs.Screen name="ilerleme-gecmis" options={{ href: null }} />
       <Tabs.Screen name="anket" options={{ href: null }} />
