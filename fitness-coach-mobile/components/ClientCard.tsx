@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Client } from '../lib/types';
+import { useT } from '../lib/i18n';
 import { C, nf } from '../lib/theme';
 
 export function ClientCard({
@@ -17,6 +18,7 @@ export function ClientCard({
   onEdit?: () => void;
   onToggleActive?: () => void;
 }) {
+  const t = useT();
   const isLinked = client.status === 'active';
   return (
     <Pressable
@@ -35,11 +37,11 @@ export function ClientCard({
       </View>
       <View style={styles.badgeCol}>
         <View style={[styles.status, { backgroundColor: isLinked ? 'rgba(198,249,78,.12)' : 'rgba(251,176,64,.12)' }]}>
-          <Text style={[styles.statusText, { color: isLinked ? C.lime : C.orange }]}>{isLinked ? 'Aktif' : 'Bekliyor'}</Text>
+          <Text style={[styles.statusText, { color: isLinked ? C.lime : C.orange }]}>{isLinked ? t('client_card.active') : t('client_card.pending')}</Text>
         </View>
         {!client.is_active && (
           <View style={styles.pausedBadge}>
-            <Text style={styles.pausedBadgeText}>Pasif</Text>
+            <Text style={styles.pausedBadgeText}>{t('client_card.paused')}</Text>
           </View>
         )}
       </View>

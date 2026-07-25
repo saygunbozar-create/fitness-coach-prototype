@@ -8,6 +8,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { PARQ_QUESTIONS } from '../../lib/parq';
 import { useAddClient, useClients, useDeleteClient, useIntakeForm, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
@@ -16,6 +17,7 @@ import { C, formatDateInputTr } from '../../lib/theme';
 import type { Client } from '../../lib/types';
 
 function IntakeFormSummary({ clientId }: { clientId: string }) {
+  const t = useT();
   const formQuery = useIntakeForm(clientId);
   const form = formQuery.data;
 
@@ -23,8 +25,8 @@ function IntakeFormSummary({ clientId }: { clientId: string }) {
 
   if (!form) {
     return (
-      <Panel title="Sağlık Formu" right="⚕">
-        <Text style={styles.formEmpty}>Danışan henüz sağlık formunu doldurmadı.</Text>
+      <Panel title={t('danisan.health_form_title')} right="⚕">
+        <Text style={styles.formEmpty}>{t('danisan.health_form_empty')}</Text>
       </Panel>
     );
   }
@@ -32,10 +34,10 @@ function IntakeFormSummary({ clientId }: { clientId: string }) {
   const flagged = PARQ_QUESTIONS.filter((q) => form.parq_answers[q.key] === true);
 
   return (
-    <Panel title="Sağlık Formu" right="⚕">
+    <Panel title={t('danisan.health_form_title')} right="⚕">
       {flagged.length > 0 ? (
         <>
-          <Text style={styles.formWarning}>⚠ {flagged.length} soruya "Evet" cevabı verildi:</Text>
+          <Text style={styles.formWarning}>{t('danisan.health_form_flagged', { count: flagged.length })}</Text>
           {flagged.map((q) => (
             <Text key={q.key} style={styles.formFlaggedItem}>
               · {q.text}
@@ -43,26 +45,26 @@ function IntakeFormSummary({ clientId }: { clientId: string }) {
           ))}
         </>
       ) : (
-        <Text style={styles.formOk}>Tüm sorulara "Hayır" cevabı verildi, bilinen bir risk işaretlenmedi.</Text>
+        <Text style={styles.formOk}>{t('danisan.health_form_ok')}</Text>
       )}
       {form.health_notes ? (
         <>
-          <Text style={[styles.label, { marginTop: 10 }]}>Sağlık Notu</Text>
+          <Text style={[styles.label, { marginTop: 10 }]}>{t('danisan.health_note_label')}</Text>
           <Text style={styles.formNote}>{form.health_notes}</Text>
         </>
       ) : null}
       <Text style={styles.formSignature}>
-        İmza: {form.waiver_signature_name} · {new Date(form.submitted_at).toLocaleDateString('tr-TR')}
+        {t('danisan.signature_prefix')} {form.waiver_signature_name} · {new Date(form.submitted_at).toLocaleDateString('tr-TR')}
       </Text>
     </Panel>
   );
 }
 
-function bmiCategory(bmi: number): string {
-  if (bmi < 18.5) return 'Zayıf';
-  if (bmi < 25) return 'Normal';
-  if (bmi < 30) return 'Fazla Kilolu';
-  return 'Obez';
+function bmiCategory(bmi: number, t: (key: string) => string): string {
+  if (bmi < 18.5) return t('danisan.bmi_underweight');
+  if (bmi < 25) return t('danisan.bmi_normal');
+  if (bmi < 30) return t('danisan.bmi_overweight');
+  return t('danisan.bmi_obese');
 }
 
 // "10.05" -> "2026-05-10" (yıl yok sayılır, sadece gün/ay geçerliliği kontrol edilir)
@@ -85,14 +87,14 @@ const GOALS = ['Yağ Yakımı', 'Kas Kazanımı'];
 const GENDERS = ['Erkek', 'Kadın'];
 
 const NUMERIC_FIELDS: [keyof typeof emptyForm, string][] = [
-  ['start_weight', 'Başlangıç Kilosu'],
-  ['kcal_target', 'Hedef Kalori'],
-  ['tdee', 'TDEE'],
-  ['macro_p', 'Protein Hedefi'],
-  ['macro_k', 'Karbonhidrat Hedefi'],
-  ['macro_y', 'Yağ Hedefi'],
-  ['pr', 'PR'],
-  ['height', 'Boy'],
+  ['start_weight', 'danisan.field_start_weight'],
+  ['kcal_target', 'danisan.field_kcal'],
+  ['tdee', 'danisan.field_tdee'],
+  ['macro_p', 'danisan.field_protein'],
+  ['macro_k', 'danisan.field_carb'],
+  ['macro_y', 'danisan.field_fat'],
+  ['pr', 'danisan.field_pr'],
+  ['height', 'danisan.field_height'],
 ];
 
 function parseNum(s: string): number | null {
@@ -106,9 +108,9 @@ function parseNum(s: string): number | null {
 }
 
 // Boş olmayan ama sayıya çevrilemeyen bir alan varsa hata mesajı döner, yoksa null.
-function findInvalidNumericField(form: Record<string, string>): string | null {
-  for (const [key, label] of NUMERIC_FIELDS) {
-    if (form[key].trim() !== '' && parseNum(form[key]) === null) return label;
+function findInvalidNumericField(form: Record<string, string>, t: (key: string) => string): string | null {
+  for (const [key, labelKey] of NUMERIC_FIELDS) {
+    if (form[key].trim() !== '' && parseNum(form[key]) === null) return t(labelKey);
   }
   return null;
 }
@@ -148,6 +150,7 @@ function clientToForm(c: Client) {
 }
 
 export default function DanisanScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const isDesktopWeb = useIsDesktopWeb();
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
@@ -183,17 +186,17 @@ export default function DanisanScreen() {
     setError(null);
     const n = (s: string) => parseNum(s) ?? 0;
     if (!form.name.trim() || !form.email.trim()) {
-      setError('Ad ve e-posta zorunlu.');
+      setError(t('danisan.required_fields'));
       return;
     }
-    const invalidField = findInvalidNumericField(form);
+    const invalidField = findInvalidNumericField(form, t);
     if (invalidField) {
-      setError(`${invalidField} alanı geçersiz bir sayı.`);
+      setError(t('danisan.invalid_number', { field: invalidField }));
       return;
     }
     const birthday = form.birthday.trim() ? parseBirthdayInput(form.birthday) : null;
     if (form.birthday.trim() && !birthday) {
-      setError('Doğum günü GG.AA.YYYY biçiminde olmalı.');
+      setError(t('danisan.invalid_birthday'));
       return;
     }
     try {
@@ -215,13 +218,10 @@ export default function DanisanScreen() {
       setForm(emptyForm);
       setShowForm(false);
       if (result.seedError) {
-        showAlert(
-          'Danışan eklendi',
-          `Danışan oluşturuldu ama varsayılan antrenman/beslenme planı eklenemedi (${result.seedError}). Antrenman ve Beslenme ekranlarından elle ekleyebilirsin.`
-        );
+        showAlert(t('danisan.add_client_toast_title'), t('danisan.add_client_seed_error', { error: result.seedError }));
       }
     } catch (e: any) {
-      setError(e.message ?? 'Danışan eklenemedi.');
+      setError(e.message ?? t('danisan.add_client_failed'));
     }
   }
 
@@ -237,17 +237,17 @@ export default function DanisanScreen() {
     setEditError(null);
     const n = (s: string) => parseNum(s) ?? 0;
     if (!editForm.name.trim() || !editForm.email.trim()) {
-      setEditError('Ad ve e-posta zorunlu.');
+      setEditError(t('danisan.required_fields'));
       return;
     }
-    const invalidField = findInvalidNumericField(editForm);
+    const invalidField = findInvalidNumericField(editForm, t);
     if (invalidField) {
-      setEditError(`${invalidField} alanı geçersiz bir sayı.`);
+      setEditError(t('danisan.invalid_number', { field: invalidField }));
       return;
     }
     const birthday = editForm.birthday.trim() ? parseBirthdayInput(editForm.birthday) : null;
     if (editForm.birthday.trim() && !birthday) {
-      setEditError('Doğum günü GG.AA.YYYY biçiminde olmalı.');
+      setEditError(t('danisan.invalid_birthday'));
       return;
     }
     try {
@@ -269,7 +269,7 @@ export default function DanisanScreen() {
       });
       setEditingClientId(null);
     } catch (e: any) {
-      setEditError(e.message ?? 'Danışan güncellenemedi.');
+      setEditError(e.message ?? t('danisan.update_client_failed'));
     }
   }
 
@@ -280,11 +280,11 @@ export default function DanisanScreen() {
     const bmi = heightM > 0 && latestWeight > 0 ? latestWeight / (heightM * heightM) : null;
 
     return (
-      <Panel title="Danışanı Düzenle" right="bilgileri güncelle">
-        <AuthField label="Ad Soyad" value={editForm.name} onChangeText={(v) => setEdit('name', v)} placeholder="Ör. Mert K." />
-        <AuthField label="E-posta" value={editForm.email} onChangeText={(v) => setEdit('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
+      <Panel title={t('danisan.edit_title')} right={t('danisan.edit_subtitle')}>
+        <AuthField label={t('ayarlar.name')} value={editForm.name} onChangeText={(v) => setEdit('name', v)} placeholder="Ör. Mert K." />
+        <AuthField label={t('ayarlar.email')} value={editForm.email} onChangeText={(v) => setEdit('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
 
-        <Text style={styles.label}>Hedef</Text>
+        <Text style={styles.label}>{t('danisan.goal_label')}</Text>
         <View style={styles.goalRow}>
           {GOALS.map((g) => (
             <Pressable key={g} onPress={() => setEdit('goal', g)} style={[styles.goalPill, editForm.goal === g && styles.goalPillActive]}>
@@ -293,7 +293,7 @@ export default function DanisanScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Cinsiyet</Text>
+        <Text style={styles.label}>{t('danisan.gender_label')}</Text>
         <View style={styles.goalRow}>
           {GENDERS.map((g) => (
             <Pressable key={g} onPress={() => setEdit('gender', g)} style={[styles.goalPill, editForm.gender === g && styles.goalPillActive]}>
@@ -302,23 +302,23 @@ export default function DanisanScreen() {
           ))}
         </View>
 
-        <AuthField label="Boy (cm)" value={editForm.height} onChangeText={(v) => setEdit('height', v)} keyboardType="decimal-pad" />
-        <AuthField label="Başlangıç Kilosu (kg)" value={editForm.start_weight} onChangeText={(v) => setEdit('start_weight', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.height_label')} value={editForm.height} onChangeText={(v) => setEdit('height', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.start_weight_label')} value={editForm.start_weight} onChangeText={(v) => setEdit('start_weight', v)} keyboardType="decimal-pad" />
         {bmi != null && (
           <Text style={styles.bmiText}>
-            BMI: {bmi.toFixed(1)} ({bmiCategory(bmi)})
+            BMI: {bmi.toFixed(1)} ({bmiCategory(bmi, t)})
           </Text>
         )}
-        <AuthField label="Kalori Hedefi (kcal)" value={editForm.kcal_target} onChangeText={(v) => setEdit('kcal_target', v)} keyboardType="decimal-pad" />
-        <AuthField label="TDEE (kcal)" value={editForm.tdee} onChangeText={(v) => setEdit('tdee', v)} keyboardType="decimal-pad" />
-        <AuthField label="Protein Hedefi (g)" value={editForm.macro_p} onChangeText={(v) => setEdit('macro_p', v)} keyboardType="decimal-pad" />
-        <AuthField label="Karbonhidrat Hedefi (g)" value={editForm.macro_k} onChangeText={(v) => setEdit('macro_k', v)} keyboardType="decimal-pad" />
-        <AuthField label="Yağ Hedefi (g)" value={editForm.macro_y} onChangeText={(v) => setEdit('macro_y', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.kcal_label')} value={editForm.kcal_target} onChangeText={(v) => setEdit('kcal_target', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.tdee_label')} value={editForm.tdee} onChangeText={(v) => setEdit('tdee', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.protein_label')} value={editForm.macro_p} onChangeText={(v) => setEdit('macro_p', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.carb_label')} value={editForm.macro_k} onChangeText={(v) => setEdit('macro_k', v)} keyboardType="decimal-pad" />
+        <AuthField label={t('danisan.fat_label')} value={editForm.macro_y} onChangeText={(v) => setEdit('macro_y', v)} keyboardType="decimal-pad" />
         <AuthField
-          label="Doğum Günü (GG.AA.YYYY, opsiyonel)"
+          label={t('danisan.birthday_label')}
           value={editForm.birthday}
           onChangeText={(v) => setEdit('birthday', formatDateInputTr(v, editForm.birthday))}
-          placeholder="Ör. 14.07.1995"
+          placeholder={t('danisan.birthday_placeholder')}
           keyboardType="number-pad"
           maxLength={10}
         />
@@ -326,10 +326,10 @@ export default function DanisanScreen() {
         {editError ? <Text style={styles.error}>{editError}</Text> : null}
         <View style={styles.rowGap}>
           <View style={{ flex: 1 }}>
-            <PrimaryButton label="Kaydet" onPress={onEditSubmit} loading={updateClient.isPending} />
+            <PrimaryButton label={t('common.save')} onPress={onEditSubmit} loading={updateClient.isPending} />
           </View>
           <Pressable style={styles.cancelBtn} onPress={() => setEditingClientId(null)}>
-            <Text style={styles.cancelBtnText}>Vazgeç</Text>
+            <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
           </Pressable>
         </View>
       </Panel>
@@ -338,9 +338,9 @@ export default function DanisanScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Danışan" />
+      <ScreenHeader title={t('nav.danisan')} />
       <ScrollView contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}>
-        {clients.length > 0 && <Text style={styles.hint}>Bir danışanı silmek için karta uzun bas, düzenlemek için ✎ ikonuna dokun.</Text>}
+        {clients.length > 0 && <Text style={styles.hint}>{t('danisan.long_press_hint')}</Text>}
 
         {clientsQuery.isLoading ? (
           <ActivityIndicator color={C.lime} />
@@ -358,20 +358,20 @@ export default function DanisanScreen() {
                   }}
                   onEdit={() => startEdit(c)}
                   onToggleActive={() =>
-                    toggleActive.mutate({ clientId: c.id, active: false }, { onError: (e: any) => showAlert('Güncellenemedi', e.message ?? 'Durum değiştirilemedi.') })
+                    toggleActive.mutate({ clientId: c.id, active: false }, { onError: (e: any) => showAlert(t('common.update_failed_title'), e.message ?? t('danisan.update_failed_body')) })
                   }
                   onLongPress={() =>
                     showAlert(
-                      'Danışanı Sil',
-                      `${c.name} silinsin mi? Tüm program, ölçüm ve ödeme geçmişi kalıcı olarak silinir.`,
+                      t('danisan.delete_client_title'),
+                      t('danisan.delete_client_body', { name: c.name }),
                       [
-                        { text: 'Vazgeç', style: 'cancel' },
+                        { text: t('common.cancel'), style: 'cancel' },
                         {
-                          text: 'Sil',
+                          text: t('common.delete'),
                           style: 'destructive',
                           onPress: () =>
                             deleteClient.mutate(c.id, {
-                              onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Danışan silinemedi.'),
+                              onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('danisan.delete_client_failed')),
                             }),
                         },
                       ]
@@ -390,7 +390,7 @@ export default function DanisanScreen() {
 
             {pausedClients.length > 0 && (
               <>
-                <Text style={styles.sectionLabel}>Pasif Danışanlar</Text>
+                <Text style={styles.sectionLabel}>{t('danisan.paused_section')}</Text>
                 <View style={isDesktopWeb && styles.desktopGrid}>
                 {pausedClients.map((c) => (
                   <View key={c.id} style={isDesktopWeb && styles.desktopGridCell}>
@@ -403,20 +403,20 @@ export default function DanisanScreen() {
                       }}
                       onEdit={() => startEdit(c)}
                       onToggleActive={() =>
-                        toggleActive.mutate({ clientId: c.id, active: true }, { onError: (e: any) => showAlert('Güncellenemedi', e.message ?? 'Durum değiştirilemedi.') })
+                        toggleActive.mutate({ clientId: c.id, active: true }, { onError: (e: any) => showAlert(t('common.update_failed_title'), e.message ?? t('danisan.update_failed_body')) })
                       }
                       onLongPress={() =>
                         showAlert(
-                          'Danışanı Sil',
-                          `${c.name} silinsin mi? Tüm program, ölçüm ve ödeme geçmişi kalıcı olarak silinir.`,
+                          t('danisan.delete_client_title'),
+                          t('danisan.delete_client_body', { name: c.name }),
                           [
-                            { text: 'Vazgeç', style: 'cancel' },
+                            { text: t('common.cancel'), style: 'cancel' },
                             {
-                              text: 'Sil',
+                              text: t('common.delete'),
                               style: 'destructive',
                               onPress: () =>
                                 deleteClient.mutate(c.id, {
-                                  onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Danışan silinemedi.'),
+                                  onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('danisan.delete_client_failed')),
                                 }),
                             },
                           ]
@@ -438,11 +438,11 @@ export default function DanisanScreen() {
         )}
 
         {!editingClientId && (showForm ? (
-          <Panel title="Yeni Danışan" right="e-posta ile davet">
-            <AuthField label="Ad Soyad" value={form.name} onChangeText={(v) => set('name', v)} placeholder="Ör. Mert K." />
-            <AuthField label="E-posta" value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
+          <Panel title={t('danisan.new_client_title')} right={t('danisan.new_client_subtitle')}>
+            <AuthField label={t('ayarlar.name')} value={form.name} onChangeText={(v) => set('name', v)} placeholder="Ör. Mert K." />
+            <AuthField label={t('ayarlar.email')} value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
 
-            <Text style={styles.label}>Hedef</Text>
+            <Text style={styles.label}>{t('danisan.goal_label')}</Text>
             <View style={styles.goalRow}>
               {GOALS.map((g) => (
                 <Pressable key={g} onPress={() => set('goal', g)} style={[styles.goalPill, form.goal === g && styles.goalPillActive]}>
@@ -451,7 +451,7 @@ export default function DanisanScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Cinsiyet</Text>
+            <Text style={styles.label}>{t('danisan.gender_label')}</Text>
             <View style={styles.goalRow}>
               {GENDERS.map((g) => (
                 <Pressable key={g} onPress={() => set('gender', g)} style={[styles.goalPill, form.gender === g && styles.goalPillActive]}>
@@ -460,39 +460,39 @@ export default function DanisanScreen() {
               ))}
             </View>
 
-            <AuthField label="Boy (cm)" value={form.height} onChangeText={(v) => set('height', v)} keyboardType="decimal-pad" />
-            <AuthField label="Başlangıç Kilosu (kg)" value={form.start_weight} onChangeText={(v) => set('start_weight', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.height_label')} value={form.height} onChangeText={(v) => set('height', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.start_weight_label')} value={form.start_weight} onChangeText={(v) => set('start_weight', v)} keyboardType="decimal-pad" />
             {(() => {
               const heightM = (parseNum(form.height) ?? 0) / 100;
               const weight = parseNum(form.start_weight) ?? 0;
               const bmi = heightM > 0 && weight > 0 ? weight / (heightM * heightM) : null;
               return bmi != null ? (
                 <Text style={styles.bmiText}>
-                  BMI: {bmi.toFixed(1)} ({bmiCategory(bmi)})
+                  BMI: {bmi.toFixed(1)} ({bmiCategory(bmi, t)})
                 </Text>
               ) : null;
             })()}
-            <AuthField label="Kalori Hedefi (kcal)" value={form.kcal_target} onChangeText={(v) => set('kcal_target', v)} keyboardType="decimal-pad" />
-            <AuthField label="TDEE (kcal)" value={form.tdee} onChangeText={(v) => set('tdee', v)} keyboardType="decimal-pad" />
-            <AuthField label="Protein Hedefi (g)" value={form.macro_p} onChangeText={(v) => set('macro_p', v)} keyboardType="decimal-pad" />
-            <AuthField label="Karbonhidrat Hedefi (g)" value={form.macro_k} onChangeText={(v) => set('macro_k', v)} keyboardType="decimal-pad" />
-            <AuthField label="Yağ Hedefi (g)" value={form.macro_y} onChangeText={(v) => set('macro_y', v)} keyboardType="decimal-pad" />
-            <AuthField label="Mevcut PR (kg)" value={form.pr} onChangeText={(v) => set('pr', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.kcal_label')} value={form.kcal_target} onChangeText={(v) => set('kcal_target', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.tdee_label')} value={form.tdee} onChangeText={(v) => set('tdee', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.protein_label')} value={form.macro_p} onChangeText={(v) => set('macro_p', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.carb_label')} value={form.macro_k} onChangeText={(v) => set('macro_k', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.fat_label')} value={form.macro_y} onChangeText={(v) => set('macro_y', v)} keyboardType="decimal-pad" />
+            <AuthField label={t('danisan.pr_label')} value={form.pr} onChangeText={(v) => set('pr', v)} keyboardType="decimal-pad" />
             <AuthField
-              label="Doğum Günü (GG.AA.YYYY, opsiyonel)"
+              label={t('danisan.birthday_label')}
               value={form.birthday}
               onChangeText={(v) => set('birthday', formatDateInputTr(v, form.birthday))}
-              placeholder="Ör. 14.07.1995"
+              placeholder={t('danisan.birthday_placeholder')}
               keyboardType="number-pad"
               maxLength={10}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <PrimaryButton label="Danışanı Ekle" onPress={onSubmit} loading={addClient.isPending} />
+            <PrimaryButton label={t('danisan.add_client_btn')} onPress={onSubmit} loading={addClient.isPending} />
           </Panel>
         ) : (
           <Pressable style={styles.addCli} onPress={() => setShowForm(true)}>
-            <Text style={styles.addCliText}>+ Yeni danışan ekle</Text>
+            <Text style={styles.addCliText}>{t('danisan.add_client_cta')}</Text>
           </Pressable>
         ))}
       </ScrollView>
