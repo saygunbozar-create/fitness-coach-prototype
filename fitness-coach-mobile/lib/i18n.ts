@@ -62,6 +62,26 @@ const tr: Dict = {
   'common.error': 'Bir hata oluştu.',
   'common.deleted_error': 'Hesap silinemedi.',
   'common.deleted_error_title': 'Silinemedi',
+  'common.logout': 'Çıkış',
+
+  'nav.panel': 'Panel',
+  'nav.antrenman': 'Antrenman',
+  'nav.beslenme': 'Beslenme',
+  'nav.ilerleme': 'İlerleme',
+  'nav.danisan': 'Danışan',
+  'nav.odemeler': 'Ödemeler',
+  'nav.randevu': 'Randevu',
+  'nav.mesajlar': 'Mesajlar',
+  'nav.account_section': 'Hesap',
+  'nav.bildirimler': 'Bildirimler',
+  'nav.role_trainer_panel': 'Antrenör Paneli',
+  'nav.select_client': 'Danışan seç',
+  'nav.active_clients_count': '{{count}} aktif danışan',
+  'nav.logout_full': 'Çıkış Yap',
+
+  'empty_client.title': 'Henüz bir danışanın yok',
+  'empty_client.sub': 'Bu ekranı kullanabilmek için önce bir danışan eklemen gerekiyor.',
+  'empty_client.cta': 'Danışan Ekle',
 };
 
 const en: Dict = {
@@ -100,6 +120,26 @@ const en: Dict = {
   'common.error': 'Something went wrong.',
   'common.deleted_error': 'Could not delete the account.',
   'common.deleted_error_title': 'Delete failed',
+  'common.logout': 'Log out',
+
+  'nav.panel': 'Dashboard',
+  'nav.antrenman': 'Workout',
+  'nav.beslenme': 'Nutrition',
+  'nav.ilerleme': 'Progress',
+  'nav.danisan': 'Clients',
+  'nav.odemeler': 'Payments',
+  'nav.randevu': 'Appointments',
+  'nav.mesajlar': 'Messages',
+  'nav.account_section': 'Account',
+  'nav.bildirimler': 'Notifications',
+  'nav.role_trainer_panel': 'Trainer Panel',
+  'nav.select_client': 'Select a client',
+  'nav.active_clients_count': '{{count}} active clients',
+  'nav.logout_full': 'Log Out',
+
+  'empty_client.title': 'You don’t have a client yet',
+  'empty_client.sub': 'You need to add a client before you can use this screen.',
+  'empty_client.cta': 'Add Client',
 };
 
 const ar: Dict = {
@@ -138,6 +178,26 @@ const ar: Dict = {
   'common.error': 'حدث خطأ ما.',
   'common.deleted_error': 'تعذر حذف الحساب.',
   'common.deleted_error_title': 'فشل الحذف',
+  'common.logout': 'تسجيل الخروج',
+
+  'nav.panel': 'الرئيسية',
+  'nav.antrenman': 'التمارين',
+  'nav.beslenme': 'التغذية',
+  'nav.ilerleme': 'التقدم',
+  'nav.danisan': 'العملاء',
+  'nav.odemeler': 'المدفوعات',
+  'nav.randevu': 'المواعيد',
+  'nav.mesajlar': 'الرسائل',
+  'nav.account_section': 'الحساب',
+  'nav.bildirimler': 'الإشعارات',
+  'nav.role_trainer_panel': 'لوحة المدرب',
+  'nav.select_client': 'اختر عميلاً',
+  'nav.active_clients_count': '{{count}} عملاء نشطون',
+  'nav.logout_full': 'تسجيل الخروج',
+
+  'empty_client.title': 'ليس لديك عميل بعد',
+  'empty_client.sub': 'تحتاج إلى إضافة عميل قبل استخدام هذه الشاشة.',
+  'empty_client.cta': 'إضافة عميل',
 };
 
 const DICTS: Record<Lang, Dict> = { tr, en, ar };

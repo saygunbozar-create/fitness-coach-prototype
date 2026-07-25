@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useT } from '../lib/i18n';
 import { C } from '../lib/theme';
 
 export function EmptyClientState() {
+  const t = useT();
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Henüz bir danışanın yok</Text>
-      <Text style={styles.sub}>Bu ekranı kullanabilmek için önce bir danışan eklemen gerekiyor.</Text>
+      <Text style={styles.title}>{t('empty_client.title')}</Text>
+      <Text style={styles.sub}>{t('empty_client.sub')}</Text>
       <Pressable style={styles.btn} onPress={() => router.push('/(app)/danisan')} hitSlop={8}>
-        <Text style={styles.btnText}>Danışan Ekle</Text>
+        <Text style={styles.btnText}>{t('empty_client.cta')}</Text>
       </Pressable>
     </View>
   );

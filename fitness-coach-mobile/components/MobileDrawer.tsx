@@ -3,22 +3,23 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
 import { useBrandName } from '../lib/branding';
+import { useT } from '../lib/i18n';
 import { closeMobileDrawer, openMobileDrawer, useMobileDrawerOpen } from '../lib/mobileDrawer';
 import { useClient, useClientByProfile, useClients, useNotifications } from '../lib/queries';
 import { useSelectedClient } from '../lib/selectedClient';
 import { C } from '../lib/theme';
 
-type NavItem = { path: string; label: string; glyph: string; trainerOnly?: boolean };
+type NavItem = { path: string; labelKey: string; glyph: string; trainerOnly?: boolean };
 
 const NAV_ITEMS: NavItem[] = [
-  { path: '/(app)/panel', label: 'Panel', glyph: '▦', trainerOnly: true },
-  { path: '/(app)/antrenman', label: 'Antrenman', glyph: '⬢' },
-  { path: '/(app)/beslenme', label: 'Beslenme', glyph: '◈' },
-  { path: '/(app)/ilerleme', label: 'İlerleme', glyph: '↗' },
-  { path: '/(app)/danisan', label: 'Danışan', glyph: '◉', trainerOnly: true },
-  { path: '/(app)/odemeler', label: 'Ödemeler', glyph: '₺' },
-  { path: '/(app)/randevu', label: 'Randevu', glyph: '◷' },
-  { path: '/(app)/mesajlar', label: 'Mesajlar', glyph: '✉' },
+  { path: '/(app)/panel', labelKey: 'nav.panel', glyph: '▦', trainerOnly: true },
+  { path: '/(app)/antrenman', labelKey: 'nav.antrenman', glyph: '⬢' },
+  { path: '/(app)/beslenme', labelKey: 'nav.beslenme', glyph: '◈' },
+  { path: '/(app)/ilerleme', labelKey: 'nav.ilerleme', glyph: '↗' },
+  { path: '/(app)/danisan', labelKey: 'nav.danisan', glyph: '◉', trainerOnly: true },
+  { path: '/(app)/odemeler', labelKey: 'nav.odemeler', glyph: '₺' },
+  { path: '/(app)/randevu', labelKey: 'nav.randevu', glyph: '◷' },
+  { path: '/(app)/mesajlar', labelKey: 'nav.mesajlar', glyph: '✉' },
 ];
 
 // ScreenHeader'ın sağ üstüne konan hamburger butonu — gerçek çekmece başka bir yerde (tek
@@ -55,6 +56,7 @@ export function MobileDrawer() {
   const activeClients = (clientsQuery.data ?? []).filter((c) => c.is_active).length;
   const contextClient = isTrainer ? selectedClientQuery.data : ownClientQuery.data;
   const brandName = useBrandName();
+  const t = useT();
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -86,7 +88,7 @@ export function MobileDrawer() {
               </View>
               <View style={{ minWidth: 0 }}>
                 <Text style={styles.brandName}>{brandName.toUpperCase()}</Text>
-                <Text style={styles.brandRole}>{isTrainer ? 'Antrenör Paneli' : 'Danışan'}</Text>
+                <Text style={styles.brandRole}>{isTrainer ? t('nav.role_trainer_panel') : t('ayarlar.role_client')}</Text>
               </View>
             </View>
 
@@ -96,18 +98,18 @@ export function MobileDrawer() {
                 return (
                   <Pressable key={item.path} onPress={() => go(item.path)} style={[styles.navItem, active && styles.navItemActive]}>
                     <Text style={[styles.navGlyph, active && styles.navGlyphActive]}>{item.glyph}</Text>
-                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>{item.label}</Text>
+                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>{t(item.labelKey)}</Text>
                   </Pressable>
                 );
               })}
 
-              <Text style={styles.sectionLabel}>Hesap</Text>
+              <Text style={styles.sectionLabel}>{t('nav.account_section')}</Text>
               {(() => {
                 const active = pathname === '/bildirimler';
                 return (
                   <Pressable onPress={() => go('/(app)/bildirimler')} style={[styles.navItem, active && styles.navItemActive]}>
                     <Text style={[styles.navGlyph, active && styles.navGlyphActive]}>🔔</Text>
-                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>Bildirimler</Text>
+                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>{t('nav.bildirimler')}</Text>
                     {unread > 0 && (
                       <View style={[styles.badge, active && styles.badgeActive]}>
                         <Text style={[styles.badgeText, active && styles.badgeTextActive]}>{unread}</Text>
@@ -121,7 +123,7 @@ export function MobileDrawer() {
                 return (
                   <Pressable onPress={() => go('/(app)/ayarlar')} style={[styles.navItem, active && styles.navItemActive]}>
                     <Text style={[styles.navGlyph, active && styles.navGlyphActive]}>⚙</Text>
-                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>Ayarlar</Text>
+                    <Text style={[styles.navLabel, active && styles.navLabelActive]}>{t('ayarlar.title')}</Text>
                   </Pressable>
                 );
               })()}
@@ -135,9 +137,9 @@ export function MobileDrawer() {
                   </View>
                   <View style={{ minWidth: 0, flex: 1 }}>
                     <Text style={styles.whoName} numberOfLines={1}>
-                      {contextClient?.name ?? 'Danışan seç'}
+                      {contextClient?.name ?? t('nav.select_client')}
                     </Text>
-                    <Text style={styles.whoRole}>{activeClients} aktif danışan</Text>
+                    <Text style={styles.whoRole}>{t('nav.active_clients_count', { count: activeClients })}</Text>
                   </View>
                 </Pressable>
               )}
@@ -149,7 +151,7 @@ export function MobileDrawer() {
                   <Text style={styles.whoName} numberOfLines={1}>
                     {profile?.name ?? '—'}
                   </Text>
-                  <Text style={styles.whoRole}>{isTrainer ? 'Antrenör' : 'Danışan'}</Text>
+                  <Text style={styles.whoRole}>{isTrainer ? t('ayarlar.role_trainer') : t('ayarlar.role_client')}</Text>
                 </View>
               </View>
               <Pressable
@@ -160,7 +162,7 @@ export function MobileDrawer() {
                 }}
                 hitSlop={8}
               >
-                <Text style={styles.signOutText}>Çıkış Yap</Text>
+                <Text style={styles.signOutText}>{t('nav.logout_full')}</Text>
               </Pressable>
             </View>
           </ScrollView>

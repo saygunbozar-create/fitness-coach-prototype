@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MobileDrawerTrigger } from './MobileDrawer';
 import { useAuth } from '../lib/auth';
 import { useBrandName } from '../lib/branding';
+import { useT } from '../lib/i18n';
 import { useUnreadNotificationCount } from '../lib/queries';
 import { useIsDesktopWeb } from '../lib/responsive';
 import { C } from '../lib/theme';
@@ -15,6 +16,7 @@ export function ScreenHeader({ title, clientName, showPill }: { title: string; c
   const unreadQuery = useUnreadNotificationCount(profile?.id);
   const unread = unreadQuery.data ?? 0;
   const brandName = useBrandName();
+  const t = useT();
   return (
     <View style={[styles.row, { paddingTop: insets.top + 12 }]}>
       <View>
@@ -41,7 +43,7 @@ export function ScreenHeader({ title, clientName, showPill }: { title: string; c
         </Pressable>
         {isDesktopWeb ? (
           <Pressable onPress={signOut} hitSlop={8}>
-            <Text style={styles.logout}>Çıkış</Text>
+            <Text style={styles.logout}>{t('common.logout')}</Text>
           </Pressable>
         ) : (
           <MobileDrawerTrigger />
