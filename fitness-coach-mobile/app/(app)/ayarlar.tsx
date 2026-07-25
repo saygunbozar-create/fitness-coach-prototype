@@ -197,7 +197,8 @@ export default function AyarlarScreen() {
 
         <WaterReminderCard />
 
-        {isTrainer && profile && <PlanPanel profile={profile} clientCount={clientsQuery.data?.length ?? 0} />}
+        {/* Paket/limit sistemi taslak aşamasında, henüz yayında değil. Devreye almak için bu satırı geri aç: */}
+        {/* {isTrainer && profile && <PlanPanel profile={profile} clientCount={clientsQuery.data?.length ?? 0} />} */}
 
         <Panel title="Uygulama Hakkında" right="v1.0.0">
           <Text style={styles.aboutText}>Coachbook</Text>
