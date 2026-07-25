@@ -6,6 +6,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddAvailabilityException,
   useAddAvailabilityRule,
@@ -138,13 +139,14 @@ function hasAnyAvailability(rules: AvailabilityRule[], dateStr: string): boolean
 }
 
 export default function RandevuScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
 
   if (isTrainer) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Müsaitlik" />
+        <ScreenHeader title={t('randevu.availability_title')} />
         <ScrollView contentContainerStyle={styles.content}>
           <TrainerAvailabilityPanel trainerId={profile?.id} />
           <TrainerExceptionsPanel trainerId={profile?.id} />
@@ -157,6 +159,7 @@ export default function RandevuScreen() {
 }
 
 function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined }) {
+  const t = useT();
   const rulesQuery = useAvailabilityRules(trainerId);
   const addRule = useAddAvailabilityRule(trainerId);
   const deleteRule = useDeleteAvailabilityRule(trainerId);
@@ -177,18 +180,18 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
   function submit() {
     setFormError(null);
     if (selectedDays.length === 0) {
-      setFormError('En az bir gün seç.');
+      setFormError(t('randevu.pick_at_least_one_day'));
       return;
     }
     const start = parseTrTime(startTime);
     const end = parseTrTime(endTime);
     if (!start || !end || start >= end) {
-      setFormError('Saat aralığını kontrol et (başlangıç bitişten önce olmalı).');
+      setFormError(t('randevu.time_range_invalid'));
       return;
     }
     const endDate = parseTrDate(endDateInput);
     if (!endDate) {
-      setFormError('Bitiş tarihini GG.AA.YYYY biçiminde gir.');
+      setFormError(t('randevu.end_date_format_err'));
       return;
     }
     addRule.mutate(
@@ -202,14 +205,14 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
       },
       {
         onSuccess: () => setEndDateInput(''),
-        onError: (e: any) => showAlert('Eklenemedi', e.message ?? 'Müsaitlik kuralı eklenemedi.'),
+        onError: (e: any) => showAlert(t('randevu.err_add_title'), e.message ?? t('randevu.err_add_rule')),
       }
     );
   }
 
   return (
-    <Panel title="Müsaitlik Kuralları" right={`${rules.length} aktif kural`}>
-      <Text style={styles.fieldLabel}>Hangi günler</Text>
+    <Panel title={t('randevu.rules_title')} right={t('randevu.active_rules_count', { count: rules.length })}>
+      <Text style={styles.fieldLabel}>{t('randevu.which_days')}</Text>
       <View style={styles.dayRow}>
         {DAY_CHIPS.map((d) => (
           <Pressable
@@ -225,7 +228,7 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
       <View style={styles.rowGap}>
         <View style={{ flex: 1 }}>
           <AuthField
-            label="Başlangıç Saati"
+            label={t('randevu.start_time_label')}
             value={startTime}
             onChangeText={(v) => setStartTime((prev) => formatTimeInputTr(v, prev))}
             placeholder="09:00"
@@ -235,7 +238,7 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
         </View>
         <View style={{ flex: 1 }}>
           <AuthField
-            label="Bitiş Saati"
+            label={t('randevu.end_time_label')}
             value={endTime}
             onChangeText={(v) => setEndTime((prev) => formatTimeInputTr(v, prev))}
             placeholder="18:00"
@@ -245,30 +248,30 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
         </View>
       </View>
 
-      <Text style={styles.fieldLabel}>Seans süresi</Text>
+      <Text style={styles.fieldLabel}>{t('randevu.session_duration')}</Text>
       <View style={styles.durRow}>
         {DURATIONS.map((d) => (
           <Pressable key={d} style={[styles.durChip, duration === d && styles.durChipOn]} onPress={() => setDuration(d)}>
-            <Text style={[styles.durChipText, duration === d && styles.durChipTextOn]}>{d} dk</Text>
+            <Text style={[styles.durChipText, duration === d && styles.durChipTextOn]}>{t('randevu.duration_chip', { minutes: d })}</Text>
           </Pressable>
         ))}
       </View>
 
       <AuthField
-        label="Bu kural ne zamana kadar geçerli olsun (GG.AA.YYYY)"
+        label={t('randevu.rule_valid_until_label')}
         value={endDateInput}
         onChangeText={(v) => setEndDateInput((prev) => formatDateInputTr(v, prev))}
-        placeholder="Ör. 31.08.2026"
+        placeholder={t('randevu.rule_valid_until_placeholder')}
         keyboardType="number-pad"
         maxLength={10}
       />
       {formError && <Text style={styles.errorText}>{formError}</Text>}
 
-      <PrimaryButton label="+ Müsaitlik Kuralı Ekle" loading={addRule.isPending} onPress={submit} />
+      <PrimaryButton label={t('randevu.add_rule_btn')} loading={addRule.isPending} onPress={submit} />
 
-      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Aktif kurallar</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('randevu.active_rules_label')}</Text>
       {rules.length === 0 ? (
-        <Text style={styles.noteText}>Henüz bir müsaitlik kuralı eklenmedi.</Text>
+        <Text style={styles.noteText}>{t('randevu.no_rules_yet')}</Text>
       ) : (
         rules.map((r) => (
           <View key={r.id} style={styles.ruleCard}>
@@ -276,19 +279,19 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.ruleDays}>{r.days_of_week.map((d) => DAY_FULL[d]).join(' · ')}</Text>
               <Text style={styles.ruleMeta}>
-                {r.start_time.slice(0, 5)}–{r.end_time.slice(0, 5)} · {r.session_minutes} dk seanslar · {formatTrDateShort(r.end_date)} tarihine kadar
+                {t('randevu.rule_meta', { start: r.start_time.slice(0, 5), end: r.end_time.slice(0, 5), minutes: r.session_minutes, date: formatTrDateShort(r.end_date) })}
               </Text>
             </View>
             <Pressable
               onPress={() =>
-                showAlert('Kuralı Sil', 'Bu müsaitlik kuralı silinsin mi? Zaten alınmış randevular etkilenmez.', [
-                  { text: 'Vazgeç', style: 'cancel' },
-                  { text: 'Sil', style: 'destructive', onPress: () => deleteRule.mutate(r.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kural silinemedi.') }) },
+                showAlert(t('randevu.delete_rule_title'), t('randevu.delete_rule_body'), [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  { text: t('common.delete'), style: 'destructive', onPress: () => deleteRule.mutate(r.id, { onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('randevu.err_rule_delete')) }) },
                 ])
               }
               hitSlop={8}
             >
-              <Text style={styles.ruleDelete}>Sil</Text>
+              <Text style={styles.ruleDelete}>{t('common.delete')}</Text>
             </Pressable>
           </View>
         ))
@@ -298,6 +301,7 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
 }
 
 function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }) {
+  const t = useT();
   const exceptionsQuery = useAvailabilityExceptions(trainerId);
   const addException = useAddAvailabilityException(trainerId);
   const deleteException = useDeleteAvailabilityException(trainerId);
@@ -315,18 +319,18 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
   function submit() {
     setFormError(null);
     if (!parsedDate) {
-      setFormError('Tarihi GG.AA.YYYY biçiminde gir.');
+      setFormError(t('ilerleme.date_format_err'));
       return;
     }
     const start = parseTrTime(startTime);
     const end = parseTrTime(endTime);
     if (!start || !end || start >= end) {
-      setFormError('Saat aralığını kontrol et (başlangıç bitişten önce olmalı).');
+      setFormError(t('randevu.time_range_invalid'));
       return;
     }
     const startMin = timeToMinutes(start);
     const endMin = timeToMinutes(end);
-    const conflicts = (conflictQuery.data ?? []).filter((t) => timeToMinutes(t) >= startMin && timeToMinutes(t) < endMin).length;
+    const conflicts = (conflictQuery.data ?? []).filter((time) => timeToMinutes(time) >= startMin && timeToMinutes(time) < endMin).length;
 
     const doSubmit = () =>
       addException.mutate(
@@ -336,17 +340,17 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
             setDateInput('');
             setNote('');
           },
-          onError: (e: any) => showAlert('Eklenemedi', e.message ?? 'Kapatma eklenemedi.'),
+          onError: (e: any) => showAlert(t('randevu.err_add_title'), e.message ?? t('randevu.err_add_exception')),
         }
       );
 
     if (conflicts > 0) {
       showAlert(
-        'Bu aralıkta randevu var',
-        `${formatTrDateLong(parsedDate)} · ${start}–${end} aralığında ${conflicts} randevu zaten alınmış. Bu kapatma o randevuları silmez — iptal etmek istersen Panel'deki takvimden elle silmen gerekir. Yine de kapatılsın mı?`,
+        t('randevu.conflict_title'),
+        t('randevu.conflict_body', { date: formatTrDateLong(parsedDate), start, end, count: conflicts }),
         [
-          { text: 'Vazgeç', style: 'cancel' },
-          { text: 'Yine de Kapat', onPress: doSubmit },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('randevu.close_anyway_btn'), onPress: doSubmit },
         ]
       );
     } else {
@@ -355,24 +359,23 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
   }
 
   return (
-    <Panel title="Kapalı Saatler" right={`${exceptions.length} kapatma`}>
+    <Panel title={t('randevu.exceptions_title')} right={t('randevu.exceptions_count', { count: exceptions.length })}>
       <Text style={styles.noteText}>
-        Genel müsaitliğinin içinde belirli bir tarihte ders veremeyeceğin bir aralık varsa (vardiya, özel iş vb.) burada kapatabilirsin — haftalık kuralın kendisi
-        değişmez.
+        {t('randevu.exceptions_hint')}
       </Text>
       <View style={{ height: 12 }} />
       <AuthField
-        label="Tarih (GG.AA.YYYY)"
+        label={t('randevu.date_label')}
         value={dateInput}
         onChangeText={(v) => setDateInput((prev) => formatDateInputTr(v, prev))}
-        placeholder="Ör. 30.07.2026"
+        placeholder={t('randevu.date_placeholder')}
         keyboardType="number-pad"
         maxLength={10}
       />
       <View style={styles.rowGap}>
         <View style={{ flex: 1 }}>
           <AuthField
-            label="Başlangıç Saati"
+            label={t('randevu.start_time_label')}
             value={startTime}
             onChangeText={(v) => setStartTime((prev) => formatTimeInputTr(v, prev))}
             placeholder="12:00"
@@ -382,7 +385,7 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
         </View>
         <View style={{ flex: 1 }}>
           <AuthField
-            label="Bitiş Saati"
+            label={t('randevu.end_time_label')}
             value={endTime}
             onChangeText={(v) => setEndTime((prev) => formatTimeInputTr(v, prev))}
             placeholder="16:00"
@@ -391,14 +394,14 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
           />
         </View>
       </View>
-      <AuthField label="Not (opsiyonel)" value={note} onChangeText={setNote} placeholder="Ör. Vardiya" />
+      <AuthField label={t('randevu.note_optional_label')} value={note} onChangeText={setNote} placeholder={t('randevu.note_optional_placeholder')} />
       {formError && <Text style={styles.errorText}>{formError}</Text>}
 
-      <PrimaryButton label="Bu Saatleri Kapat" loading={addException.isPending} onPress={submit} />
+      <PrimaryButton label={t('randevu.close_hours_btn')} loading={addException.isPending} onPress={submit} />
 
-      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Yaklaşan kapatmalar</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('randevu.upcoming_closures_label')}</Text>
       {exceptions.length === 0 ? (
-        <Text style={styles.noteText}>Kapatılmış bir saat aralığı yok.</Text>
+        <Text style={styles.noteText}>{t('randevu.no_closures')}</Text>
       ) : (
         exceptions.map((e) => (
           <View key={e.id} style={styles.ruleCard}>
@@ -411,10 +414,10 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
               </Text>
             </View>
             <Pressable
-              onPress={() => deleteException.mutate(e.id, { onError: (err: any) => showAlert('Silinemedi', err.message ?? 'Kapatma kaldırılamadı.') })}
+              onPress={() => deleteException.mutate(e.id, { onError: (err: any) => showAlert(t('common.delete_failed_title'), err.message ?? t('randevu.err_exception_delete')) })}
               hitSlop={8}
             >
-              <Text style={styles.ruleDelete}>Aç</Text>
+              <Text style={styles.ruleDelete}>{t('randevu.open_btn')}</Text>
             </Pressable>
           </View>
         ))
@@ -424,6 +427,7 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
 }
 
 function ClientAppointmentScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const { selectedClientId } = useSelectedClient();
   const clientQuery = useClient(selectedClientId ?? undefined);
@@ -439,7 +443,7 @@ function ClientAppointmentScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Randevu Al" />
+      <ScreenHeader title={t('randevu.book_title')} />
       <ScrollView contentContainerStyle={styles.content}>
         <ClientBookingPanel trainerId={client.trainer_id} clientId={client.id} />
         <MyAppointmentsPanel trainerId={client.trainer_id} clientId={client.id} />
@@ -467,6 +471,7 @@ function SlotPicker({
   onPickSlot: (time: string) => void;
   picking?: boolean;
 }) {
+  const t = useT();
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const takenQuery = useTakenSlots(trainerId, selectedDate);
   const slots = useMemo(
@@ -496,11 +501,11 @@ function SlotPicker({
         })}
       </ScrollView>
 
-      <Text style={styles.fieldLabel}>{formatTrDateLong(selectedDate)} — boş saatler</Text>
+      <Text style={styles.fieldLabel}>{formatTrDateLong(selectedDate)} {t('randevu.empty_slots_suffix')}</Text>
       {takenQuery.isLoading ? (
         <ActivityIndicator color={C.lime} />
       ) : slots.length === 0 ? (
-        <Text style={styles.noteText}>Bu gün için açık saat yok.</Text>
+        <Text style={styles.noteText}>{t('randevu.no_slots_today')}</Text>
       ) : (
         <View style={styles.slotGrid}>
           {slots.map((s) => {
@@ -518,6 +523,7 @@ function SlotPicker({
 }
 
 function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; clientId: string }) {
+  const t = useT();
   const rulesQuery = useAvailabilityRules(trainerId);
   const exceptionsQuery = useAvailabilityExceptions(trainerId);
   const rules = rulesQuery.data ?? [];
@@ -529,26 +535,26 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
   const bookAppointment = useBookAppointment(trainerId, clientId);
 
   function confirmBooking(time: string) {
-    showAlert('Randevuyu Onayla', `${formatTrDateLong(selectedDate)} · ${time} için randevu alınsın mı?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    showAlert(t('randevu.confirm_booking_title'), t('randevu.confirm_booking_body', { date: formatTrDateLong(selectedDate), time }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Randevu Al',
+        text: t('randevu.book_btn'),
         onPress: () =>
           bookAppointment.mutate(
             { date: selectedDate, time },
-            { onError: (e: any) => showAlert('Alınamadı', e.message?.includes('duplicate') ? 'Bu saat az önce başka biri tarafından alındı.' : e.message ?? 'Randevu alınamadı.') }
+            { onError: (e: any) => showAlert(t('randevu.err_book_title'), e.message?.includes('duplicate') ? t('randevu.err_slot_taken') : e.message ?? t('randevu.err_book_generic')) }
           ),
       },
     ]);
   }
 
   return (
-    <Panel title="Randevu Al" right={rulesQuery.isLoading ? undefined : `${rules.length} açık kural`}>
+    <Panel title={t('randevu.book_title')} right={rulesQuery.isLoading ? undefined : t('randevu.open_slots_count', { count: rules.length })}>
       {!rulesQuery.isLoading && rules.length === 0 ? (
-        <Text style={styles.noteText}>Antrenörün henüz randevuya açık bir saat aralığı yok.</Text>
+        <Text style={styles.noteText}>{t('randevu.no_rules_client')}</Text>
       ) : (
         <>
-          <Text style={styles.fieldLabel}>Tarih seç</Text>
+          <Text style={styles.fieldLabel}>{t('randevu.pick_date')}</Text>
           <SlotPicker
             trainerId={trainerId}
             rules={rules}
@@ -565,6 +571,7 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
 }
 
 function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clientId: string }) {
+  const t = useT();
   const appointmentsQuery = useMyUpcomingAppointments(clientId);
   const rulesQuery = useAvailabilityRules(trainerId);
   const exceptionsQuery = useAvailabilityExceptions(trainerId);
@@ -583,17 +590,17 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
   }
 
   function confirmReschedule(id: string, oldLabel: string, time: string) {
-    showAlert('Randevuyu Taşı', `${oldLabel} yerine ${formatTrDateLong(rescheduleDate)} · ${time} olsun mu?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+    showAlert(t('randevu.reschedule_title'), t('randevu.reschedule_body', { old: oldLabel, date: formatTrDateLong(rescheduleDate), time }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Taşı',
+        text: t('randevu.move_btn'),
         onPress: () =>
           reschedule.mutate(
             { id, date: rescheduleDate, time },
             {
               onSuccess: () => setReschedulingId(null),
               onError: (e: any) =>
-                showAlert('Taşınamadı', e.message?.includes('duplicate') ? 'Bu saat az önce başka biri tarafından alındı.' : e.message ?? 'Randevu taşınamadı.'),
+                showAlert(t('randevu.err_reschedule_title'), e.message?.includes('duplicate') ? t('randevu.err_slot_taken') : e.message ?? t('randevu.err_reschedule_generic')),
             }
           ),
       },
@@ -601,9 +608,9 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
   }
 
   return (
-    <Panel title="Randevularım" right={`${appointments.length} kayıt`}>
+    <Panel title={t('randevu.my_appointments_title')} right={t('ilerleme.records_count', { count: appointments.length })}>
       {appointments.length === 0 ? (
-        <Text style={styles.noteText}>Yaklaşan randevun yok.</Text>
+        <Text style={styles.noteText}>{t('randevu.no_upcoming_appt')}</Text>
       ) : (
         appointments.map((a) => (
           <View key={a.id} style={styles.apptBlock}>
@@ -613,7 +620,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
                 <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
               </View>
               <Pressable onPress={() => (reschedulingId === a.id ? setReschedulingId(null) : openReschedule(a.id))} hitSlop={8}>
-                <Text style={styles.apptChange}>{reschedulingId === a.id ? 'Vazgeç' : 'Değiştir'}</Text>
+                <Text style={styles.apptChange}>{reschedulingId === a.id ? t('common.cancel') : t('randevu.change_btn')}</Text>
               </Pressable>
             </View>
             {reschedulingId === a.id && (
@@ -632,7 +639,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
           </View>
         ))
       )}
-      <Text style={styles.trainerHint}>İptal etmek için antrenörünle iletişime geç.</Text>
+      <Text style={styles.trainerHint}>{t('randevu.cancel_hint')}</Text>
     </Panel>
   );
 }
