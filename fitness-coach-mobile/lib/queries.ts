@@ -2454,3 +2454,18 @@ export function useDeleteOwnAccount() {
     },
   });
 }
+
+// ---------- KVKK Onayı (geriye dönük) ----------
+
+export function useAcceptConsent(profileId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!profileId) throw new Error('profileId eksik');
+      const { error } = await supabase
+        .from('profiles')
+        .update({ consent_accepted_at: new Date().toISOString() })
+        .eq('id', profileId);
+      if (error) throw error;
+    },
+  });
+}

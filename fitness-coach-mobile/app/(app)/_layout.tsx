@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ConsentGate } from '../../components/ConsentGate';
 import { DesktopSidebar } from '../../components/DesktopSidebar';
 import { MobileDrawer } from '../../components/MobileDrawer';
 import { useAuth } from '../../lib/auth';
@@ -70,6 +71,10 @@ export default function AppLayout() {
   }
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
+
+  // KVKK onay kutusu 22 Temmuz 2026'da eklendi — ondan önce oluşturulan hesapların onay
+  // kaydı yok. Böyle bir hesap girişte buraya takılır, onaylamadan hiçbir sekmeye geçemez.
+  if (!profile.consent_accepted_at) return <ConsentGate profileId={profile.id} />;
 
   const tabs = (
     <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
