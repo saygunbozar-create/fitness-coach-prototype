@@ -7,6 +7,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddLessonEntry,
   useClients,
@@ -20,8 +21,6 @@ import {
 } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { addDaysToDateStr, C, formatDateInputTr, formatTimeInputTr, localDateStr, mondayOfWeek, nf } from '../../lib/theme';
-
-const TR_WEEKDAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 
 function formatTrDateShort(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -46,6 +45,8 @@ function parseTrTimeShort(input: string): string | null {
 }
 
 function LessonScheduleCard() {
+  const t = useT();
+  const WEEKDAYS = [t('weekday.mon'), t('weekday.tue'), t('weekday.wed'), t('weekday.thu'), t('weekday.fri'), t('weekday.sat'), t('weekday.sun')];
   const { profile } = useAuth();
   const clientsQuery = useClients(profile?.id);
   const [weekStart, setWeekStart] = useState(() => mondayOfWeek());
@@ -79,15 +80,15 @@ function LessonScheduleCard() {
     const isoDate = parseTrDateFull(lessonDate);
     const isoTime = parseTrTimeShort(lessonTime);
     if (!lessonClientId) {
-      setLessonError('Bir danışan seç.');
+      setLessonError(t('panel.err_pick_client'));
       return;
     }
     if (!isoDate) {
-      setLessonError('Tarih GG.AA.YYYY formatında olmalı.');
+      setLessonError(t('panel.err_date_format'));
       return;
     }
     if (!isoTime) {
-      setLessonError('Saat SS:DD formatında olmalı.');
+      setLessonError(t('panel.err_time_format'));
       return;
     }
     addLesson.mutate(
@@ -99,22 +100,22 @@ function LessonScheduleCard() {
           setLessonTime('');
           setAddingLesson(false);
         },
-        onError: (e: any) => showAlert('Eklenemedi', e.message ?? 'Ders eklenemedi.'),
+        onError: (e: any) => showAlert(t('panel.add_lesson_failed_title'), e.message ?? t('panel.add_lesson_failed_body')),
       }
     );
   }
 
   return (
-    <Panel title="Haftalık Ders Takvimi" right={`${formatTrDateShort(weekStart)} – ${formatTrDateShort(weekEnd)}`}>
+    <Panel title={t('panel.weekly_calendar')} right={`${formatTrDateShort(weekStart)} – ${formatTrDateShort(weekEnd)}`}>
       <View style={styles.weekNavRow}>
         <Pressable onPress={() => setWeekStart((s) => addDaysToDateStr(s, -7))} hitSlop={8}>
-          <Text style={styles.weekNavBtn}>‹ Önceki hafta</Text>
+          <Text style={styles.weekNavBtn}>{t('panel.prev_week')}</Text>
         </Pressable>
         <Pressable onPress={() => setWeekStart(mondayOfWeek())} hitSlop={8}>
-          <Text style={styles.weekNavToday}>Bu hafta</Text>
+          <Text style={styles.weekNavToday}>{t('panel.this_week')}</Text>
         </Pressable>
         <Pressable onPress={() => setWeekStart((s) => addDaysToDateStr(s, 7))} hitSlop={8}>
-          <Text style={styles.weekNavBtn}>Sonraki hafta ›</Text>
+          <Text style={styles.weekNavBtn}>{t('panel.next_week')}</Text>
         </Pressable>
       </View>
 
@@ -126,10 +127,10 @@ function LessonScheduleCard() {
           return (
             <View key={dayStr} style={styles.dayBlock}>
               <Text style={styles.dayBlockTitle}>
-                {TR_WEEKDAYS[i]} · {formatTrDateShort(dayStr)}
+                {WEEKDAYS[i]} · {formatTrDateShort(dayStr)}
               </Text>
               {dayLessons.length === 0 ? (
-                <Text style={styles.dayBlockEmpty}>Ders yok</Text>
+                <Text style={styles.dayBlockEmpty}>{t('panel.no_lesson')}</Text>
               ) : (
                 dayLessons.map((l) => {
                   const used = usedByKey.get(sessionKey(l.client_id, l.date, l.time));
@@ -141,7 +142,7 @@ function LessonScheduleCard() {
                         </Text>
                         {l.booked_by_client && (
                           <View style={styles.bookedBadge}>
-                            <Text style={styles.bookedBadgeText}>Randevu</Text>
+                            <Text style={styles.bookedBadgeText}>{t('panel.booked_badge')}</Text>
                           </View>
                         )}
                       </View>
@@ -150,21 +151,21 @@ function LessonScheduleCard() {
                           <Pressable
                             style={styles.useSessionBtnOn}
                             onPress={() =>
-                              showAlert('Seansı Geri Al', `${l.clientName} için kullanılan seans geri alınsın mı?`, [
-                                { text: 'Vazgeç', style: 'cancel' },
+                              showAlert(t('panel.undo_session_title'), t('panel.undo_session_body', { name: l.clientName }), [
+                                { text: t('common.cancel'), style: 'cancel' },
                                 {
-                                  text: 'Geri Al',
+                                  text: t('panel.undo'),
                                   style: 'destructive',
                                   onPress: () =>
                                     unlogSession.mutate(
                                       { id: used.id, client_id: l.client_id },
-                                      { onError: (e: any) => showAlert('Geri alınamadı', e.message ?? 'Bir hata oluştu.') }
+                                      { onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('panel.undo_failed_body')) }
                                     ),
                                 },
                               ])
                             }
                           >
-                            <Text style={styles.useSessionBtnOnText}>✓ Kullanıldı</Text>
+                            <Text style={styles.useSessionBtnOnText}>{t('panel.session_used')}</Text>
                           </Pressable>
                         ) : (
                           <Pressable
@@ -172,14 +173,21 @@ function LessonScheduleCard() {
                             onPress={() =>
                               logSession.mutate(
                                 { client_id: l.client_id, date: l.date, time: l.time },
-                                { onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Seans kullanılamadı.') }
+                                { onError: (e: any) => showAlert(t('panel.log_session_failed_title'), e.message ?? t('panel.log_session_failed_body')) }
                               )
                             }
                           >
-                            <Text style={styles.useSessionBtnText}>Seans Kullan</Text>
+                            <Text style={styles.useSessionBtnText}>{t('panel.use_session')}</Text>
                           </Pressable>
                         )}
-                        <Pressable onPress={() => deleteLesson.mutate(l.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Silinemedi.') })} hitSlop={8}>
+                        <Pressable
+                          onPress={() =>
+                            deleteLesson.mutate(l.id, {
+                              onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('common.delete_failed_body')),
+                            })
+                          }
+                          hitSlop={8}
+                        >
                           <Text style={styles.lessonDelete}>✕</Text>
                         </Pressable>
                       </View>
@@ -194,11 +202,11 @@ function LessonScheduleCard() {
 
       {!addingLesson ? (
         <Pressable style={styles.addLessonBtn} onPress={() => setAddingLesson(true)}>
-          <Text style={styles.addLessonBtnText}>+ Ders Ekle</Text>
+          <Text style={styles.addLessonBtnText}>{t('panel.add_lesson')}</Text>
         </Pressable>
       ) : (
         <View style={styles.addDayCard}>
-          <Text style={styles.label}>Danışan</Text>
+          <Text style={styles.label}>{t('common.client_label')}</Text>
           <View style={styles.clientPickRow}>
             {clients.map((c) => (
               <Pressable
@@ -213,20 +221,20 @@ function LessonScheduleCard() {
           <View style={styles.rowGap}>
             <View style={{ flex: 1 }}>
               <AuthField
-                label="Tarih (GG.AA.YYYY)"
+                label={t('panel.date_label')}
                 value={lessonDate}
                 onChangeText={(v) => setLessonDate((prev) => formatDateInputTr(v, prev))}
-                placeholder="Ör. 13.07.2026"
+                placeholder={t('panel.date_placeholder')}
                 keyboardType="number-pad"
                 maxLength={10}
               />
             </View>
             <View style={{ flex: 1 }}>
               <AuthField
-                label="Saat (SS:DD)"
+                label={t('panel.time_label')}
                 value={lessonTime}
                 onChangeText={(v) => setLessonTime((prev) => formatTimeInputTr(v, prev))}
-                placeholder="Ör. 14:30"
+                placeholder={t('panel.time_placeholder')}
                 keyboardType="number-pad"
                 maxLength={5}
               />
@@ -235,7 +243,7 @@ function LessonScheduleCard() {
           {lessonError && <Text style={styles.lessonErrorText}>{lessonError}</Text>}
           <View style={styles.rowGap}>
             <View style={{ flex: 1 }}>
-              <PrimaryButton label="Kaydet" loading={addLesson.isPending} onPress={submitLesson} />
+              <PrimaryButton label={t('common.save')} loading={addLesson.isPending} onPress={submitLesson} />
             </View>
             <Pressable
               style={styles.cancelBtn}
@@ -245,7 +253,7 @@ function LessonScheduleCard() {
               }}
               hitSlop={8}
             >
-              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
             </Pressable>
           </View>
         </View>
@@ -255,6 +263,7 @@ function LessonScheduleCard() {
 }
 
 function TrainerReportCard() {
+  const t = useT();
   const { profile } = useAuth();
   const [amountHidden, setAmountHidden] = useState(false);
 
@@ -274,7 +283,7 @@ function TrainerReportCard() {
   const loading = weeklySessionsQuery.isLoading || monthlyPaymentsQuery.isLoading;
 
   return (
-    <Panel title="Rapor" right="Genel Bakış">
+    <Panel title={t('panel.report_title')} right={t('panel.report_subtitle')}>
       {loading ? (
         <ActivityIndicator color={C.lime} />
       ) : (
@@ -282,7 +291,7 @@ function TrainerReportCard() {
           <View style={styles.reportGrid}>
             <View style={styles.reportStat}>
               <Text style={styles.reportStatValue}>{weeklySessionsQuery.data ?? 0}</Text>
-              <Text style={styles.reportStatLabel}>Bu hafta tamamlanan ders</Text>
+              <Text style={styles.reportStatLabel}>{t('panel.completed_this_week')}</Text>
             </View>
             <View style={styles.reportStat}>
               <View style={styles.reportStatValueRow}>
@@ -293,22 +302,22 @@ function TrainerReportCard() {
                   <Text style={[styles.eyeIcon, amountHidden && styles.eyeIconOff]}>👁</Text>
                 </Pressable>
               </View>
-              <Text style={styles.reportStatLabel}>Bu ay toplam ödeme</Text>
+              <Text style={styles.reportStatLabel}>{t('panel.total_payment_month')}</Text>
             </View>
           </View>
           {monthlyPaymentsQuery.data && !amountHidden && (
             <Text style={styles.reportSub}>
-              {nf(monthlyPaymentsQuery.data.paid)} ₺ alındı · {nf(monthlyPaymentsQuery.data.pending)} ₺ bekliyor
+              {t('panel.paid_pending', { paid: nf(monthlyPaymentsQuery.data.paid), pending: nf(monthlyPaymentsQuery.data.pending) })}
             </Text>
           )}
         </>
       )}
 
-      <Text style={styles.reportSectionTitle}>Bugünkü Yaklaşan Dersler</Text>
+      <Text style={styles.reportSectionTitle}>{t('panel.upcoming_today')}</Text>
       {todayLessonsQuery.isLoading ? (
         <ActivityIndicator color={C.lime} />
       ) : upcomingToday.length === 0 ? (
-        <Text style={styles.dayBlockEmpty}>Bugün için yaklaşan ders yok.</Text>
+        <Text style={styles.dayBlockEmpty}>{t('panel.no_upcoming_today')}</Text>
       ) : (
         upcomingToday.map((l) => (
           <View key={l.id} style={styles.lessonRow}>
@@ -323,6 +332,7 @@ function TrainerReportCard() {
 }
 
 export default function PanelScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const isDesktopWeb = useIsDesktopWeb();
@@ -331,7 +341,7 @@ export default function PanelScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Panel" />
+      <ScreenHeader title={t('nav.panel')} />
       <ScrollView contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}>
         {isDesktopWeb ? (
           // Geniş ekranda takvim + rapor yan yana — mobilde ikisi de tek sütun halinde alt alta kalır.
