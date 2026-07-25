@@ -5,9 +5,11 @@ import { AuthField } from '../../components/AuthField';
 import { ConsentCheckbox } from '../../components/ConsentCheckbox';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { C } from '../../lib/theme';
 
 export default function SignupClient() {
+  const t = useT();
   const { signUpClient } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,35 +32,35 @@ export default function SignupClient() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>COACHBOOK</Text>
-        <Text style={styles.title}>Danışan Kaydı</Text>
+        <Text style={styles.title}>{t('auth.signup_client_title')}</Text>
         <Text style={styles.hint}>
-          Antrenörünün seni eklediği e-posta adresiyle kayıt ol — hesabın otomatik olarak antrenörüne bağlanır.
+          {t('auth.signup_client_hint')}
         </Text>
 
         {done ? (
           <>
-            <Text style={styles.success}>Kayıt tamamlandı. E-postanı onayladıktan sonra giriş yapabilirsin.</Text>
-            <PrimaryButton label="Girişe dön" onPress={() => router.replace('/(auth)/login')} />
+            <Text style={styles.success}>{t('auth.signup_done')}</Text>
+            <PrimaryButton label={t('auth.back_to_login_btn')} onPress={() => router.replace('/(auth)/login')} />
           </>
         ) : (
           <>
-            <AuthField label="Ad Soyad" value={name} onChangeText={setName} placeholder="Ör. Mert K." />
+            <AuthField label={t('ayarlar.name')} value={name} onChangeText={setName} placeholder="Ör. Mert K." />
             <AuthField
-              label="E-posta (antrenörünün eklediği)"
+              label={t('auth.email_trainer_added_label')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               placeholder="ornek@eposta.com"
             />
-            <AuthField label="Şifre" value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" />
+            <AuthField label={t('auth.password_label')} value={password} onChangeText={setPassword} secureTextEntry placeholder={t('hesap.new_password_placeholder')} />
             <ConsentCheckbox checked={consent} onToggle={() => setConsent((v) => !v)} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <PrimaryButton label="Kayıt Ol" onPress={onSubmit} loading={loading} disabled={!name || !email || !password || !consent} />
+            <PrimaryButton label={t('auth.signup_btn')} onPress={onSubmit} loading={loading} disabled={!name || !email || !password || !consent} />
           </>
         )}
 
         <Link href="/(auth)/login" style={styles.link}>
-          Zaten hesabın var mı? Giriş yap
+          {t('auth.already_have_account')}
         </Link>
       </ScrollView>
     </KeyboardAvoidingView>

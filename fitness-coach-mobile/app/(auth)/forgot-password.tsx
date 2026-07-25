@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { useT } from '../../lib/i18n';
 import { supabase } from '../../lib/supabase';
 import { C } from '../../lib/theme';
 
@@ -11,6 +12,7 @@ import { C } from '../../lib/theme';
 const RESET_PASSWORD_URL = 'https://coachbook-roan.vercel.app/reset-password';
 
 export default function ForgotPassword() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -35,26 +37,25 @@ export default function ForgotPassword() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>COACHBOOK</Text>
-        <Text style={styles.title}>Şifremi Unuttum</Text>
+        <Text style={styles.title}>{t('auth.forgot_password_title')}</Text>
 
         {sent ? (
           <>
             <Text style={styles.info}>
-              {email.trim()} adresine bir şifre sıfırlama linki gönderdik. Gelen kutunu (ve spam klasörünü) kontrol et,
-              linke tıklayıp yeni şifreni belirle.
+              {t('auth.reset_link_sent', { email: email.trim() })}
             </Text>
             <Link href="/(auth)/login" style={styles.link}>
-              Girişe dön
+              {t('auth.back_to_login_btn')}
             </Link>
           </>
         ) : (
           <>
-            <Text style={styles.info}>Hesabına kayıtlı e-posta adresini gir, sana bir şifre sıfırlama linki gönderelim.</Text>
-            <AuthField label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
+            <Text style={styles.info}>{t('auth.forgot_password_intro')}</Text>
+            <AuthField label={t('ayarlar.email')} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <PrimaryButton label="Sıfırlama Linki Gönder" onPress={onSubmit} loading={loading} disabled={!email.trim()} />
+            <PrimaryButton label={t('auth.send_reset_link_btn')} onPress={onSubmit} loading={loading} disabled={!email.trim()} />
             <Text style={styles.link} onPress={() => router.back()}>
-              ‹ Girişe dön
+              {t('auth.back_to_login_arrow')}
             </Text>
           </>
         )}

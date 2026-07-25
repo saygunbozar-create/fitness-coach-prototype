@@ -1,44 +1,61 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useLanguage, useT } from '../lib/i18n';
 import { C } from '../lib/theme';
 
 const LEGAL_BASE_URL = 'https://coachbook-roan.vercel.app/legal';
 
 export function ConsentCheckbox({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
+  const t = useT();
+  const lang = useLanguage();
+
+  function openKvkk(e: any) {
+    e.stopPropagation();
+    Linking.openURL(`${LEGAL_BASE_URL}/kvkk-aydinlatma-metni.html`);
+  }
+  function openPrivacy(e: any) {
+    e.stopPropagation();
+    Linking.openURL(`${LEGAL_BASE_URL}/privacy-policy.html`);
+  }
+  function openTerms(e: any) {
+    e.stopPropagation();
+    Linking.openURL(`${LEGAL_BASE_URL}/kullanim-sartlari.html`);
+  }
+
   return (
     <Pressable style={styles.row} onPress={onToggle} hitSlop={8}>
       <View style={[styles.box, checked && styles.boxOn]}>{checked ? <Text style={styles.mark}>✓</Text> : null}</View>
-      <Text style={styles.text}>
-        <Text
-          style={styles.link}
-          onPress={(e) => {
-            e.stopPropagation();
-            Linking.openURL(`${LEGAL_BASE_URL}/kvkk-aydinlatma-metni.html`);
-          }}
-        >
-          KVKK Aydınlatma Metni
+      {lang === 'en' ? (
+        <Text style={styles.text}>
+          {t('consent.agree_prefix')}{' '}
+          <Text style={styles.link} onPress={openKvkk}>
+            {t('ayarlar.kvkk')}
+          </Text>
+          {', '}
+          <Text style={styles.link} onPress={openPrivacy}>
+            {t('ayarlar.privacy_policy')}
+          </Text>{' '}
+          {t('consent.and')}{' '}
+          <Text style={styles.link} onPress={openTerms}>
+            {t('ayarlar.terms')}
+          </Text>
+          .
         </Text>
-        ,{' '}
-        <Text
-          style={styles.link}
-          onPress={(e) => {
-            e.stopPropagation();
-            Linking.openURL(`${LEGAL_BASE_URL}/privacy-policy.html`);
-          }}
-        >
-          Gizlilik Politikası
-        </Text>{' '}
-        ve{' '}
-        <Text
-          style={styles.link}
-          onPress={(e) => {
-            e.stopPropagation();
-            Linking.openURL(`${LEGAL_BASE_URL}/kullanim-sartlari.html`);
-          }}
-        >
-          Kullanım Şartları
+      ) : (
+        <Text style={styles.text}>
+          <Text style={styles.link} onPress={openKvkk}>
+            {t('ayarlar.kvkk')}
+          </Text>
+          {', '}
+          <Text style={styles.link} onPress={openPrivacy}>
+            {t('ayarlar.privacy_policy')}
+          </Text>{' '}
+          {t('consent.and')}{' '}
+          <Text style={styles.link} onPress={openTerms}>
+            {t('ayarlar.terms')}
+          </Text>
+          {t('consent.agree_suffix_tr')}
         </Text>
-        'nı okudum, kabul ediyorum.
-      </Text>
+      )}
     </Pressable>
   );
 }

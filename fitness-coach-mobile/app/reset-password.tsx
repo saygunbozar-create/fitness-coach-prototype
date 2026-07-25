@@ -4,6 +4,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleShe
 import { AuthField } from '../components/AuthField';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useAuth } from '../lib/auth';
+import { useT } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 
@@ -11,6 +12,7 @@ import { C } from '../lib/theme';
 // uygulamaya yönlendir" kuralı burada da çalışırsa, şifre sıfırlama linkine tıklayınca kurulan
 // geçici "recovery" oturumu bu sayfayı hiç göstermeden kullanıcıyı uygulamaya atardı.
 export default function ResetPassword() {
+  const t = useT();
   const { session } = useAuth();
   const [checked, setChecked] = useState(false);
   const [password, setPassword] = useState('');
@@ -29,11 +31,11 @@ export default function ResetPassword() {
   async function onSubmit() {
     setError(null);
     if (password.length < 6) {
-      setError('Şifre en az 6 karakter olmalı.');
+      setError(t('hesap.password_too_short_body'));
       return;
     }
     if (password !== confirm) {
-      setError('Şifreler eşleşmiyor.');
+      setError(t('auth.err_passwords_mismatch'));
       return;
     }
     setLoading(true);
@@ -59,9 +61,9 @@ export default function ResetPassword() {
       <View style={styles.flex}>
         <View style={styles.content}>
           <Text style={styles.brand}>COACHBOOK</Text>
-          <Text style={styles.title}>Link Geçersiz</Text>
+          <Text style={styles.title}>{t('auth.link_invalid_title')}</Text>
           <Text style={styles.info}>
-            Bu şifre sıfırlama linki geçersiz veya süresi dolmuş. Uygulamadaki "Şifremi unuttum" ile yeni bir link iste.
+            {t('auth.link_invalid_body')}
           </Text>
         </View>
       </View>
@@ -72,19 +74,19 @@ export default function ResetPassword() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>COACHBOOK</Text>
-        <Text style={styles.title}>Yeni Şifre Belirle</Text>
+        <Text style={styles.title}>{t('auth.reset_password_title')}</Text>
 
         {done ? (
           <>
-            <Text style={styles.info}>Şifren güncellendi. Devam etmek için aşağıya dokun.</Text>
-            <PrimaryButton label="Uygulamaya Git" onPress={() => router.replace('/')} />
+            <Text style={styles.info}>{t('auth.password_updated_info')}</Text>
+            <PrimaryButton label={t('auth.go_to_app_btn')} onPress={() => router.replace('/')} />
           </>
         ) : (
           <>
-            <AuthField label="Yeni Şifre" value={password} onChangeText={setPassword} secureTextEntry placeholder="En az 6 karakter" />
-            <AuthField label="Yeni Şifre (Tekrar)" value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="••••••••" />
+            <AuthField label={t('hesap.new_password_label')} value={password} onChangeText={setPassword} secureTextEntry placeholder={t('hesap.new_password_placeholder')} />
+            <AuthField label={t('auth.new_password_repeat_label')} value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="••••••••" />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <PrimaryButton label="Şifreyi Güncelle" onPress={onSubmit} loading={loading} disabled={!password || !confirm} />
+            <PrimaryButton label={t('auth.update_password_btn')} onPress={onSubmit} loading={loading} disabled={!password || !confirm} />
           </>
         )}
       </ScrollView>

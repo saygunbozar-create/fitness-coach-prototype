@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { getDeviceLang } from './i18n';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'trainer', name, consent } },
+      options: { data: { role: 'trainer', name, consent, language: getDeviceLang() } },
     });
     return { error: error?.message ?? null };
   }
@@ -97,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'client', name, consent } },
+      options: { data: { role: 'client', name, consent, language: getDeviceLang() } },
     });
     return { error: error?.message ?? null };
   }

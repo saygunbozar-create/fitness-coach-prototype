@@ -4,9 +4,11 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { AuthField } from '../../components/AuthField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { C } from '../../lib/theme';
 
 export default function Login() {
+  const t = useT();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,25 +27,25 @@ export default function Login() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>COACHBOOK</Text>
-        <Text style={styles.title}>Giriş Yap</Text>
+        <Text style={styles.title}>{t('auth.login_title')}</Text>
 
-        <AuthField label="E-posta" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
-        <AuthField label="Şifre" value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
+        <AuthField label={t('ayarlar.email')} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
+        <AuthField label={t('auth.password_label')} value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <PrimaryButton label="Giriş Yap" onPress={onSubmit} loading={loading} disabled={!email || !password} />
+        <PrimaryButton label={t('auth.login_title')} onPress={onSubmit} loading={loading} disabled={!email || !password} />
 
         <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
-          Şifremi unuttum
+          {t('auth.forgot_password_link')}
         </Link>
 
         <View style={styles.links}>
           <Link href="/(auth)/signup-trainer" style={styles.link}>
-            Antrenör olarak kayıt ol
+            {t('auth.signup_trainer_link')}
           </Link>
           <Link href="/(auth)/signup-client" style={styles.link}>
-            Danışan olarak kayıt ol
+            {t('auth.signup_client_link')}
           </Link>
         </View>
       </ScrollView>

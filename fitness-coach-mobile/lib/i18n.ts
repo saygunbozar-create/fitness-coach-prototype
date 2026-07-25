@@ -1,3 +1,4 @@
+import * as Localization from 'expo-localization';
 import { useAuth } from './auth';
 
 // Çoklu dil desteği — pilot aşaması, sadece Ayarlar ekranı kapsıyor (bkz. proje notları).
@@ -589,6 +590,44 @@ const tr: Dict = {
   'anket.update_btn': 'Güncelle',
   'anket.submit_btn': 'Anketi Gönder',
   'anket.err_save': 'Anket kaydedilemedi.',
+
+  'auth.login_title': 'Giriş Yap',
+  'auth.password_label': 'Şifre',
+  'auth.forgot_password_link': 'Şifremi unuttum',
+  'auth.signup_trainer_link': 'Antrenör olarak kayıt ol',
+  'auth.signup_client_link': 'Danışan olarak kayıt ol',
+
+  'auth.signup_trainer_title': 'Antrenör Kaydı',
+  'auth.signup_done': 'Kayıt tamamlandı. E-postanı onayladıktan sonra giriş yapabilirsin.',
+  'auth.back_to_login_btn': 'Girişe dön',
+  'auth.signup_btn': 'Kayıt Ol',
+  'auth.already_have_account': 'Zaten hesabın var mı? Giriş yap',
+
+  'auth.signup_client_title': 'Danışan Kaydı',
+  'auth.signup_client_hint':
+    'Antrenörünün seni eklediği e-posta adresiyle kayıt ol — hesabın otomatik olarak antrenörüne bağlanır.',
+  'auth.email_trainer_added_label': 'E-posta (antrenörünün eklediği)',
+
+  'auth.forgot_password_title': 'Şifremi Unuttum',
+  'auth.forgot_password_intro': 'Hesabına kayıtlı e-posta adresini gir, sana bir şifre sıfırlama linki gönderelim.',
+  'auth.reset_link_sent':
+    '{{email}} adresine bir şifre sıfırlama linki gönderdik. Gelen kutunu (ve spam klasörünü) kontrol et, linke tıklayıp yeni şifreni belirle.',
+  'auth.send_reset_link_btn': 'Sıfırlama Linki Gönder',
+  'auth.back_to_login_arrow': '‹ Girişe dön',
+
+  'auth.reset_password_title': 'Yeni Şifre Belirle',
+  'auth.link_invalid_title': 'Link Geçersiz',
+  'auth.link_invalid_body':
+    'Bu şifre sıfırlama linki geçersiz veya süresi dolmuş. Uygulamadaki "Şifremi unuttum" ile yeni bir link iste.',
+  'auth.password_updated_info': 'Şifren güncellendi. Devam etmek için aşağıya dokun.',
+  'auth.go_to_app_btn': 'Uygulamaya Git',
+  'auth.new_password_repeat_label': 'Yeni Şifre (Tekrar)',
+  'auth.update_password_btn': 'Şifreyi Güncelle',
+  'auth.err_passwords_mismatch': 'Şifreler eşleşmiyor.',
+
+  'consent.agree_prefix': 'Okudum ve kabul ediyorum:',
+  'consent.and': 've',
+  'consent.agree_suffix_tr': "'nı okudum, kabul ediyorum.",
 };
 
 const en: Dict = {
@@ -1154,6 +1193,43 @@ const en: Dict = {
   'anket.update_btn': 'Update',
   'anket.submit_btn': 'Submit Survey',
   'anket.err_save': 'Could not save the survey.',
+
+  'auth.login_title': 'Log In',
+  'auth.password_label': 'Password',
+  'auth.forgot_password_link': 'Forgot password',
+  'auth.signup_trainer_link': 'Sign up as a trainer',
+  'auth.signup_client_link': 'Sign up as a client',
+
+  'auth.signup_trainer_title': 'Trainer Signup',
+  'auth.signup_done': 'Signup complete. You can log in once you confirm your email.',
+  'auth.back_to_login_btn': 'Back to login',
+  'auth.signup_btn': 'Sign Up',
+  'auth.already_have_account': 'Already have an account? Log in',
+
+  'auth.signup_client_title': 'Client Signup',
+  'auth.signup_client_hint':
+    "Sign up with the email address your trainer added you with — your account will link to your trainer automatically.",
+  'auth.email_trainer_added_label': 'Email (the one your trainer added)',
+
+  'auth.forgot_password_title': 'Forgot Password',
+  'auth.forgot_password_intro': "Enter the email address on your account and we'll send you a password reset link.",
+  'auth.reset_link_sent':
+    'We sent a password reset link to {{email}}. Check your inbox (and spam folder), then tap the link to set a new password.',
+  'auth.send_reset_link_btn': 'Send Reset Link',
+  'auth.back_to_login_arrow': '‹ Back to login',
+
+  'auth.reset_password_title': 'Set New Password',
+  'auth.link_invalid_title': 'Invalid Link',
+  'auth.link_invalid_body': 'This password reset link is invalid or has expired. Request a new one from "Forgot password" in the app.',
+  'auth.password_updated_info': 'Your password has been updated. Tap below to continue.',
+  'auth.go_to_app_btn': 'Go to App',
+  'auth.new_password_repeat_label': 'New Password (Repeat)',
+  'auth.update_password_btn': 'Update Password',
+  'auth.err_passwords_mismatch': 'Passwords do not match.',
+
+  'consent.agree_prefix': 'I have read and agree to the',
+  'consent.and': 'and',
+  'consent.agree_suffix_tr': '.',
 };
 
 const ar: Dict = {
@@ -1265,9 +1341,24 @@ function normalizeLang(value: string | undefined | null): Lang {
   return value === 'en' || value === 'ar' ? value : 'tr';
 }
 
+// Oturum açmadan önceki ekranlarda (login/signup/şifre sıfırlama) henüz bir `profile.language`
+// yok — bu durumda cihaz/tarayıcı diline bakıyoruz. Sadece tr/en ayırt ediyoruz (Arapça
+// sözlüğü bu ekranlar için henüz yazılmadı, ayrıca dil seçicide de gösterilmiyor); Türkçe
+// olmayan her cihaz İngilizce görür — hedef, İngilizce konuşan yeni danışanların kayıt
+// formunu ilk andan itibaren anlayabilmesi.
+export function getDeviceLang(): Lang {
+  try {
+    const code = Localization.getLocales()[0]?.languageCode;
+    return code === 'tr' ? 'tr' : 'en';
+  } catch {
+    return 'tr';
+  }
+}
+
 export function useLanguage(): Lang {
   const { profile } = useAuth();
-  return normalizeLang(profile?.language);
+  if (profile?.language) return normalizeLang(profile.language);
+  return getDeviceLang();
 }
 
 export function useIsRTL(): boolean {
