@@ -528,6 +528,26 @@ const tr: Dict = {
   'randevu.err_reschedule_title': 'Taşınamadı',
   'randevu.err_reschedule_generic': 'Randevu taşınamadı.',
   'randevu.cancel_hint': 'İptal etmek için antrenörünle iletişime geç.',
+
+  'hesap.back': '‹ Geri',
+  'hesap.title': 'Hesap Bilgilerini Düzenle',
+  'hesap.subtitle': 'hesabın',
+  'hesap.save_name_btn': 'Adı Kaydet',
+  'hesap.brand_name_label': "İşletme Adı (danışanlarına 'Coachbook' yerine bu görünür)",
+  'hesap.brand_name_placeholder': "Boş bırakırsan 'Coachbook' görünür",
+  'hesap.save_brand_btn': 'İşletme Adını Kaydet',
+  'hesap.new_email_label': 'Yeni E-posta',
+  'hesap.change_email_btn': 'E-postayı Değiştir',
+  'hesap.new_password_label': 'Yeni Şifre',
+  'hesap.new_password_placeholder': 'En az 6 karakter',
+  'hesap.change_password_btn': 'Şifreyi Değiştir',
+  'hesap.err_change_title': 'Değiştirilemedi',
+  'hesap.confirm_needed_title': 'Onay gerekli',
+  'hesap.confirm_needed_body': 'Yeni e-posta adresine bir onay bağlantısı gönderildi. Onaylayana kadar eski e-postan geçerli kalır.',
+  'hesap.password_too_short_title': 'Şifre çok kısa',
+  'hesap.password_too_short_body': 'Şifre en az 6 karakter olmalı.',
+  'hesap.success_title': 'Başarılı',
+  'hesap.password_updated_body': 'Şifren güncellendi.',
 };
 
 const en: Dict = {
@@ -1032,6 +1052,26 @@ const en: Dict = {
   'randevu.err_reschedule_title': 'Could not reschedule',
   'randevu.err_reschedule_generic': 'Could not reschedule the appointment.',
   'randevu.cancel_hint': 'Contact your trainer to cancel.',
+
+  'hesap.back': '‹ Back',
+  'hesap.title': 'Edit Account Info',
+  'hesap.subtitle': 'your account',
+  'hesap.save_name_btn': 'Save Name',
+  'hesap.brand_name_label': "Business Name (shown to your clients instead of 'Coachbook')",
+  'hesap.brand_name_placeholder': "Leave blank to show 'Coachbook'",
+  'hesap.save_brand_btn': 'Save Business Name',
+  'hesap.new_email_label': 'New Email',
+  'hesap.change_email_btn': 'Change Email',
+  'hesap.new_password_label': 'New Password',
+  'hesap.new_password_placeholder': 'At least 6 characters',
+  'hesap.change_password_btn': 'Change Password',
+  'hesap.err_change_title': 'Could not change',
+  'hesap.confirm_needed_title': 'Confirmation needed',
+  'hesap.confirm_needed_body': "A confirmation link was sent to your new email address. Your old email stays active until you confirm.",
+  'hesap.password_too_short_title': 'Password too short',
+  'hesap.password_too_short_body': 'Password must be at least 6 characters.',
+  'hesap.success_title': 'Success',
+  'hesap.password_updated_body': 'Your password has been updated.',
 };
 
 const ar: Dict = {

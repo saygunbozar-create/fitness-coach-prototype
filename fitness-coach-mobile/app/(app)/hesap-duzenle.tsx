@@ -7,15 +7,19 @@ import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { useUpdateBrandName, useUpdateOwnName } from '../../lib/queries';
 import { supabase } from '../../lib/supabase';
 import { C } from '../../lib/theme';
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
 export default function HesapDuzenleScreen() {
+  const t = useT();
+  const onErr = useOnErr();
   const { profile, session, refreshProfile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const updateName = useUpdateOwnName(profile?.id);
@@ -35,25 +39,25 @@ export default function HesapDuzenleScreen() {
     const { error } = await supabase.auth.updateUser({ email: emailDraft.trim() });
     setEmailSaving(false);
     if (error) {
-      showAlert('Değiştirilemedi', error.message);
+      showAlert(t('hesap.err_change_title'), error.message);
     } else {
-      showAlert('Onay gerekli', 'Yeni e-posta adresine bir onay bağlantısı gönderildi. Onaylayana kadar eski e-postan geçerli kalır.');
+      showAlert(t('hesap.confirm_needed_title'), t('hesap.confirm_needed_body'));
       setEmailDraft('');
     }
   }
 
   async function savePassword() {
     if (passwordDraft.length < 6) {
-      showAlert('Şifre çok kısa', 'Şifre en az 6 karakter olmalı.');
+      showAlert(t('hesap.password_too_short_title'), t('hesap.password_too_short_body'));
       return;
     }
     setPasswordSaving(true);
     const { error } = await supabase.auth.updateUser({ password: passwordDraft });
     setPasswordSaving(false);
     if (error) {
-      showAlert('Değiştirilemedi', error.message);
+      showAlert(t('hesap.err_change_title'), error.message);
     } else {
-      showAlert('Başarılı', 'Şifren güncellendi.');
+      showAlert(t('hesap.success_title'), t('hesap.password_updated_body'));
       setPasswordDraft('');
     }
   }
@@ -62,23 +66,23 @@ export default function HesapDuzenleScreen() {
     <View style={styles.flex}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={styles.back}>‹ Geri</Text>
+          <Text style={styles.back}>{t('hesap.back')}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Hesap Bilgilerini Düzenle</Text>
+        <Text style={styles.headerTitle}>{t('hesap.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Panel title="Hesap Bilgilerini Düzenle" right="hesabın">
-          <AuthField label="Ad Soyad" value={nameDraft} onChangeText={setNameDraft} placeholder="Ör. Mert K." />
+        <Panel title={t('hesap.title')} right={t('hesap.subtitle')}>
+          <AuthField label={t('ayarlar.name')} value={nameDraft} onChangeText={setNameDraft} placeholder="Ör. Mert K." />
           <PrimaryButton
-            label="Adı Kaydet"
+            label={t('hesap.save_name_btn')}
             loading={updateName.isPending}
             disabled={!nameDraft.trim() || nameDraft.trim() === profile?.name}
             onPress={() =>
               updateName.mutate(nameDraft.trim(), {
                 onSuccess: () => refreshProfile(),
-                onError: onErr('Kaydedilemedi'),
+                onError: onErr(t('antrenman.err_save_title')),
               })
             }
           />
@@ -87,19 +91,19 @@ export default function HesapDuzenleScreen() {
             <>
               <View style={styles.divider} />
               <AuthField
-                label="İşletme Adı (danışanlarına 'Coachbook' yerine bu görünür)"
+                label={t('hesap.brand_name_label')}
                 value={brandNameDraft}
                 onChangeText={setBrandNameDraft}
-                placeholder="Boş bırakırsan 'Coachbook' görünür"
+                placeholder={t('hesap.brand_name_placeholder')}
               />
               <PrimaryButton
-                label="İşletme Adını Kaydet"
+                label={t('hesap.save_brand_btn')}
                 loading={updateBrandName.isPending}
                 disabled={brandNameDraft.trim() === (profile?.brand_name ?? '')}
                 onPress={() =>
                   updateBrandName.mutate(brandNameDraft.trim(), {
                     onSuccess: () => refreshProfile(),
-                    onError: onErr('Kaydedilemedi'),
+                    onError: onErr(t('antrenman.err_save_title')),
                   })
                 }
               />
@@ -108,13 +112,13 @@ export default function HesapDuzenleScreen() {
 
           <View style={styles.divider} />
 
-          <AuthField label="Yeni E-posta" value={emailDraft} onChangeText={setEmailDraft} keyboardType="email-address" placeholder={session?.user.email ?? ''} />
-          <PrimaryButton label="E-postayı Değiştir" loading={emailSaving} disabled={!emailDraft.trim()} onPress={saveEmail} />
+          <AuthField label={t('hesap.new_email_label')} value={emailDraft} onChangeText={setEmailDraft} keyboardType="email-address" placeholder={session?.user.email ?? ''} />
+          <PrimaryButton label={t('hesap.change_email_btn')} loading={emailSaving} disabled={!emailDraft.trim()} onPress={saveEmail} />
 
           <View style={styles.divider} />
 
-          <AuthField label="Yeni Şifre" value={passwordDraft} onChangeText={setPasswordDraft} secureTextEntry placeholder="En az 6 karakter" />
-          <PrimaryButton label="Şifreyi Değiştir" loading={passwordSaving} disabled={!passwordDraft.trim()} onPress={savePassword} />
+          <AuthField label={t('hesap.new_password_label')} value={passwordDraft} onChangeText={setPasswordDraft} secureTextEntry placeholder={t('hesap.new_password_placeholder')} />
+          <PrimaryButton label={t('hesap.change_password_btn')} loading={passwordSaving} disabled={!passwordDraft.trim()} onPress={savePassword} />
         </Panel>
       </ScrollView>
     </View>
