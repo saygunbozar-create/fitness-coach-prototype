@@ -3,24 +3,26 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../../lib/queries';
 import { C } from '../../lib/theme';
 import type { AppNotification } from '../../lib/types';
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
   const d = new Date(iso);
   const diffMs = Date.now() - d.getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'az önce';
-  if (mins < 60) return `${mins} dk önce`;
+  if (mins < 1) return t('bildirimler.time_just_now');
+  if (mins < 60) return t('bildirimler.time_minutes_ago', { mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} sa önce`;
+  if (hours < 24) return t('bildirimler.time_hours_ago', { hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} gün önce`;
+  if (days < 7) return t('bildirimler.time_days_ago', { days });
   const [y, m, dd] = iso.slice(0, 10).split('-');
   return `${dd}.${m}.${y}`;
 }
@@ -41,6 +43,8 @@ const TYPE_ICON: Record<string, string> = {
 };
 
 export default function BildirimlerScreen() {
+  const t = useT();
+  const onErr = useOnErr();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
   const notificationsQuery = useNotifications(profile?.id);
@@ -55,13 +59,13 @@ export default function BildirimlerScreen() {
       <Pressable
         key={n.id}
         style={[styles.row, !n.read && styles.rowUnread]}
-        onPress={() => !n.read && markRead.mutate(n.id, { onError: onErr('İşaretlenemedi') })}
+        onPress={() => !n.read && markRead.mutate(n.id, { onError: onErr(t('bildirimler.err_mark_read')) })}
       >
         <Text style={styles.icon}>{TYPE_ICON[n.type] ?? '🔔'}</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{n.title}</Text>
           {n.body ? <Text style={styles.body}>{n.body}</Text> : null}
-          <Text style={styles.time}>{relativeTime(n.created_at)}</Text>
+          <Text style={styles.time}>{relativeTime(n.created_at, t)}</Text>
         </View>
         {!n.read && <View style={styles.dot} />}
       </Pressable>
@@ -72,12 +76,12 @@ export default function BildirimlerScreen() {
     <View style={styles.flex}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={styles.back}>‹ Geri</Text>
+          <Text style={styles.back}>{t('hesap.back')}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Bildirimler</Text>
+        <Text style={styles.headerTitle}>{t('nav.bildirimler')}</Text>
         {unreadCount > 0 ? (
-          <Pressable onPress={() => markAllRead.mutate(undefined, { onError: onErr('İşaretlenemedi') })} hitSlop={8}>
-            <Text style={styles.markAll}>Tümünü okundu işaretle</Text>
+          <Pressable onPress={() => markAllRead.mutate(undefined, { onError: onErr(t('bildirimler.err_mark_read')) })} hitSlop={8}>
+            <Text style={styles.markAll}>{t('bildirimler.mark_all_read')}</Text>
           </Pressable>
         ) : (
           <View style={{ width: 40 }} />
@@ -85,7 +89,7 @@ export default function BildirimlerScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         {notifications.length === 0 ? (
-          <Text style={styles.empty}>Henüz bildirim yok.</Text>
+          <Text style={styles.empty}>{t('bildirimler.empty')}</Text>
         ) : (
           notifications.map(renderItem)
         )}

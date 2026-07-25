@@ -548,6 +548,14 @@ const tr: Dict = {
   'hesap.password_too_short_body': 'Şifre en az 6 karakter olmalı.',
   'hesap.success_title': 'Başarılı',
   'hesap.password_updated_body': 'Şifren güncellendi.',
+
+  'bildirimler.mark_all_read': 'Tümünü okundu işaretle',
+  'bildirimler.empty': 'Henüz bildirim yok.',
+  'bildirimler.err_mark_read': 'İşaretlenemedi',
+  'bildirimler.time_just_now': 'az önce',
+  'bildirimler.time_minutes_ago': '{{mins}} dk önce',
+  'bildirimler.time_hours_ago': '{{hours}} sa önce',
+  'bildirimler.time_days_ago': '{{days}} gün önce',
 };
 
 const en: Dict = {
@@ -1072,6 +1080,14 @@ const en: Dict = {
   'hesap.password_too_short_body': 'Password must be at least 6 characters.',
   'hesap.success_title': 'Success',
   'hesap.password_updated_body': 'Your password has been updated.',
+
+  'bildirimler.mark_all_read': 'Mark all as read',
+  'bildirimler.empty': 'No notifications yet.',
+  'bildirimler.err_mark_read': 'Could not mark as read',
+  'bildirimler.time_just_now': 'just now',
+  'bildirimler.time_minutes_ago': '{{mins}}m ago',
+  'bildirimler.time_hours_ago': '{{hours}}h ago',
+  'bildirimler.time_days_ago': '{{days}}d ago',
 };
 
 const ar: Dict = {
