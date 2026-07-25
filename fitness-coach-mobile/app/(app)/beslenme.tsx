@@ -11,6 +11,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddMeal,
   useAddMealItem,
@@ -36,11 +37,14 @@ import {
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, nf } from '../../lib/theme';
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
 export default function BeslenmeScreen() {
+  const t = useT();
+  const onErr = useOnErr();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const { selectedClientId } = useSelectedClient();
@@ -75,7 +79,7 @@ export default function BeslenmeScreen() {
 
   useEffect(() => {
     if (isTrainer && foodLibraryQuery.isSuccess && foodLibraryQuery.data?.length === 0 && !seedFoodLibrary.isPending) {
-      seedFoodLibrary.mutate(undefined, { onError: onErr('Besin kütüphanesi oluşturulamadı') });
+      seedFoodLibrary.mutate(undefined, { onError: onErr(t('beslenme.err_seed_food_library')) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTrainer, foodLibraryQuery.isSuccess, foodLibraryQuery.data?.length]);
@@ -100,7 +104,7 @@ export default function BeslenmeScreen() {
   if (isTrainer && !selectedClientId) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Beslenme" />
+        <ScreenHeader title={t('nav.beslenme')} />
         <EmptyClientState />
       </View>
     );
@@ -122,7 +126,7 @@ export default function BeslenmeScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Beslenme" clientName={client.name} showPill={isTrainer} />
+      <ScreenHeader title={t('nav.beslenme')} clientName={client.name} showPill={isTrainer} />
       <ScrollView contentContainerStyle={styles.content}>
         {isTrainer && (
           <Pressable
@@ -131,26 +135,24 @@ export default function BeslenmeScreen() {
             hitSlop={10}
           >
             <Text style={[styles.editToggleText, editMode && { color: C.bg }]}>
-              {editMode ? '✓ Programı düzenliyorsun' : '✎ Programı düzenle'}
+              {editMode ? t('beslenme.edit_toggle_on') : t('antrenman.edit_toggle')}
             </Text>
           </Pressable>
         )}
 
-        <Panel title="Günlük Hedef Durumu" right="otomatik">
-          <Bar label="Kalori" val={totals.kcal} target={client.kcal_target} unit="kcal" color={C.lime} />
-          <Bar label="Protein" val={totals.p} target={client.macro_p} unit="g" color={C.blue} />
-          <Bar label="Karbonhidrat" val={totals.k} target={client.macro_k} unit="g" color={C.orange} />
-          <Bar label="Yağ" val={totals.y} target={client.macro_y} unit="g" color={C.red} />
+        <Panel title={t('beslenme.daily_target_title')} right={t('beslenme.auto')}>
+          <Bar label={t('beslenme.calorie_label')} val={totals.kcal} target={client.kcal_target} unit="kcal" color={C.lime} />
+          <Bar label={t('beslenme.protein_label')} val={totals.p} target={client.macro_p} unit="g" color={C.blue} />
+          <Bar label={t('beslenme.carb_label')} val={totals.k} target={client.macro_k} unit="g" color={C.orange} />
+          <Bar label={t('beslenme.fat_label')} val={totals.y} target={client.macro_y} unit="g" color={C.red} />
           {isTrainer && totals.kcal === 0 && (
-            <Text style={styles.barHint}>
-              Bu çubuklar danışanın aşağıda "Yendi" işaretlediği besinlere göre dolar — danışan henüz bugün için hiçbir şey işaretlemedi.
-            </Text>
+            <Text style={styles.barHint}>{t('beslenme.bar_hint')}</Text>
           )}
         </Panel>
 
-        <Panel title="Notlar" right={`${notes.length} not`}>
+        <Panel title={t('beslenme.notes_title')} right={t('beslenme.notes_count', { count: notes.length })}>
           {notes.length === 0 ? (
-            <Text style={styles.empty}>Henüz not yok.</Text>
+            <Text style={styles.empty}>{t('beslenme.notes_empty')}</Text>
           ) : (
             notes.map((n) => (
               <View key={n.id} style={styles.noteRow}>
@@ -159,8 +161,8 @@ export default function BeslenmeScreen() {
                   <Text style={styles.noteDate}>{new Date(n.created_at).toLocaleDateString('tr-TR')}</Text>
                 </View>
                 {isTrainer && (
-                  <Pressable onPress={() => deleteNote.mutate(n.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
-                    <Text style={styles.listDelete}>Sil</Text>
+                  <Pressable onPress={() => deleteNote.mutate(n.id, { onError: onErr(t('common.delete_failed_title')) })} hitSlop={8}>
+                    <Text style={styles.listDelete}>{t('common.delete')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -168,13 +170,13 @@ export default function BeslenmeScreen() {
           )}
           {isTrainer && (
             <View style={styles.inlineForm}>
-              <AuthField label="Yeni Not" value={noteDraft} onChangeText={setNoteDraft} placeholder="Ör. Bu hafta şeker tüketimine dikkat et" />
+              <AuthField label={t('beslenme.new_note_label')} value={noteDraft} onChangeText={setNoteDraft} placeholder={t('beslenme.new_note_placeholder')} />
               <PrimaryButton
-                label="Not Ekle"
+                label={t('beslenme.add_note_btn')}
                 loading={addNote.isPending}
                 disabled={!noteDraft.trim()}
                 onPress={() =>
-                  addNote.mutate(noteDraft.trim(), { onSuccess: () => setNoteDraft(''), onError: onErr('Not eklenemedi') })
+                  addNote.mutate(noteDraft.trim(), { onSuccess: () => setNoteDraft(''), onError: onErr(t('beslenme.err_add_note')) })
                 }
               />
             </View>
@@ -191,8 +193,8 @@ export default function BeslenmeScreen() {
               right={editMode ? undefined : `${nf(mk)} kcal · ${nf(mp)} g protein`}
             >
               {editMode && (
-                <Pressable style={styles.deleteMealBtn} onPress={() => deleteMeal.mutate(m.id, { onError: onErr('Öğün silinemedi') })}>
-                  <Text style={styles.deleteMealText}>Öğünü Sil</Text>
+                <Pressable style={styles.deleteMealBtn} onPress={() => deleteMeal.mutate(m.id, { onError: onErr(t('beslenme.err_delete_meal')) })}>
+                  <Text style={styles.deleteMealText}>{t('beslenme.delete_meal_btn')}</Text>
                 </Pressable>
               )}
 
@@ -203,8 +205,8 @@ export default function BeslenmeScreen() {
                       key={it.id}
                       initial={{ food: it.food, unit: it.unit, kcal: it.kcal, p: it.p, k: it.k, y: it.y, default_qty: it.default_qty }}
                       saving={updateMealItem.isPending || deleteMealItem.isPending}
-                      onSave={(v) => updateMealItem.mutate({ id: it.id, ...v }, { onError: onErr('Kaydedilemedi') })}
-                      onDelete={() => deleteMealItem.mutate(it.id, { onError: onErr('Silinemedi') })}
+                      onSave={(v) => updateMealItem.mutate({ id: it.id, ...v }, { onError: onErr(t('antrenman.err_save_title')) })}
+                      onDelete={() => deleteMealItem.mutate(it.id, { onError: onErr(t('common.delete_failed_title')) })}
                     />
                   );
                 }
@@ -216,7 +218,7 @@ export default function BeslenmeScreen() {
                     readOnly={isTrainer}
                     onToggle={() => {
                       const next = applied ? 0 : it.default_qty;
-                      updateQty.mutate({ mealItemId: it.id, qty: next }, { onError: onErr('Kaydedilemedi') });
+                      updateQty.mutate({ mealItemId: it.id, qty: next }, { onError: onErr(t('antrenman.err_save_title')) });
                     }}
                   />
                 );
@@ -230,7 +232,7 @@ export default function BeslenmeScreen() {
                   onSave={(v) =>
                     addMealItem.mutate(
                       { meal_id: m.id, sort_order: m.items.length, ...v },
-                      { onSuccess: () => setAddingItemForMeal(null), onError: onErr('Besin eklenemedi') }
+                      { onSuccess: () => setAddingItemForMeal(null), onError: onErr(t('beslenme.err_add_food')) }
                     )
                   }
                   onCancel={() => setAddingItemForMeal(null)}
@@ -239,7 +241,7 @@ export default function BeslenmeScreen() {
 
               {editMode && addingItemForMeal !== m.id && (
                 <Pressable style={styles.addItemBtn} onPress={() => setAddingItemForMeal(m.id)}>
-                  <Text style={styles.addItemText}>+ Besin Ekle</Text>
+                  <Text style={styles.addItemText}>{t('beslenme.add_item_btn')}</Text>
                 </Pressable>
               )}
             </Panel>
@@ -248,30 +250,30 @@ export default function BeslenmeScreen() {
 
         {editMode && !addingMeal && (
           <Pressable style={styles.addMealBtn} onPress={() => setAddingMeal(true)}>
-            <Text style={styles.addMealText}>+ Yeni Öğün Ekle</Text>
+            <Text style={styles.addMealText}>{t('beslenme.add_meal_btn')}</Text>
           </Pressable>
         )}
 
         {editMode && addingMeal && (
           <View style={styles.addMealCard}>
-            <AuthField label="Öğün Adı" value={newMealName} onChangeText={setNewMealName} placeholder="Ör. Ara Öğün" />
+            <AuthField label={t('beslenme.meal_name_label')} value={newMealName} onChangeText={setNewMealName} placeholder={t('beslenme.meal_name_placeholder')} />
             <PrimaryButton
-              label="Öğün Ekle"
+              label={t('beslenme.add_meal_confirm_btn')}
               loading={addMeal.isPending}
               disabled={!newMealName.trim()}
               onPress={() =>
                 addMeal.mutate(
                   { name: newMealName.trim(), sort_order: meals.length },
-                  { onSuccess: () => { setNewMealName(''); setAddingMeal(false); }, onError: onErr('Öğün eklenemedi') }
+                  { onSuccess: () => { setNewMealName(''); setAddingMeal(false); }, onError: onErr(t('beslenme.err_add_meal')) }
                 )
               }
             />
           </View>
         )}
 
-        <Panel title="Takviye Planı" right={`${supplements.length} takviye`}>
+        <Panel title={t('beslenme.supplement_plan_title')} right={t('beslenme.supplement_count', { count: supplements.length })}>
           {supplements.length === 0 ? (
-            <Text style={styles.empty}>Henüz takviye eklenmedi.</Text>
+            <Text style={styles.empty}>{t('beslenme.supplement_empty')}</Text>
           ) : (
             supplements.map((s) => (
               <View key={s.id} style={styles.listRow}>
@@ -282,8 +284,8 @@ export default function BeslenmeScreen() {
                   </Text>
                 </View>
                 {editMode && (
-                  <Pressable onPress={() => deleteSupplement.mutate(s.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
-                    <Text style={styles.listDelete}>Sil</Text>
+                  <Pressable onPress={() => deleteSupplement.mutate(s.id, { onError: onErr(t('common.delete_failed_title')) })} hitSlop={8}>
+                    <Text style={styles.listDelete}>{t('common.delete')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -292,24 +294,24 @@ export default function BeslenmeScreen() {
 
           {editMode && (
             <View style={styles.inlineForm}>
-              <AuthField label="Takviye Adı" value={supplementDraft.name} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, name: v }))} placeholder="Ör. Whey Protein" />
+              <AuthField label={t('beslenme.supplement_name_label')} value={supplementDraft.name} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, name: v }))} placeholder={t('beslenme.supplement_name_placeholder')} />
               <View style={styles.rowGap}>
                 <View style={{ flex: 1 }}>
-                  <AuthField label="Doz" value={supplementDraft.dose} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, dose: v }))} placeholder="Ör. 30 g" />
+                  <AuthField label={t('beslenme.dose_label')} value={supplementDraft.dose} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, dose: v }))} placeholder={t('beslenme.dose_placeholder')} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AuthField label="Zamanlama" value={supplementDraft.timing} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, timing: v }))} placeholder="Ör. Antrenman sonrası" />
+                  <AuthField label={t('beslenme.timing_label')} value={supplementDraft.timing} onChangeText={(v) => setSupplementDraft((s) => ({ ...s, timing: v }))} placeholder={t('beslenme.timing_placeholder')} />
                 </View>
               </View>
               <PrimaryButton
-                label="Takviye Ekle"
+                label={t('beslenme.add_supplement_btn')}
                 loading={addSupplement.isPending}
                 disabled={!supplementDraft.name.trim()}
                 onPress={() => {
-                  if (!selectedClientId) { showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
+                  if (!selectedClientId) { showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded')); return; }
                   addSupplement.mutate(
                     { name: supplementDraft.name.trim(), dose: supplementDraft.dose.trim(), timing: supplementDraft.timing.trim(), sort_order: supplements.length },
-                    { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }), onError: onErr('Takviye eklenemedi') }
+                    { onSuccess: () => setSupplementDraft({ name: '', dose: '', timing: '' }), onError: onErr(t('beslenme.err_add_supplement')) }
                   );
                 }}
               />
@@ -317,15 +319,15 @@ export default function BeslenmeScreen() {
           )}
         </Panel>
 
-        <Panel title="Alışveriş Listesi" right={`${shoppingItems.filter((i) => !i.checked).length} kalan`}>
+        <Panel title={t('beslenme.shopping_list_title')} right={t('beslenme.shopping_remaining', { count: shoppingItems.filter((i) => !i.checked).length })}>
           {shoppingItems.length === 0 ? (
-            <Text style={styles.empty}>Liste boş.</Text>
+            <Text style={styles.empty}>{t('beslenme.shopping_empty')}</Text>
           ) : (
             shoppingItems.map((item) => (
               <View key={item.id} style={styles.listRow}>
                 <Pressable
                   style={styles.shopCheckRow}
-                  onPress={() => toggleShoppingItem.mutate({ id: item.id, checked: !item.checked }, { onError: onErr('Güncellenemedi') })}
+                  onPress={() => toggleShoppingItem.mutate({ id: item.id, checked: !item.checked }, { onError: onErr(t('common.update_failed_title')) })}
                 >
                   <View style={[styles.checkbox, item.checked && styles.checkboxOn]}>
                     {item.checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
@@ -336,8 +338,8 @@ export default function BeslenmeScreen() {
                   </Text>
                 </Pressable>
                 {editMode && (
-                  <Pressable onPress={() => deleteShoppingItem.mutate(item.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
-                    <Text style={styles.listDelete}>Sil</Text>
+                  <Pressable onPress={() => deleteShoppingItem.mutate(item.id, { onError: onErr(t('common.delete_failed_title')) })} hitSlop={8}>
+                    <Text style={styles.listDelete}>{t('common.delete')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -348,21 +350,21 @@ export default function BeslenmeScreen() {
             <View style={styles.inlineForm}>
               <View style={styles.rowGap}>
                 <View style={{ flex: 2 }}>
-                  <AuthField label="Ürün" value={shoppingDraft.name} onChangeText={(v) => setShoppingDraft((s) => ({ ...s, name: v }))} placeholder="Ör. Yumurta" />
+                  <AuthField label={t('beslenme.product_label')} value={shoppingDraft.name} onChangeText={(v) => setShoppingDraft((s) => ({ ...s, name: v }))} placeholder={t('beslenme.product_placeholder')} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <AuthField label="Miktar" value={shoppingDraft.quantity} onChangeText={(v) => setShoppingDraft((s) => ({ ...s, quantity: v }))} placeholder="Ör. 1 koli" />
+                  <AuthField label={t('beslenme.quantity_label')} value={shoppingDraft.quantity} onChangeText={(v) => setShoppingDraft((s) => ({ ...s, quantity: v }))} placeholder={t('beslenme.quantity_placeholder')} />
                 </View>
               </View>
               <PrimaryButton
-                label="Ürün Ekle"
+                label={t('beslenme.add_product_btn')}
                 loading={addShoppingItem.isPending}
                 disabled={!shoppingDraft.name.trim()}
                 onPress={() => {
-                  if (!selectedClientId) { showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.'); return; }
+                  if (!selectedClientId) { showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded')); return; }
                   addShoppingItem.mutate(
                     { name: shoppingDraft.name.trim(), quantity: shoppingDraft.quantity.trim(), sort_order: shoppingItems.length },
-                    { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }), onError: onErr('Ürün eklenemedi') }
+                    { onSuccess: () => setShoppingDraft({ name: '', quantity: '' }), onError: onErr(t('beslenme.err_add_product')) }
                   );
                 }}
               />
