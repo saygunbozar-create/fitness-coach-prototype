@@ -6,11 +6,34 @@ import { Panel } from '../../components/Panel';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { disableWaterReminder, enableWaterReminder, getWaterReminderPrefs, type WaterReminderPrefs } from '../../lib/notifications';
-import { useClientByProfile, useClients, useDeleteOwnAccount, useProfileById } from '../../lib/queries';
+import { useClientByProfile, useClients, useDeleteOwnAccount, usePlanTiers, useProfileById } from '../../lib/queries';
 import { C } from '../../lib/theme';
+import type { Profile } from '../../lib/types';
 
 const REMINDER_INTERVALS = [1, 2, 3, 4];
 const LEGAL_BASE_URL = 'https://coachbook-roan.vercel.app/legal';
+
+function PlanPanel({ profile, clientCount }: { profile: Profile; clientCount: number }) {
+  const tiersQuery = usePlanTiers();
+  const current = tiersQuery.data?.find((t) => t.tier === profile.plan_tier);
+  const limit = current?.client_limit ?? null;
+
+  return (
+    <Panel title="Paketim" right="🚀">
+      <View style={styles.row}>
+        <Text style={styles.label}>Paket</Text>
+        <Text style={styles.value}>{current?.label ?? '—'}</Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Danışan Kullanımı</Text>
+        <Text style={styles.value}>
+          {clientCount} / {limit ?? 'Sınırsız'}
+        </Text>
+      </View>
+      <Text style={styles.premiumSub}>Paketini yükseltmek için bize ulaş.</Text>
+    </Panel>
+  );
+}
 
 function LegalCard() {
   return (
@@ -174,12 +197,7 @@ export default function AyarlarScreen() {
 
         <WaterReminderCard />
 
-        {isTrainer && (
-          <Panel title="Premium" right="🚀">
-            <Text style={styles.premiumText}>Premium özellikler yakında burada olacak.</Text>
-            <Text style={styles.premiumSub}>Gelişmiş raporlar, sınırsız danışan ve daha fazlası için çalışıyoruz.</Text>
-          </Panel>
-        )}
+        {isTrainer && profile && <PlanPanel profile={profile} clientCount={clientsQuery.data?.length ?? 0} />}
 
         <Panel title="Uygulama Hakkında" right="v1.0.0">
           <Text style={styles.aboutText}>Coachbook</Text>

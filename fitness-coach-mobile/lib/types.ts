@@ -6,6 +6,14 @@ export type Profile = {
   name: string;
   trainer_id: string | null;
   consent_accepted_at: string | null;
+  plan_tier: string;
+};
+
+export type PlanTier = {
+  tier: string;
+  label: string;
+  client_limit: number | null;
+  sort_order: number;
 };
 
 export type Client = {

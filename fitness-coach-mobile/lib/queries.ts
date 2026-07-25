@@ -21,6 +21,7 @@ import type {
   MealLog,
   Measurement,
   Payment,
+  PlanTier,
   PrLog,
   Profile,
   ProgramLesson,
@@ -217,6 +218,20 @@ async function seedClientDefaults(clientId: string): Promise<string | null> {
   } catch (e: any) {
     return e?.message ?? 'Varsayılan program/beslenme planı eklenemedi.';
   }
+}
+
+// ---------- Paket / Danışan Sınırı ----------
+
+export function usePlanTiers() {
+  return useQuery({
+    queryKey: ['plan_tiers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('plan_tiers').select('*').order('sort_order');
+      if (error) throw error;
+      return data as PlanTier[];
+    },
+    staleTime: 1000 * 60 * 60,
+  });
 }
 
 export function useAddClient(trainerId: string | undefined) {
