@@ -8,6 +8,7 @@ export type Profile = {
   consent_accepted_at: string | null;
   plan_tier: string;
   brand_name: string | null;
+  language: string;
 };
 
 export type PlanTier = {

@@ -5,8 +5,9 @@ import { showAlert } from '../../lib/alert';
 import { Panel } from '../../components/Panel';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { LANGUAGES, useT } from '../../lib/i18n';
 import { disableWaterReminder, enableWaterReminder, getWaterReminderPrefs, type WaterReminderPrefs } from '../../lib/notifications';
-import { useClientByProfile, useClients, useDeleteOwnAccount, usePlanTiers, useProfileById } from '../../lib/queries';
+import { useClientByProfile, useClients, useDeleteOwnAccount, usePlanTiers, useProfileById, useUpdateLanguage } from '../../lib/queries';
 import { C } from '../../lib/theme';
 import type { Profile } from '../../lib/types';
 
@@ -36,22 +37,47 @@ function PlanPanel({ profile, clientCount }: { profile: Profile; clientCount: nu
 }
 
 function LegalCard() {
+  const t = useT();
   return (
-    <Panel title="Yasal" right="📄">
+    <Panel title={t('ayarlar.legal')} right="📄">
       <Pressable style={styles.legalRow} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/privacy-policy.html`)} hitSlop={4}>
-        <Text style={styles.legalLink}>Gizlilik Politikası</Text>
+        <Text style={styles.legalLink}>{t('ayarlar.privacy_policy')}</Text>
       </Pressable>
       <Pressable style={styles.legalRow} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/kullanim-sartlari.html`)} hitSlop={4}>
-        <Text style={styles.legalLink}>Kullanım Şartları</Text>
+        <Text style={styles.legalLink}>{t('ayarlar.terms')}</Text>
       </Pressable>
       <Pressable style={[styles.legalRow, { borderBottomWidth: 0 }]} onPress={() => Linking.openURL(`${LEGAL_BASE_URL}/kvkk-aydinlatma-metni.html`)} hitSlop={4}>
-        <Text style={styles.legalLink}>KVKK Aydınlatma Metni</Text>
+        <Text style={styles.legalLink}>{t('ayarlar.kvkk')}</Text>
       </Pressable>
     </Panel>
   );
 }
 
+function LanguagePanel({ profile }: { profile: Profile }) {
+  const t = useT();
+  const { refreshProfile } = useAuth();
+  const updateLanguage = useUpdateLanguage(profile.id);
+
+  return (
+    <Panel title={t('ayarlar.language')} right="🌐">
+      <View style={styles.waterPeriodRow}>
+        {LANGUAGES.map((l) => (
+          <Pressable
+            key={l.code}
+            onPress={() => updateLanguage.mutate(l.code, { onSuccess: () => refreshProfile() })}
+            disabled={updateLanguage.isPending}
+            style={[styles.waterPeriodBtn, profile.language === l.code && { backgroundColor: C.lime, borderColor: C.lime }]}
+          >
+            <Text style={[styles.waterPeriodBtnText, profile.language === l.code && { color: C.bg }]}>{l.nativeLabel}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </Panel>
+  );
+}
+
 function WaterReminderCard() {
+  const t = useT();
   const [prefs, setPrefs] = useState<WaterReminderPrefs>({ enabled: false, intervalHours: 2 });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -66,9 +92,9 @@ function WaterReminderCard() {
     if (next) {
       const result = await enableWaterReminder(prefs.intervalHours);
       if (result === 'denied') {
-        setNotice('Bildirim izni verilmedi. Telefon ayarlarından izin vermen gerekiyor.');
+        setNotice(t('ayarlar.water_denied'));
       } else if (result === 'unsupported') {
-        setNotice('Bildirimler web önizlemede desteklenmiyor, telefonda dene.');
+        setNotice(t('ayarlar.water_unsupported'));
       } else {
         setPrefs((p) => ({ ...p, enabled: true }));
       }
@@ -89,9 +115,11 @@ function WaterReminderCard() {
   }
 
   return (
-    <Panel title="Su İçme Hatırlatıcısı" right="💧">
+    <Panel title={t('ayarlar.water_reminder')} right="💧">
       <View style={styles.waterRow}>
-        <Text style={styles.waterLabel}>{prefs.enabled ? `08:00–22:00 arası her ${prefs.intervalHours} saatte bir` : 'Kapalı'}</Text>
+        <Text style={styles.waterLabel}>
+          {prefs.enabled ? t('ayarlar.water_on', { hours: prefs.intervalHours }) : t('ayarlar.water_off')}
+        </Text>
         <Switch
           value={prefs.enabled}
           onValueChange={toggle}
@@ -108,51 +136,49 @@ function WaterReminderCard() {
             disabled={busy}
             style={[styles.waterPeriodBtn, prefs.intervalHours === h && { backgroundColor: C.lime, borderColor: C.lime }]}
           >
-            <Text style={[styles.waterPeriodBtnText, prefs.intervalHours === h && { color: C.bg }]}>{h} saat</Text>
+            <Text style={[styles.waterPeriodBtnText, prefs.intervalHours === h && { color: C.bg }]}>{t('ayarlar.water_hours', { hours: h })}</Text>
           </Pressable>
         ))}
       </View>
       {notice && <Text style={styles.waterNotice}>{notice}</Text>}
-      {Platform.OS === 'web' && !notice && <Text style={styles.waterNotice}>Gerçek bildirim için telefonda dene.</Text>}
+      {Platform.OS === 'web' && !notice && <Text style={styles.waterNotice}>{t('ayarlar.water_web_hint')}</Text>}
     </Panel>
   );
 }
 
 function DeleteAccountCard() {
+  const t = useT();
   const { signOut } = useAuth();
   const deleteAccount = useDeleteOwnAccount();
 
   function confirmDelete() {
-    showAlert(
-      'Hesabını silmek istediğine emin misin?',
-      'Bu işlem geri alınamaz. Hesabın ve tüm verilerin (antrenman, beslenme, ölçüm, ödeme geçmişi vb.) kalıcı olarak silinir.',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Hesabımı Sil',
-          style: 'destructive',
-          onPress: () => {
-            deleteAccount.mutate(undefined, {
-              onSuccess: () => signOut(),
-              onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Hesap silinemedi.'),
-            });
-          },
+    showAlert(t('ayarlar.delete_confirm_title'), t('ayarlar.delete_confirm_body'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('ayarlar.delete_btn'),
+        style: 'destructive',
+        onPress: () => {
+          deleteAccount.mutate(undefined, {
+            onSuccess: () => signOut(),
+            onError: (e: any) => showAlert(t('common.deleted_error_title'), e.message ?? t('common.deleted_error')),
+          });
         },
-      ]
-    );
+      },
+    ]);
   }
 
   return (
-    <Panel title="Tehlikeli Bölge" right="⚠️">
-      <Text style={styles.deleteHint}>Hesabını ve tüm verilerini kalıcı olarak siler. Bu işlem geri alınamaz.</Text>
+    <Panel title={t('ayarlar.danger_zone')} right="⚠️">
+      <Text style={styles.deleteHint}>{t('ayarlar.delete_hint')}</Text>
       <Pressable style={styles.deleteBtn} onPress={confirmDelete} disabled={deleteAccount.isPending} hitSlop={4}>
-        <Text style={styles.deleteBtnText}>{deleteAccount.isPending ? 'Siliniyor...' : 'Hesabımı Sil'}</Text>
+        <Text style={styles.deleteBtnText}>{deleteAccount.isPending ? t('ayarlar.deleting') : t('ayarlar.delete_btn')}</Text>
       </Pressable>
     </Panel>
   );
 }
 
 export default function AyarlarScreen() {
+  const t = useT();
   const { profile, session } = useAuth();
   const isTrainer = profile?.role === 'trainer';
 
@@ -162,49 +188,49 @@ export default function AyarlarScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Ayarlar" />
+      <ScreenHeader title={t('ayarlar.title')} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Panel title="Üyelik Bilgileri" right={isTrainer ? 'Antrenör' : 'Danışan'}>
+        <Panel title={t('ayarlar.membership_info')} right={isTrainer ? t('ayarlar.role_trainer') : t('ayarlar.role_client')}>
           <View style={styles.row}>
-            <Text style={styles.label}>Ad Soyad</Text>
+            <Text style={styles.label}>{t('ayarlar.name')}</Text>
             <Text style={styles.value}>{profile?.name ?? '—'}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={styles.label}>{t('ayarlar.email')}</Text>
             <Text style={styles.value}>{session?.user.email ?? '—'}</Text>
           </View>
           {isTrainer ? (
             <>
               <View style={styles.row}>
-                <Text style={styles.label}>Aktif Danışan Sayısı</Text>
+                <Text style={styles.label}>{t('ayarlar.active_clients')}</Text>
                 <Text style={styles.value}>{clientsQuery.data?.filter((c) => c.is_active).length ?? 0}</Text>
               </View>
               <View style={styles.row}>
-                <Text style={styles.label}>Pasif Danışan Sayısı</Text>
+                <Text style={styles.label}>{t('ayarlar.paused_clients')}</Text>
                 <Text style={styles.value}>{clientsQuery.data?.filter((c) => !c.is_active).length ?? 0}</Text>
               </View>
             </>
           ) : (
             <View style={styles.row}>
-              <Text style={styles.label}>Antrenör</Text>
+              <Text style={styles.label}>{t('ayarlar.trainer_label')}</Text>
               <Text style={styles.value}>{trainerProfileQuery.data?.name ?? '—'}</Text>
             </View>
           )}
           <Pressable style={styles.editBtn} onPress={() => router.push('/(app)/hesap-duzenle')} hitSlop={8}>
-            <Text style={styles.editBtnText}>✎ Düzenle</Text>
+            <Text style={styles.editBtnText}>{t('ayarlar.edit')}</Text>
           </Pressable>
         </Panel>
+
+        {profile && <LanguagePanel profile={profile} />}
 
         <WaterReminderCard />
 
         {/* Paket/limit sistemi taslak aşamasında, henüz yayında değil. Devreye almak için bu satırı geri aç: */}
         {/* {isTrainer && profile && <PlanPanel profile={profile} clientCount={clientsQuery.data?.length ?? 0} />} */}
 
-        <Panel title="Uygulama Hakkında" right="v1.0.0">
+        <Panel title={t('ayarlar.about')} right="v1.0.0">
           <Text style={styles.aboutText}>Coachbook</Text>
-          <Text style={styles.aboutSub}>
-            Antrenör ve danışanların antrenman, beslenme ve ilerleme takibini tek yerde yönetmesi için geliştirildi.
-          </Text>
+          <Text style={styles.aboutSub}>{t('ayarlar.about_sub')}</Text>
         </Panel>
 
         <LegalCard />

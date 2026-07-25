@@ -68,6 +68,18 @@ export function useUpdateOwnName(profileId: string | undefined) {
   });
 }
 
+export function useUpdateLanguage(profileId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (language: string) => {
+      if (!profileId) throw new Error('profileId eksik');
+      const { error } = await supabase.from('profiles').update({ language }).eq('id', profileId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', profileId] }),
+  });
+}
+
 export function useUpdateBrandName(profileId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
