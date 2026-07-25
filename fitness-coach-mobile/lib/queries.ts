@@ -13,6 +13,7 @@ import type {
   Client,
   ClientPackage,
   InjuryLog,
+  IntakeForm,
   LessonScheduleEntry,
   LibraryExercise,
   LibraryFood,
@@ -2491,6 +2492,32 @@ export function useSendMessage(trainerId: string | undefined, clientId: string |
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', trainerId, clientId] }),
+  });
+}
+
+// ---------- Kayıt Formu (PAR-Q + Feragatname) ----------
+
+export function useIntakeForm(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['intake_form', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('intake_forms').select('*').eq('client_id', clientId).maybeSingle();
+      if (error) throw error;
+      return data as IntakeForm | null;
+    },
+    enabled: !!clientId,
+  });
+}
+
+export function useSubmitIntakeForm(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { parq_answers: Record<string, boolean>; health_notes: string; waiver_signature_name: string }) => {
+      if (!clientId) throw new Error('clientId eksik');
+      const { error } = await supabase.from('intake_forms').insert({ client_id: clientId, ...input });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['intake_form', clientId] }),
   });
 }
 

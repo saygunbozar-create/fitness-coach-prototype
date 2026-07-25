@@ -8,11 +8,55 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { useAddClient, useClients, useDeleteClient, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
+import { PARQ_QUESTIONS } from '../../lib/parq';
+import { useAddClient, useClients, useDeleteClient, useIntakeForm, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, formatDateInputTr } from '../../lib/theme';
 import type { Client } from '../../lib/types';
+
+function IntakeFormSummary({ clientId }: { clientId: string }) {
+  const formQuery = useIntakeForm(clientId);
+  const form = formQuery.data;
+
+  if (formQuery.isLoading) return null;
+
+  if (!form) {
+    return (
+      <Panel title="Sağlık Formu" right="⚕">
+        <Text style={styles.formEmpty}>Danışan henüz sağlık formunu doldurmadı.</Text>
+      </Panel>
+    );
+  }
+
+  const flagged = PARQ_QUESTIONS.filter((q) => form.parq_answers[q.key] === true);
+
+  return (
+    <Panel title="Sağlık Formu" right="⚕">
+      {flagged.length > 0 ? (
+        <>
+          <Text style={styles.formWarning}>⚠ {flagged.length} soruya "Evet" cevabı verildi:</Text>
+          {flagged.map((q) => (
+            <Text key={q.key} style={styles.formFlaggedItem}>
+              · {q.text}
+            </Text>
+          ))}
+        </>
+      ) : (
+        <Text style={styles.formOk}>Tüm sorulara "Hayır" cevabı verildi, bilinen bir risk işaretlenmedi.</Text>
+      )}
+      {form.health_notes ? (
+        <>
+          <Text style={[styles.label, { marginTop: 10 }]}>Sağlık Notu</Text>
+          <Text style={styles.formNote}>{form.health_notes}</Text>
+        </>
+      ) : null}
+      <Text style={styles.formSignature}>
+        İmza: {form.waiver_signature_name} · {new Date(form.submitted_at).toLocaleDateString('tr-TR')}
+      </Text>
+    </Panel>
+  );
+}
 
 function bmiCategory(bmi: number): string {
   if (bmi < 18.5) return 'Zayıf';
@@ -334,7 +378,12 @@ export default function DanisanScreen() {
                     )
                   }
                 />
-                {editingClientId === c.id && renderEditPanel()}
+                {editingClientId === c.id && (
+                  <>
+                    {renderEditPanel()}
+                    <IntakeFormSummary clientId={c.id} />
+                  </>
+                )}
               </View>
             ))}
             </View>
@@ -374,7 +423,12 @@ export default function DanisanScreen() {
                         )
                       }
                     />
-                    {editingClientId === c.id && renderEditPanel()}
+                    {editingClientId === c.id && (
+                  <>
+                    {renderEditPanel()}
+                    <IntakeFormSummary clientId={c.id} />
+                  </>
+                )}
                   </View>
                 ))}
                 </View>
@@ -462,6 +516,12 @@ const styles = StyleSheet.create({
   goalPillActive: { backgroundColor: C.lime, borderColor: C.lime },
   goalPillText: { fontSize: 12, fontWeight: '700', color: C.grey },
   bmiText: { fontSize: 12, fontWeight: '700', color: C.lime, marginTop: -8, marginBottom: 14 },
+  formEmpty: { fontSize: 12.5, color: C.greyD, fontStyle: 'italic' },
+  formWarning: { fontSize: 12.5, fontWeight: '700', color: C.orange, marginBottom: 6 },
+  formFlaggedItem: { fontSize: 12, color: C.grey, lineHeight: 18, marginBottom: 2 },
+  formOk: { fontSize: 12.5, color: C.grey },
+  formNote: { fontSize: 12.5, color: C.grey, lineHeight: 18 },
+  formSignature: { fontSize: 11, color: C.greyD, marginTop: 10, fontStyle: 'italic' },
   error: { color: C.red, fontSize: 12, marginBottom: 12 },
   rowGap: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   cancelBtn: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.card2, borderWidth: 1, borderColor: C.edge },

@@ -3,10 +3,11 @@ import { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ConsentGate } from '../../components/ConsentGate';
 import { DesktopSidebar } from '../../components/DesktopSidebar';
+import { IntakeFormGate } from '../../components/IntakeFormGate';
 import { MobileDrawer } from '../../components/MobileDrawer';
 import { useAuth } from '../../lib/auth';
 import { registerPushToken } from '../../lib/notifications';
-import { useClientByProfile, useClients } from '../../lib/queries';
+import { useClientByProfile, useClients, useIntakeForm } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
@@ -19,6 +20,7 @@ export default function AppLayout() {
 
   const clientsQuery = useClients(isTrainer ? profile?.id : undefined);
   const ownClientQuery = useClientByProfile(!isTrainer ? profile?.id : undefined);
+  const intakeFormQuery = useIntakeForm(!isTrainer ? ownClientQuery.data?.id : undefined);
 
   useEffect(() => {
     if (!isTrainer || !clientsQuery.data) return;
@@ -62,7 +64,9 @@ export default function AppLayout() {
   // every mutation rejects with a silent-looking "clientId eksik" error.
   const trainerNotReady = isTrainer && clientsQuery.isLoading;
 
-  if (loading || trainerNotReady || (!isTrainer && profile && !selectedClientId)) {
+  const intakeFormNotReady = !isTrainer && !!ownClientQuery.data && intakeFormQuery.isLoading;
+
+  if (loading || trainerNotReady || intakeFormNotReady || (!isTrainer && profile && !selectedClientId)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={C.lime} size="large" />
@@ -75,6 +79,12 @@ export default function AppLayout() {
   // KVKK onay kutusu 22 Temmuz 2026'da eklendi — ondan önce oluşturulan hesapların onay
   // kaydı yok. Böyle bir hesap girişte buraya takılır, onaylamadan hiçbir sekmeye geçemez.
   if (!profile.consent_accepted_at) return <ConsentGate profileId={profile.id} />;
+
+  // Danışanın antrenmana başlamadan önce doldurması gereken PAR-Q sağlık taraması +
+  // feragatname. Trainer tarafında değil, sadece danışan girişinde uygulanır.
+  if (!isTrainer && ownClientQuery.data && intakeFormQuery.data === null) {
+    return <IntakeFormGate clientId={ownClientQuery.data.id} />;
+  }
 
   const tabs = (
     <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>

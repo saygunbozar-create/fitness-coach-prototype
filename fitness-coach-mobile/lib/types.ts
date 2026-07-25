@@ -25,6 +25,15 @@ export type Message = {
   created_at: string;
 };
 
+export type IntakeForm = {
+  id: string;
+  client_id: string;
+  parq_answers: Record<string, boolean>;
+  health_notes: string;
+  waiver_signature_name: string;
+  submitted_at: string;
+};
+
 export type Client = {
   id: string;
   trainer_id: string;
