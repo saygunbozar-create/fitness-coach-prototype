@@ -11,6 +11,7 @@ import { PrChart } from '../../components/PrChart';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddPrLog,
   useAddWorkoutDay,
@@ -50,8 +51,9 @@ function formatTrDateShort(iso: string): string {
   return `${parseInt(d, 10)} ${TR_MONTHS_SHORT[parseInt(m, 10) - 1]}`;
 }
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
 // Program Geçmişi'nde tek bir günün (bir derse atanmış workout_day) not + egzersiz/set özetini
@@ -70,6 +72,7 @@ function HistoryDaySection({
   label: string;
   notes: string | null;
 }) {
+  const t = useT();
   const q = useLessonDayWorkout(clientId, dayId, logDate);
   const exercises = q.data ?? [];
   return (
@@ -79,7 +82,7 @@ function HistoryDaySection({
       {q.isLoading ? (
         <ActivityIndicator color={C.lime} />
       ) : exercises.length === 0 ? (
-        notes ? null : <Text style={styles.empty}>Bu günde egzersiz yok.</Text>
+        notes ? null : <Text style={styles.empty}>{t('antrenman.no_exercise_this_day')}</Text>
       ) : (
         exercises.map((ex) => (
           <View key={ex.id} style={styles.historyExerciseRow}>
@@ -93,6 +96,8 @@ function HistoryDaySection({
 }
 
 export default function AntrenmanScreen() {
+  const t = useT();
+  const onErr = useOnErr();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
   const isTrainer = profile?.role === 'trainer';
@@ -245,7 +250,7 @@ export default function AntrenmanScreen() {
   if (isTrainer && !selectedClientId) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Antrenman" />
+        <ScreenHeader title={t('nav.antrenman')} />
         <EmptyClientState />
       </View>
     );
@@ -308,11 +313,11 @@ export default function AntrenmanScreen() {
                 setEditMode(true);
                 selectDay(day.id);
               },
-              onError: onErr('Derse atanamadı'),
+              onError: onErr(t('antrenman.err_assign_lesson_title')),
             }
           );
         },
-        onError: onErr('Gün oluşturulamadı'),
+        onError: onErr(t('antrenman.err_create_day_title')),
       }
     );
   }
@@ -320,10 +325,10 @@ export default function AntrenmanScreen() {
   if (!isTrainer && programs.length === 0) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Antrenman" clientName={client.name} />
+        <ScreenHeader title={t('nav.antrenman')} clientName={client.name} />
         <View style={styles.notSharedWrap}>
-          <Text style={styles.notSharedTitle}>Program henüz paylaşılmadı</Text>
-          <Text style={styles.notSharedText}>Antrenörün bir programı seninle paylaştığında burada görünecek.</Text>
+          <Text style={styles.notSharedTitle}>{t('antrenman.not_shared_title')}</Text>
+          <Text style={styles.notSharedText}>{t('antrenman.not_shared_text')}</Text>
         </View>
       </View>
     );
@@ -331,11 +336,11 @@ export default function AntrenmanScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Antrenman" clientName={client.name} showPill={isTrainer} />
+      <ScreenHeader title={t('nav.antrenman')} clientName={client.name} showPill={isTrainer} />
       <ScrollView contentContainerStyle={styles.content}>
         {isTrainer && (
           <Pressable style={styles.editToggle} onPress={() => setEditMode(true)} hitSlop={10}>
-            <Text style={styles.editToggleText}>✎ Programı düzenle</Text>
+            <Text style={styles.editToggleText}>{t('antrenman.edit_toggle')}</Text>
           </Pressable>
         )}
 
@@ -343,23 +348,23 @@ export default function AntrenmanScreen() {
           {programs.map((p) =>
             renamingProgramId === p.id ? (
               <View key={p.id} style={styles.addDayCard}>
-                <AuthField label="Program Adı" value={programNameDraft} onChangeText={setProgramNameDraft} placeholder="Ör. Yaz Programı" />
+                <AuthField label={t('antrenman.program_name_label')} value={programNameDraft} onChangeText={setProgramNameDraft} placeholder={t('antrenman.program_name_placeholder')} />
                 <View style={styles.rowGap}>
                   <View style={{ flex: 1 }}>
                     <PrimaryButton
-                      label="Kaydet"
+                      label={t('common.save')}
                       loading={updateProgram.isPending}
                       disabled={!programNameDraft.trim()}
                       onPress={() =>
                         updateProgram.mutate(
                           { id: p.id, name: programNameDraft.trim() },
-                          { onSuccess: () => setRenamingProgramId(null), onError: onErr('Kaydedilemedi') }
+                          { onSuccess: () => setRenamingProgramId(null), onError: onErr(t('antrenman.err_save_title')) }
                         )
                       }
                     />
                   </View>
                   <Pressable style={styles.cancelBtn} onPress={() => setRenamingProgramId(null)} hitSlop={8}>
-                    <Text style={styles.cancelBtnText}>Vazgeç</Text>
+                    <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -371,7 +376,7 @@ export default function AntrenmanScreen() {
               >
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.programRowText, p.id === selectedProgram?.id && styles.programRowTextOn]}>{p.name}</Text>
-                  {isTrainer && <Text style={styles.programRowSub}>{p.shared ? 'Danışanla paylaşıldı' : 'Paylaşılmadı'}</Text>}
+                  {isTrainer && <Text style={styles.programRowSub}>{p.shared ? t('antrenman.shared_with_client') : t('antrenman.not_shared')}</Text>}
                 </View>
                 {isTrainer && (
                   <>
@@ -387,7 +392,7 @@ export default function AntrenmanScreen() {
                     </Pressable>
                     <Pressable
                       style={[styles.programIconBtn, p.shared && styles.programIconBtnOn]}
-                      onPress={() => toggleProgramShared.mutate({ id: p.id, shared: !p.shared }, { onError: onErr('Güncellenemedi') })}
+                      onPress={() => toggleProgramShared.mutate({ id: p.id, shared: !p.shared }, { onError: onErr(t('common.update_failed_title')) })}
                       hitSlop={6}
                     >
                       <Text style={[styles.programIconBtnText, p.shared && { color: C.bg }]}>{p.shared ? '✓' : '📤'}</Text>
@@ -395,10 +400,10 @@ export default function AntrenmanScreen() {
                     <Pressable
                       style={styles.programIconBtn}
                       onPress={() =>
-                        showAlert('Programı Sil', `"${p.name}" silinsin mi? İçindeki tüm günler ve egzersizler de silinir.`, [
-                          { text: 'Vazgeç', style: 'cancel' },
+                        showAlert(t('antrenman.delete_program_title'), t('antrenman.delete_program_body', { name: p.name }), [
+                          { text: t('common.cancel'), style: 'cancel' },
                           {
-                            text: 'Sil',
+                            text: t('common.delete'),
                             style: 'destructive',
                             onPress: () => {
                               deleteProgram.mutate(p.id, {
@@ -411,12 +416,9 @@ export default function AntrenmanScreen() {
                                 },
                                 onError: (e: any) => {
                                   if (e?.code === '23503') {
-                                    showAlert(
-                                      'Program Silinemedi',
-                                      'Bu programın Ders Defteri\'nde kayıtlı dersleri var. Programı silmeden önce Ders Defteri\'ndeki o programa ait dersleri silmen gerekiyor — böylece tamamlanmış ders geçmişin yanlışlıkla kaybolmaz.'
-                                    );
+                                    showAlert(t('antrenman.delete_program_blocked_title'), t('antrenman.delete_program_blocked_body'));
                                   } else {
-                                    onErr('Silinemedi')(e);
+                                    onErr(t('common.delete_failed_title'))(e);
                                   }
                                 },
                               });
@@ -436,17 +438,17 @@ export default function AntrenmanScreen() {
 
           {isTrainer && !addingProgram && (
             <Pressable style={styles.addProgramBtn} onPress={() => setAddingProgram(true)}>
-              <Text style={styles.addProgramBtnText}>+ Yeni Program</Text>
+              <Text style={styles.addProgramBtnText}>{t('antrenman.new_program_btn')}</Text>
             </Pressable>
           )}
 
           {isTrainer && addingProgram && (
             <View style={styles.addDayCard}>
-              <AuthField label="Program Adı" value={newProgramName} onChangeText={setNewProgramName} placeholder="Ör. Yaz Programı" />
+              <AuthField label={t('antrenman.program_name_label')} value={newProgramName} onChangeText={setNewProgramName} placeholder={t('antrenman.program_name_placeholder')} />
               <View style={styles.rowGap}>
                 <View style={{ flex: 1 }}>
                   <PrimaryButton
-                    label="Program Ekle"
+                    label={t('antrenman.add_program_btn')}
                     loading={addProgram.isPending}
                     disabled={!newProgramName.trim()}
                     onPress={() =>
@@ -458,14 +460,14 @@ export default function AntrenmanScreen() {
                             setAddingProgram(false);
                             selectProgram(created.id);
                           },
-                          onError: onErr('Program eklenemedi'),
+                          onError: onErr(t('antrenman.err_add_program_title')),
                         }
                       )
                     }
                   />
                 </View>
                 <Pressable style={styles.cancelBtn} onPress={() => setAddingProgram(false)} hitSlop={8}>
-                  <Text style={styles.cancelBtnText}>Vazgeç</Text>
+                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -490,7 +492,7 @@ export default function AntrenmanScreen() {
                 <View style={[styles.modalHeader, { paddingTop: insets.top + 14 }]}>
                   <Text style={styles.modalHeaderText}>{selectedProgram.name}</Text>
                   <Pressable onPress={closeEditModal} hitSlop={10}>
-                    <Text style={styles.modalCloseText}>✕ Kapat</Text>
+                    <Text style={styles.modalCloseText}>{t('antrenman.modal_close')}</Text>
                   </Pressable>
                 </View>
                 <NotebookFrame contentContainerStyle={[styles.modalScroll, { paddingBottom: insets.bottom + 16 }]}>
@@ -506,9 +508,9 @@ export default function AntrenmanScreen() {
                         <Pressable
                           style={styles.dayDelete}
                           onPress={() =>
-                            showAlert('Günü Sil', `"${d.label}" silinsin mi? İçindeki tüm egzersizler ve setler de silinir.`, [
-                              { text: 'Vazgeç', style: 'cancel' },
-                              { text: 'Sil', style: 'destructive', onPress: () => deleteDay.mutate(d.id, { onError: onErr('Gün silinemedi') }) },
+                            showAlert(t('antrenman.delete_day_title'), t('antrenman.delete_day_body', { label: d.label }), [
+                              { text: t('common.cancel'), style: 'cancel' },
+                              { text: t('common.delete'), style: 'destructive', onPress: () => deleteDay.mutate(d.id, { onError: onErr(t('common.delete_failed_title')) }) },
                             ])
                           }
                         >
@@ -518,19 +520,19 @@ export default function AntrenmanScreen() {
                     ))}
                     {!addingDay && (
                       <Pressable style={styles.dayTabAdd} onPress={() => setAddingDay(true)}>
-                        <Text style={styles.dayTabAddText}>+ Gün</Text>
+                        <Text style={styles.dayTabAddText}>{t('antrenman.add_day_btn_short')}</Text>
                       </Pressable>
                     )}
                   </View>
 
                   {addingDay && (
                     <View style={styles.addDayCard}>
-                      <AuthField label="Gün Kısaltması" value={newDayKey} onChangeText={setNewDayKey} placeholder="Ör. Per" />
-                      <AuthField label="Gün Başlığı" value={newDayLabel} onChangeText={setNewDayLabel} placeholder="Ör. OMUZ & KARIN" />
+                      <AuthField label={t('antrenman.day_key_label')} value={newDayKey} onChangeText={setNewDayKey} placeholder={t('antrenman.day_key_placeholder')} />
+                      <AuthField label={t('antrenman.day_label_label')} value={newDayLabel} onChangeText={setNewDayLabel} placeholder={t('antrenman.day_label_placeholder')} />
                       <View style={styles.rowGap}>
                         <View style={{ flex: 1 }}>
                           <PrimaryButton
-                            label="Gün Ekle"
+                            label={t('antrenman.add_day_btn')}
                             loading={addDay.isPending}
                             disabled={!newDayKey.trim() || !newDayLabel.trim()}
                             onPress={() => {
@@ -542,7 +544,7 @@ export default function AntrenmanScreen() {
                                     setNewDayLabel('');
                                     setAddingDay(false);
                                   },
-                                  onError: onErr('Gün eklenemedi'),
+                                  onError: onErr(t('antrenman.err_add_day_title')),
                                 }
                               );
                             }}
@@ -557,14 +559,14 @@ export default function AntrenmanScreen() {
                           }}
                           hitSlop={8}
                         >
-                          <Text style={styles.cancelBtnText}>Vazgeç</Text>
+                          <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                         </Pressable>
                       </View>
                     </View>
                   )}
 
                   {!activeDay ? (
-                    <Text style={styles.empty}>Bu programda henüz gün yok.</Text>
+                    <Text style={styles.empty}>{t('antrenman.no_days_yet')}</Text>
                   ) : (
                     <>
                       {!renamingDay && (
@@ -575,29 +577,29 @@ export default function AntrenmanScreen() {
                             setRenamingDay(true);
                           }}
                         >
-                          <Text style={styles.renameDayBtnText}>✎ Gün adını düzenle ({activeDay.label})</Text>
+                          <Text style={styles.renameDayBtnText}>{t('antrenman.rename_day_btn', { label: activeDay.label })}</Text>
                         </Pressable>
                       )}
                       {renamingDay && (
                         <View style={styles.addDayCard}>
-                          <AuthField label="Gün Kısaltması" value={dayNameDraft.day_key} onChangeText={(v) => setDayNameDraft((s) => ({ ...s, day_key: v }))} />
-                          <AuthField label="Gün Başlığı" value={dayNameDraft.label} onChangeText={(v) => setDayNameDraft((s) => ({ ...s, label: v }))} />
+                          <AuthField label={t('antrenman.day_key_label')} value={dayNameDraft.day_key} onChangeText={(v) => setDayNameDraft((s) => ({ ...s, day_key: v }))} />
+                          <AuthField label={t('antrenman.day_label_label')} value={dayNameDraft.label} onChangeText={(v) => setDayNameDraft((s) => ({ ...s, label: v }))} />
                           <View style={styles.rowGap}>
                             <View style={{ flex: 1 }}>
                               <PrimaryButton
-                                label="Kaydet"
+                                label={t('common.save')}
                                 loading={updateDay.isPending}
                                 disabled={!dayNameDraft.day_key.trim() || !dayNameDraft.label.trim()}
                                 onPress={() =>
                                   updateDay.mutate(
                                     { id: activeDay.id, day_key: dayNameDraft.day_key.trim(), label: dayNameDraft.label.trim() },
-                                    { onSuccess: () => setRenamingDay(false), onError: onErr('Kaydedilemedi') }
+                                    { onSuccess: () => setRenamingDay(false), onError: onErr(t('antrenman.err_save_title')) }
                                   )
                                 }
                               />
                             </View>
                             <Pressable style={styles.cancelBtn} onPress={() => setRenamingDay(false)} hitSlop={8}>
-                              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+                              <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                             </Pressable>
                           </View>
                         </View>
@@ -608,14 +610,14 @@ export default function AntrenmanScreen() {
                         value={notesDraft}
                         onChangeText={setNotesDraft}
                         multiline
-                        placeholder="Bu gün için serbest not yaz…"
+                        placeholder={t('antrenman.notes_placeholder')}
                         placeholderTextColor={C.greyD}
                         textAlignVertical="top"
                       />
                       <PrimaryButton
-                        label="Kaydet"
+                        label={t('common.save')}
                         loading={updateDayNotes.isPending}
-                        onPress={() => updateDayNotes.mutate({ id: activeDay.id, notes: notesDraft }, { onError: onErr('Not kaydedilemedi') })}
+                        onPress={() => updateDayNotes.mutate({ id: activeDay.id, notes: notesDraft }, { onError: onErr(t('antrenman.err_save_notes_title')) })}
                       />
                     </>
                   )}
@@ -625,9 +627,9 @@ export default function AntrenmanScreen() {
           </Modal>
         )}
 
-        <Panel title="PR & Güç Takibi" right={`${bestByExercise.length} egzersiz`}>
+        <Panel title={t('antrenman.pr_title')} right={t('antrenman.pr_count', { count: bestByExercise.length })}>
           {bestByExercise.length === 0 ? (
-            <Text style={styles.empty}>Henüz PR kaydı yok.</Text>
+            <Text style={styles.empty}>{t('antrenman.pr_empty')}</Text>
           ) : (
             bestByExercise.map((log) => {
               const expanded = expandedExercise === log.exercise;
@@ -645,12 +647,12 @@ export default function AntrenmanScreen() {
                     <View>
                       <Text style={styles.prExercise}>{log.exercise}</Text>
                       <Text style={styles.prMeta}>
-                        {log.date} · {log.reps} tekrar · {history.length} kayıt
+                        {t('antrenman.pr_meta', { date: log.date, reps: log.reps, count: history.length })}
                       </Text>
                     </View>
                     <View style={styles.prRight}>
                       <Text style={styles.prWeight}>{nf(log.weight, 1)} kg</Text>
-                      <Text style={styles.prExpandHint}>{expanded ? 'Kapat ▲' : 'Detay ▼'}</Text>
+                      <Text style={styles.prExpandHint}>{expanded ? t('antrenman.pr_close') : t('antrenman.pr_detail')}</Text>
                     </View>
                   </Pressable>
 
@@ -663,11 +665,11 @@ export default function AntrenmanScreen() {
                         .map((h) => (
                           <View key={h.id} style={styles.prHistoryRow}>
                             <Text style={styles.prHistoryText}>
-                              {formatTrDate(h.date)} · {nf(h.weight, 1)} kg · {h.reps} tekrar
+                              {t('antrenman.pr_history_row', { date: formatTrDate(h.date), weight: nf(h.weight, 1), reps: h.reps })}
                             </Text>
                             {isTrainer && (
-                              <Pressable onPress={() => deletePrLog.mutate(h.id, { onError: onErr('Silinemedi') })} hitSlop={8}>
-                                <Text style={styles.prDelete}>Sil</Text>
+                              <Pressable onPress={() => deletePrLog.mutate(h.id, { onError: onErr(t('common.delete_failed_title')) })} hitSlop={8}>
+                                <Text style={styles.prDelete}>{t('common.delete')}</Text>
                               </Pressable>
                             )}
                           </View>
@@ -681,17 +683,17 @@ export default function AntrenmanScreen() {
 
           <View style={styles.prForm}>
             <View style={{ flex: 2 }}>
-              <AuthField label="Egzersiz" value={prDraft.exercise} onChangeText={(v) => setPrDraft((s) => ({ ...s, exercise: v }))} placeholder="Ör. Squat" />
+              <AuthField label={t('antrenman.exercise_label')} value={prDraft.exercise} onChangeText={(v) => setPrDraft((s) => ({ ...s, exercise: v }))} placeholder="Ör. Squat" />
             </View>
             <View style={{ flex: 1 }}>
-              <AuthField label="kg" value={prDraft.weight} onChangeText={(v) => setPrDraft((s) => ({ ...s, weight: v }))} keyboardType="decimal-pad" />
+              <AuthField label={t('antrenman.kg_label')} value={prDraft.weight} onChangeText={(v) => setPrDraft((s) => ({ ...s, weight: v }))} keyboardType="decimal-pad" />
             </View>
             <View style={{ flex: 1 }}>
-              <AuthField label="Tekrar" value={prDraft.reps} onChangeText={(v) => setPrDraft((s) => ({ ...s, reps: v }))} keyboardType="number-pad" />
+              <AuthField label={t('antrenman.reps_label')} value={prDraft.reps} onChangeText={(v) => setPrDraft((s) => ({ ...s, reps: v }))} keyboardType="number-pad" />
             </View>
           </View>
           <PrimaryButton
-            label="PR Kaydet"
+            label={t('antrenman.save_pr_btn')}
             loading={addPrLog.isPending}
             disabled={!prDraft.exercise.trim() || !prDraft.weight}
             onPress={() => {
@@ -700,21 +702,18 @@ export default function AntrenmanScreen() {
               if (Number.isNaN(weight)) return;
               addPrLog.mutate(
                 { exercise: prDraft.exercise.trim(), weight, reps },
-                { onSuccess: () => setPrDraft({ exercise: '', weight: '', reps: '1' }), onError: onErr('PR kaydedilemedi') }
+                { onSuccess: () => setPrDraft({ exercise: '', weight: '', reps: '1' }), onError: onErr(t('antrenman.err_save_pr_title')) }
               );
             }}
           />
         </Panel>
 
-        <Panel title="Program Geçmişi" right={`${historyEntries.length} kayıt`}>
+        <Panel title={t('antrenman.history_title')} right={t('antrenman.history_count', { count: historyEntries.length })}>
           {historyEntries.length === 0 ? (
-            <Text style={styles.empty}>
-              Henüz tamamlanan seans/ders yok. Seans eklemek için Ödemeler ekranındaki "Seans Kullan" bölümünü, ya da Ders
-              Defteri'nde bir dersi bitirebilirsin.
-            </Text>
+            <Text style={styles.empty}>{t('antrenman.history_empty')}</Text>
           ) : (
             <>
-              <Text style={styles.historyHint}>Ne yapıldığını görmek için bir tarihe dokun.</Text>
+              <Text style={styles.historyHint}>{t('antrenman.history_hint')}</Text>
               <View style={styles.dateChipRow}>
                 {(showAllHistory ? historyEntries : historyEntries.slice(0, 14)).map((s) => {
                   const on = expandedHistoryDate === s.date;
@@ -732,7 +731,7 @@ export default function AntrenmanScreen() {
               </View>
               {historyEntries.length > 14 && (
                 <Pressable onPress={() => setShowAllHistory((v) => !v)} hitSlop={8}>
-                  <Text style={styles.showMore}>{showAllHistory ? 'Daha az göster' : `Tümünü göster (${historyEntries.length})`}</Text>
+                  <Text style={styles.showMore}>{showAllHistory ? t('antrenman.show_less') : t('antrenman.show_all', { count: historyEntries.length })}</Text>
                 </Pressable>
               )}
 
@@ -741,7 +740,7 @@ export default function AntrenmanScreen() {
                   <Text style={styles.historyDetailTitle}>
                     {formatTrDate(expandedHistoryDate)}
                     {expandedEntry && expandedEntry.lessons.length === 0
-                      ? ` — ${expandedEntry.workout_day_id ? dayLabelById.get(expandedEntry.workout_day_id) ?? 'Program' : 'Antrenman'}`
+                      ? ` — ${expandedEntry.workout_day_id ? dayLabelById.get(expandedEntry.workout_day_id) ?? t('antrenman.fallback_program') : t('antrenman.fallback_workout')}`
                       : ''}
                   </Text>
                   {/* Not/egzersiz detayı: birden fazla ders varken her gün ayrı bölümde (aşağıda)
@@ -760,24 +759,24 @@ export default function AntrenmanScreen() {
                           style={styles.historyLessonUndoBtn}
                           onPress={() =>
                             showAlert(
-                              'Dersi Geri Al',
-                              `Ders ${l.lesson_number} tamamlanmamış olarak işaretlenip Ders Defteri'ne geri alınsın mı?`,
+                              t('antrenman.undo_lesson_title'),
+                              t('antrenman.undo_lesson_body', { number: l.lesson_number }),
                               [
-                                { text: 'Vazgeç', style: 'cancel' },
+                                { text: t('common.cancel'), style: 'cancel' },
                                 {
-                                  text: 'Geri Al',
+                                  text: t('antrenman.undo_btn'),
                                   style: 'destructive',
                                   onPress: () =>
                                     toggleLessonComplete.mutate(
                                       { id: l.id, program_id: l.program_id, completed: false },
-                                      { onError: onErr('Geri alınamadı') }
+                                      { onError: onErr(t('antrenman.err_undo_title')) }
                                     ),
                                 },
                               ]
                             )
                           }
                         >
-                          <Text style={styles.historyLessonUndoText}>Ders {l.lesson_number} — Geri Al</Text>
+                          <Text style={styles.historyLessonUndoText}>{t('antrenman.lesson_undo_label', { number: l.lesson_number })}</Text>
                         </Pressable>
                       ))}
                     </View>
@@ -793,14 +792,14 @@ export default function AntrenmanScreen() {
                         arr.push(l.lesson_number);
                         byDay.set(l.workout_day_id, arr);
                       }
-                      if (byDay.size === 0) return <Text style={styles.empty}>Bu derslere gün atanmamış.</Text>;
+                      if (byDay.size === 0) return <Text style={styles.empty}>{t('antrenman.lessons_no_day')}</Text>;
                       return Array.from(byDay.entries()).map(([dayId, nums]) => (
                         <HistoryDaySection
                           key={dayId}
                           clientId={clientQuery.data?.id}
                           dayId={dayId}
                           logDate={expandedHistoryDate}
-                          label={`${nums.sort((a, b) => a - b).map((n) => `Ders ${n}`).join(', ')} · ${dayLabelById.get(dayId) ?? 'Gün'}`}
+                          label={`${nums.sort((a, b) => a - b).map((n) => `Ders ${n}`).join(', ')} · ${dayLabelById.get(dayId) ?? t('antrenman.fallback_day')}`}
                           notes={dayNotesById.get(dayId) ?? null}
                         />
                       ));
@@ -810,7 +809,7 @@ export default function AntrenmanScreen() {
                       <ActivityIndicator color={C.lime} />
                     ) : (expandedDayWorkoutQuery.data ?? []).length === 0 ? (
                       dayNotesById.get(expandedEntry.workout_day_id) ? null : (
-                        <Text style={styles.empty}>Bu günde henüz egzersiz yok.</Text>
+                        <Text style={styles.empty}>{t('antrenman.no_exercise_this_day')}</Text>
                       )
                     ) : (
                       expandedDayWorkoutQuery.data!.map((ex) => (
@@ -825,7 +824,7 @@ export default function AntrenmanScreen() {
                   ) : historyLogsQuery.isLoading ? (
                     <ActivityIndicator color={C.lime} />
                   ) : (historyLogsQuery.data ?? []).length === 0 ? (
-                    <Text style={styles.empty}>Bu tarihte kayıtlı egzersiz detayı bulunamadı.</Text>
+                    <Text style={styles.empty}>{t('antrenman.no_detail_found')}</Text>
                   ) : (
                     Array.from(
                       (historyLogsQuery.data ?? []).reduce((map, { log, exercise }) => {
