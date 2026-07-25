@@ -13,6 +13,7 @@ import { Stepper } from '../../components/Stepper';
 import { TrendChart } from '../../components/TrendChart';
 import { LineChart } from '../../components/LineChart';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddInjuryLog,
   useCardioLogs,
@@ -36,24 +37,24 @@ import { C, checkinWeekStart, formatDateInputTr, localDateStr, monthPeriodStr, n
 import { monthLabelTr } from '../../lib/wellnessSurvey';
 
 const WEEKS = 12;
-const FIELDS: { key: 'uyku' | 'enerji' | 'aclik' | 'stres' | 'motivasyon'; label: string }[] = [
-  { key: 'uyku', label: 'Uyku' },
-  { key: 'enerji', label: 'Enerji' },
-  { key: 'aclik', label: 'Açlık' },
-  { key: 'stres', label: 'Stres' },
-  { key: 'motivasyon', label: 'Motivasyon' },
+const FIELDS: { key: 'uyku' | 'enerji' | 'aclik' | 'stres' | 'motivasyon'; labelKey: string }[] = [
+  { key: 'uyku', labelKey: 'ilerleme.field_sleep' },
+  { key: 'enerji', labelKey: 'ilerleme.field_energy' },
+  { key: 'aclik', labelKey: 'ilerleme.field_hunger' },
+  { key: 'stres', labelKey: 'ilerleme.field_stress' },
+  { key: 'motivasyon', labelKey: 'ilerleme.field_motivation' },
 ];
 
-const MEASURE_FIELDS: { key: 'chest' | 'waist' | 'hip' | 'shoulder' | 'arm_left' | 'arm_right' | 'thigh_left' | 'thigh_right' | 'calf'; label: string }[] = [
-  { key: 'chest', label: 'Göğüs (cm)' },
-  { key: 'waist', label: 'Bel (cm)' },
-  { key: 'hip', label: 'Kalça (cm)' },
-  { key: 'shoulder', label: 'Omuz (cm)' },
-  { key: 'arm_left', label: 'Sol Kol (cm)' },
-  { key: 'arm_right', label: 'Sağ Kol (cm)' },
-  { key: 'thigh_left', label: 'Sol Bacak (cm)' },
-  { key: 'thigh_right', label: 'Sağ Bacak (cm)' },
-  { key: 'calf', label: 'Baldır (cm)' },
+const MEASURE_FIELDS: { key: 'chest' | 'waist' | 'hip' | 'shoulder' | 'arm_left' | 'arm_right' | 'thigh_left' | 'thigh_right' | 'calf'; labelKey: string }[] = [
+  { key: 'chest', labelKey: 'ilerleme.measure_chest' },
+  { key: 'waist', labelKey: 'ilerleme.measure_waist' },
+  { key: 'hip', labelKey: 'ilerleme.measure_hip' },
+  { key: 'shoulder', labelKey: 'ilerleme.measure_shoulder' },
+  { key: 'arm_left', labelKey: 'ilerleme.measure_arm_left' },
+  { key: 'arm_right', labelKey: 'ilerleme.measure_arm_right' },
+  { key: 'thigh_left', labelKey: 'ilerleme.measure_thigh_left' },
+  { key: 'thigh_right', labelKey: 'ilerleme.measure_thigh_right' },
+  { key: 'calf', labelKey: 'ilerleme.measure_calf' },
 ];
 
 // "10.05.2026" -> "2026-05-10"
@@ -68,6 +69,9 @@ function parseTrDate(input: string): string | null {
 }
 
 export default function IlerlemeScreen() {
+  const t = useT();
+  const fields = FIELDS.map((f) => ({ key: f.key, label: t(f.labelKey) }));
+  const measureFields = MEASURE_FIELDS.map((f) => ({ key: f.key, label: t(f.labelKey) }));
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const { selectedClientId } = useSelectedClient();
@@ -196,7 +200,7 @@ export default function IlerlemeScreen() {
   if (isTrainer && !selectedClientId) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="İlerleme" />
+        <ScreenHeader title={t('nav.ilerleme')} />
         <EmptyClientState />
       </View>
     );
@@ -211,7 +215,7 @@ export default function IlerlemeScreen() {
   }
 
   const checkin = checkinQuery.data;
-  const entries = checkin ? FIELDS.map((f) => [f.label, checkin[f.key]] as const) : [];
+  const entries = checkin ? fields.map((f) => [f.label, checkin[f.key]] as const) : [];
   const avg = entries.length ? entries.reduce((a, [, v]) => a + v, 0) / entries.length : 0;
   const low = entries.some(([, v]) => v <= 4);
   const weeklyDelta = proj.length > 1 ? proj[1] - proj[0] : 0;
@@ -235,12 +239,12 @@ export default function IlerlemeScreen() {
 
   async function pickPhoto() {
     if (!selectedClientId) {
-      showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+      showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded'));
       return;
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      showAlert('İzin gerekli', 'Fotoğraf eklemek için galeri izni vermen gerekiyor.');
+      showAlert(t('ilerleme.permission_needed_title'), t('ilerleme.permission_needed_body'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
@@ -248,23 +252,23 @@ export default function IlerlemeScreen() {
     const asset = result.assets[0];
     uploadPhoto.mutate(
       { uri: asset.uri, mimeType: asset.mimeType },
-      { onError: (e: any) => showAlert('Yüklenemedi', e.message ?? 'Fotoğraf yüklenirken bir hata oldu.') }
+      { onError: (e: any) => showAlert(t('ilerleme.err_photo_upload_title'), e.message ?? t('ilerleme.err_photo_upload_body')) }
     );
   }
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="İlerleme" clientName={client.name} showPill={profile?.role === 'trainer'} />
+      <ScreenHeader title={t('nav.ilerleme')} clientName={client.name} showPill={profile?.role === 'trainer'} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Panel title="Haftalık Check-in" right={checkin ? `Ortalama ${nf(avg, 1)} / 10` : 'Henüz kayıt yok'}>
+        <Panel title={t('ilerleme.checkin_title')} right={checkin ? t('ilerleme.avg_label', { avg: nf(avg, 1) }) : t('ilerleme.no_records')}>
           {checkin && (
             <Text style={[styles.noteText, !checkedInThisWeek && { color: C.orange }]}>
               {(() => {
                 const [y, m, d] = checkin.date.split('-');
                 const dateStr = `${d}.${m}.${y}`;
-                if (checkedInThisWeek) return `Bu haftadan: ${dateStr}`;
+                if (checkedInThisWeek) return t('ilerleme.this_week_from', { date: dateStr });
                 const weeksAgo = Math.max(1, Math.round((Date.now() - new Date(checkin.date).getTime()) / (7 * 24 * 60 * 60 * 1000)));
-                return `Son check-in: ${dateStr} (${weeksAgo} hafta önce — güncel değil)`;
+                return t('ilerleme.last_checkin', { date: dateStr, weeks: weeksAgo });
               })()}
             </Text>
           )}
@@ -278,25 +282,25 @@ export default function IlerlemeScreen() {
           {checkin && (
             <View style={styles.note}>
               <Text style={styles.noteText}>
-                {low ? 'Düşük skor tespit edildi — danışanla görüşme öner.' : 'Tüm skorlar sağlıklı aralıkta.'}
+                {low ? t('ilerleme.low_score_note') : t('ilerleme.healthy_note')}
               </Text>
             </View>
           )}
 
           <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'checkin' } })}>
-            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+            <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
           {!isTrainer &&
             (checkedInThisWeek ? (
               <Text style={styles.noteText}>
-                Bu haftanın check-in'ini gönderdin. Bir sonraki check-in Cumartesi günü açılacak
-                {daysUntilNextSaturday === 1 ? ' (yarın).' : ` (${daysUntilNextSaturday} gün sonra).`}
+                {t('ilerleme.submitted_this_week')}
+                {daysUntilNextSaturday === 1 ? t('ilerleme.next_checkin_tomorrow') : t('ilerleme.next_checkin_days', { days: daysUntilNextSaturday })}
               </Text>
             ) : (
               <>
                 <View style={styles.formGrid}>
-                  {FIELDS.map((f) => (
+                  {fields.map((f) => (
                     <View key={f.key} style={styles.formItem}>
                       <Stepper
                         label={f.label}
@@ -308,22 +312,22 @@ export default function IlerlemeScreen() {
                   ))}
                 </View>
                 <PrimaryButton
-                  label="Bu haftanın check-in'ini kaydet"
+                  label={t('ilerleme.save_checkin_btn')}
                   loading={saveCheckin.isPending}
                   onPress={() =>
                     saveCheckin.mutate(draft, {
-                      onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Check-in kaydedilemedi.'),
+                      onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_checkin_save')),
                     })
                   }
                 />
               </>
             ))}
-          {isTrainer && !checkin && <Text style={styles.noteText}>Danışan henüz check-in göndermedi.</Text>}
+          {isTrainer && !checkin && <Text style={styles.noteText}>{t('ilerleme.client_no_checkin')}</Text>}
         </Panel>
 
-        <Panel title="Sakatlık & Mobilite" right={`${(injuryQuery.data ?? []).length} kayıt`}>
+        <Panel title={t('ilerleme.injury_title')} right={t('ilerleme.records_count', { count: (injuryQuery.data ?? []).length })}>
           {(injuryQuery.data ?? []).length === 0 ? (
-            <Text style={styles.noteText}>Henüz kayıt yok.</Text>
+            <Text style={styles.noteText}>{t('ilerleme.no_records_yet')}</Text>
           ) : (
             (injuryQuery.data ?? []).map((log) => (
               <View key={log.id} style={styles.injuryRow}>
@@ -336,65 +340,65 @@ export default function IlerlemeScreen() {
                   <Text style={styles.listMeta}>{log.date}</Text>
                 </View>
                 <Pressable
-                  onPress={() => deleteInjury.mutate(log.id, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Kayıt silinemedi.') })}
+                  onPress={() => deleteInjury.mutate(log.id, { onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('common.delete_failed_body')) })}
                   hitSlop={8}
                 >
-                  <Text style={styles.listDelete}>Sil</Text>
+                  <Text style={styles.listDelete}>{t('common.delete')}</Text>
                 </Pressable>
               </View>
             ))
           )}
 
           <AuthField
-            label="Bölge"
+            label={t('ilerleme.body_part_label')}
             value={injuryDraft.body_part}
             onChangeText={(v) => setInjuryDraft((s) => ({ ...s, body_part: v }))}
-            placeholder="Ör. Sol Diz"
+            placeholder={t('ilerleme.body_part_placeholder')}
           />
           <View style={styles.severityRow}>
             <Stepper
-              label="Ağrı Şiddeti"
+              label={t('ilerleme.pain_severity_label')}
               value={injuryDraft.severity}
               onChange={(d) => setInjuryDraft((s) => ({ ...s, severity: Math.min(10, Math.max(1, s.severity + d)) }))}
               step={1}
             />
           </View>
           <AuthField
-            label="Not"
+            label={t('ilerleme.note_label')}
             value={injuryDraft.note}
             onChangeText={(v) => setInjuryDraft((s) => ({ ...s, note: v }))}
-            placeholder="Ör. Squat sırasında ağrı"
+            placeholder={t('ilerleme.note_placeholder')}
           />
           <PrimaryButton
-            label="Kaydet"
+            label={t('common.save')}
             loading={addInjury.isPending}
             disabled={!injuryDraft.body_part.trim()}
             onPress={() => {
               if (!selectedClientId) {
-                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded'));
                 return;
               }
               addInjury.mutate(
                 { body_part: injuryDraft.body_part.trim(), severity: injuryDraft.severity, note: injuryDraft.note.trim() },
                 {
                   onSuccess: () => setInjuryDraft({ body_part: '', severity: 3, note: '' }),
-                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kayıt eklenemedi.'),
+                  onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_injury_save')),
                 }
               );
             }}
           />
         </Panel>
 
-        <Panel title="Kilo Projeksiyonu" right="7700 kcal ≈ 1 kg">
+        <Panel title={t('ilerleme.weight_proj_title')} right={t('ilerleme.kcal_per_kg')}>
           {proj.length > 0 && <LineChart proj={proj} actual={actual} />}
           <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'weight' } })}>
-            <Text style={styles.historyBtnText}>Kilo Geçmişini Gör</Text>
+            <Text style={styles.historyBtnText}>{t('ilerleme.weight_history_btn')}</Text>
           </Pressable>
           <View style={styles.chips}>
             {[
-              [`${nf(weeklyDelta * WEEKS, 1)} kg`, `${WEEKS} haftada`],
-              [`${nf(weeklyDelta, 2)} kg`, 'haftalık'],
-              [`${nf(client.kcal_target - client.tdee)} kcal`, 'günlük fark'],
+              [`${nf(weeklyDelta * WEEKS, 1)} kg`, t('ilerleme.in_weeks', { weeks: WEEKS })],
+              [`${nf(weeklyDelta, 2)} kg`, t('ilerleme.weekly')],
+              [`${nf(client.kcal_target - client.tdee)} kcal`, t('ilerleme.daily_diff')],
             ].map(([v, l]) => (
               <View key={l} style={styles.chip}>
                 <Text style={styles.chipValue}>{v}</Text>
@@ -406,7 +410,7 @@ export default function IlerlemeScreen() {
           <View style={styles.logRow}>
             <View style={{ flex: 1 }}>
               <AuthField
-                label="Kilo (kg)"
+                label={t('ilerleme.weight_label')}
                 value={weightInput}
                 onChangeText={setWeightInput}
                 keyboardType="decimal-pad"
@@ -415,7 +419,7 @@ export default function IlerlemeScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <AuthField
-                label="Tarih (boş = bugün)"
+                label={t('ilerleme.date_empty_today')}
                 value={weightDateInput}
                 onChangeText={(v) => setWeightDateInput((prev) => formatDateInputTr(v, prev))}
                 placeholder="GG.AA.YYYY"
@@ -424,9 +428,9 @@ export default function IlerlemeScreen() {
               />
             </View>
           </View>
-          {weightDateInput.trim() && !weightDateIso && <Text style={styles.dateError}>Tarihi GG.AA.YYYY biçiminde gir.</Text>}
+          {weightDateInput.trim() && !weightDateIso && <Text style={styles.dateError}>{t('ilerleme.date_format_err')}</Text>}
           <PrimaryButton
-            label="Kaydet"
+            label={t('common.save')}
             loading={logWeight.isPending}
             disabled={!weightInput || (!!weightDateInput.trim() && !weightDateIso)}
             onPress={() => {
@@ -434,28 +438,28 @@ export default function IlerlemeScreen() {
               if (!Number.isNaN(v) && weightDateIso) {
                 logWeight.mutate(
                   { weight: v, date: weightDateIso },
-                  { onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kilo kaydedilemedi.') }
+                  { onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_weight_save')) }
                 );
               }
             }}
           />
         </Panel>
 
-        <Panel title="Kardiyo & Adım" right={cardioWeek.length ? `Ort. ${nf(avgSteps)} adım` : 'Henüz kayıt yok'}>
+        <Panel title={t('ilerleme.cardio_title')} right={cardioWeek.length ? t('ilerleme.avg_steps', { count: nf(avgSteps) }) : t('ilerleme.no_records')}>
           {cardioTrendPoints.length > 0 ? (
             <TrendChart points={cardioTrendPoints} color={C.blue} formatValue={(v) => nf(v)} h={130} />
           ) : (
-            <Text style={styles.noteText}>Henüz kayıt yok.</Text>
+            <Text style={styles.noteText}>{t('ilerleme.no_records_yet')}</Text>
           )}
 
           <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'cardio' } })}>
-            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+            <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
           <View style={styles.formGrid}>
             <View style={styles.measureFormItem}>
               <AuthField
-                label="Adım Sayısı"
+                label={t('ilerleme.steps_label')}
                 value={cardioDraft.steps}
                 onChangeText={(v) => setCardioDraft((s) => ({ ...s, steps: v }))}
                 keyboardType="number-pad"
@@ -464,15 +468,15 @@ export default function IlerlemeScreen() {
             </View>
             <View style={styles.measureFormItem}>
               <AuthField
-                label="Kardiyo Türü"
+                label={t('ilerleme.cardio_type_label')}
                 value={cardioDraft.cardio_type}
                 onChangeText={(v) => setCardioDraft((s) => ({ ...s, cardio_type: v }))}
-                placeholder="Ör. Koşu"
+                placeholder={t('ilerleme.cardio_type_placeholder')}
               />
             </View>
             <View style={styles.measureFormItem}>
               <AuthField
-                label="Süre (dk)"
+                label={t('ilerleme.duration_label')}
                 value={cardioDraft.duration_minutes}
                 onChangeText={(v) => setCardioDraft((s) => ({ ...s, duration_minutes: v }))}
                 keyboardType="decimal-pad"
@@ -481,7 +485,7 @@ export default function IlerlemeScreen() {
             </View>
             <View style={styles.measureFormItem}>
               <AuthField
-                label="Mesafe (km)"
+                label={t('ilerleme.distance_label')}
                 value={cardioDraft.distance_km}
                 onChangeText={(v) => setCardioDraft((s) => ({ ...s, distance_km: v }))}
                 keyboardType="decimal-pad"
@@ -490,7 +494,7 @@ export default function IlerlemeScreen() {
             </View>
             <View style={styles.measureFormItem}>
               <AuthField
-                label="Kalori"
+                label={t('ilerleme.calories_label')}
                 value={cardioDraft.calories}
                 onChangeText={(v) => setCardioDraft((s) => ({ ...s, calories: v }))}
                 keyboardType="decimal-pad"
@@ -499,7 +503,7 @@ export default function IlerlemeScreen() {
             </View>
           </View>
           <PrimaryButton
-            label="Bugünün kardiyosunu kaydet"
+            label={t('ilerleme.save_cardio_btn')}
             loading={logCardio.isPending}
             disabled={
               !cardioDraft.cardio_type.trim() &&
@@ -510,7 +514,7 @@ export default function IlerlemeScreen() {
             }
             onPress={() => {
               if (!selectedClientId) {
-                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded'));
                 return;
               }
               const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
@@ -524,17 +528,17 @@ export default function IlerlemeScreen() {
                 },
                 {
                   onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }),
-                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Kardiyo kaydı kaydedilemedi.'),
+                  onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_cardio_save')),
                 }
               );
             }}
           />
         </Panel>
 
-        <Panel title="Ölçümler" right={latestMeasurement ? `Son: ${latestMeasurement.date}` : 'Henüz kayıt yok'}>
+        <Panel title={t('ilerleme.measurements_title')} right={latestMeasurement ? t('ilerleme.last_measurement', { date: latestMeasurement.date }) : t('ilerleme.no_records')}>
           {latestMeasurement && (
             <View style={styles.measureGrid}>
-              {MEASURE_FIELDS.map((f) => {
+              {measureFields.map((f) => {
                 const cur = latestMeasurement[f.key];
                 const prev = prevMeasurement?.[f.key] ?? null;
                 const diff = cur != null && prev != null ? cur - prev : null;
@@ -559,20 +563,20 @@ export default function IlerlemeScreen() {
           ) : null}
 
           <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/ilerleme-gecmis', params: { type: 'measurement' } })}>
-            <Text style={styles.historyBtnText}>Geçmişi Gör</Text>
+            <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
           <AuthField
-            label="Tarih (boş = bugün)"
+            label={t('ilerleme.date_empty_today')}
             value={measureDateInput}
             onChangeText={(v) => setMeasureDateInput((prev) => formatDateInputTr(v, prev))}
             placeholder="GG.AA.YYYY"
             keyboardType="number-pad"
             maxLength={10}
           />
-          {measureDateInput.trim() && !measureDateIso && <Text style={styles.dateError}>Tarihi GG.AA.YYYY biçiminde gir.</Text>}
+          {measureDateInput.trim() && !measureDateIso && <Text style={styles.dateError}>{t('ilerleme.date_format_err')}</Text>}
           <View style={styles.formGrid}>
-            {MEASURE_FIELDS.map((f) => (
+            {measureFields.map((f) => (
               <View key={f.key} style={styles.measureFormItem}>
                 <AuthField
                   label={f.label}
@@ -585,12 +589,12 @@ export default function IlerlemeScreen() {
             ))}
           </View>
           <PrimaryButton
-            label="Ölçümü Kaydet"
+            label={t('ilerleme.save_measurement_btn')}
             loading={logMeasurement.isPending}
             disabled={MEASURE_FIELDS.every((f) => !measureDraft[f.key]) || (!!measureDateInput.trim() && !measureDateIso)}
             onPress={() => {
               if (!selectedClientId) {
-                showAlert('Bekle', 'Danışan bilgisi henüz yüklenmedi, birkaç saniye sonra tekrar dene.');
+                showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded'));
                 return;
               }
               if (!measureDateIso) return;
@@ -611,16 +615,16 @@ export default function IlerlemeScreen() {
                   date: measureDateIso,
                 },
                 {
-                  onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Ölçüm kaydedilemedi.'),
+                  onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_measurement_save')),
                 }
               );
             }}
           />
         </Panel>
 
-        <Panel title="İlerleme Fotoğrafları" right={`${(photosQuery.data ?? []).length} fotoğraf`}>
+        <Panel title={t('ilerleme.photos_title')} right={t('ilerleme.photos_count', { count: (photosQuery.data ?? []).length })}>
           <Pressable style={styles.addPhotoBtn} onPress={pickPhoto} disabled={uploadPhoto.isPending}>
-            <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? 'Yükleniyor…' : '+ Fotoğraf Ekle'}</Text>
+            <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? t('ilerleme.uploading') : t('ilerleme.add_photo_btn')}</Text>
           </Pressable>
           <View style={styles.photoGrid}>
             {(photosQuery.data ?? []).map((p: any) => (
@@ -629,12 +633,12 @@ export default function IlerlemeScreen() {
                 style={styles.photoWrap}
                 onPress={() => setViewingPhoto({ url: p.url, date: p.date })}
                 onLongPress={() =>
-                  showAlert('Fotoğrafı Sil', `${p.date} tarihli fotoğraf silinsin mi?`, [
-                    { text: 'Vazgeç', style: 'cancel' },
+                  showAlert(t('ilerleme.delete_photo_title'), t('ilerleme.delete_photo_body', { date: p.date }), [
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                      text: 'Sil',
+                      text: t('common.delete'),
                       style: 'destructive',
-                      onPress: () => deletePhoto.mutate(p, { onError: (e: any) => showAlert('Silinemedi', e.message ?? 'Fotoğraf silinemedi.') }),
+                      onPress: () => deletePhoto.mutate(p, { onError: (e: any) => showAlert(t('common.delete_failed_title'), e.message ?? t('ilerleme.err_photo_delete')) }),
                     },
                   ])
                 }
@@ -656,21 +660,21 @@ export default function IlerlemeScreen() {
           </Pressable>
         </Modal>
 
-        <Panel title="Aylık Değerlendirme Anketi" right={monthLabelTr(thisMonthPeriod)}>
+        <Panel title={t('ilerleme.monthly_survey_title')} right={monthLabelTr(thisMonthPeriod)}>
           {surveysQuery.isLoading ? (
-            <Text style={styles.noteText}>Yükleniyor…</Text>
+            <Text style={styles.noteText}>{t('ilerleme.loading')}</Text>
           ) : (
             <>
               <Text style={styles.noteText}>
                 {isTrainer
-                  ? `${surveys.length} ay dolduruldu.`
+                  ? t('ilerleme.months_completed', { count: surveys.length })
                   : thisMonthSurvey
-                    ? 'Bu ayın anketini doldurdun. İstersen düzenleyebilirsin.'
-                    : 'Bu ayın anketini henüz doldurmadın.'}
+                    ? t('ilerleme.survey_done_this_month')
+                    : t('ilerleme.survey_not_done_this_month')}
               </Text>
               <Pressable style={styles.historyBtn} onPress={() => router.push({ pathname: '/(app)/anket', params: { period: thisMonthPeriod } })}>
                 <Text style={styles.historyBtnText}>
-                  {isTrainer ? 'Anketleri Gör' : thisMonthSurvey ? 'Anketi Görüntüle / Düzenle' : 'Anketi Doldur'}
+                  {isTrainer ? t('ilerleme.view_surveys_btn') : thisMonthSurvey ? t('ilerleme.view_edit_survey_btn') : t('ilerleme.fill_survey_btn')}
                 </Text>
               </Pressable>
             </>
