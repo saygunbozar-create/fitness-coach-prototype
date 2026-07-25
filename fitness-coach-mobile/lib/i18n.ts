@@ -200,6 +200,12 @@ const tr: Dict = {
   'odemeler.delete_payment_title': 'Ödemeyi Sil',
   'odemeler.delete_payment_body': '{{amount}} ₺ tutarındaki ödeme kaydı silinsin mi?',
   'odemeler.saved_failed': 'Kaydedilemedi',
+
+  'mesajlar.title': 'Mesajlar',
+  'mesajlar.title_with_client': 'Mesajlar · {{name}}',
+  'mesajlar.empty': 'Henüz mesaj yok. İlk mesajı sen gönder.',
+  'mesajlar.placeholder': 'Mesaj yaz...',
+  'mesajlar.send': 'Gönder',
 };
 
 const en: Dict = {
@@ -376,6 +382,12 @@ const en: Dict = {
   'odemeler.delete_payment_title': 'Delete Payment',
   'odemeler.delete_payment_body': 'Delete the {{amount}}₺ payment record?',
   'odemeler.saved_failed': 'Could not save',
+
+  'mesajlar.title': 'Messages',
+  'mesajlar.title_with_client': 'Messages · {{name}}',
+  'mesajlar.empty': 'No messages yet. Send the first one.',
+  'mesajlar.placeholder': 'Write a message...',
+  'mesajlar.send': 'Send',
 };
 
 const ar: Dict = {

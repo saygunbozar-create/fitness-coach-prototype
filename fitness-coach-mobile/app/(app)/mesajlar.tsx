@@ -3,6 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { EmptyClientState } from '../../components/EmptyClientState';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { useClient, useMessages, useSendMessage } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
@@ -25,6 +26,7 @@ function MessageBubble({ message, mine }: { message: Message; mine: boolean }) {
 }
 
 export default function MesajlarScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const { selectedClientId } = useSelectedClient();
   const clientQuery = useClient(selectedClientId ?? undefined);
@@ -58,7 +60,7 @@ export default function MesajlarScreen() {
   if (isTrainer && !selectedClientId) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Mesajlar" />
+        <ScreenHeader title={t('mesajlar.title')} />
         <EmptyClientState />
       </View>
     );
@@ -67,7 +69,7 @@ export default function MesajlarScreen() {
   if (!client) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Mesajlar" />
+        <ScreenHeader title={t('mesajlar.title')} />
         <View style={styles.loading}>
           <ActivityIndicator color={C.lime} size="large" />
         </View>
@@ -77,10 +79,10 @@ export default function MesajlarScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title={isTrainer ? `Mesajlar · ${client.name}` : 'Mesajlar'} />
+      <ScreenHeader title={isTrainer ? t('mesajlar.title_with_client', { name: client.name }) : t('mesajlar.title')} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
         {messages.length === 0 ? (
-          <Text style={styles.empty}>Henüz mesaj yok. İlk mesajı sen gönder.</Text>
+          <Text style={styles.empty}>{t('mesajlar.empty')}</Text>
         ) : (
           messages.map((m) => <MessageBubble key={m.id} message={m} mine={m.sender_role === (isTrainer ? 'trainer' : 'client')} />)
         )}
@@ -90,12 +92,12 @@ export default function MesajlarScreen() {
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Mesaj yaz..."
+          placeholder={t('mesajlar.placeholder')}
           placeholderTextColor={C.greyD}
           multiline
         />
         <Pressable style={[styles.sendBtn, !draft.trim() && styles.sendBtnDisabled]} onPress={onSend} disabled={!draft.trim() || sendMessage.isPending} hitSlop={8}>
-          <Text style={styles.sendBtnText}>Gönder</Text>
+          <Text style={styles.sendBtnText}>{t('mesajlar.send')}</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
