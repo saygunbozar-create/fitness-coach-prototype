@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { EmptyClientState } from '../../components/EmptyClientState';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { useClient, useMessages, useSendMessage } from '../../lib/queries';
@@ -49,6 +50,18 @@ export default function MesajlarScreen() {
     } catch {
       setDraft(body);
     }
+  }
+
+  // Hiç danışanı olmayan eğitmende selectedClientId null kalıyor, dolayısıyla clientQuery hiç
+  // çalışmıyordu — bu ekran sonsuza kadar dönen bir spinner'da takılı kalırdı. Diğer
+  // ekranlardaki (Antrenman, Beslenme, İlerleme, Ödemeler) davranışın aynısı.
+  if (isTrainer && !selectedClientId) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title="Mesajlar" />
+        <EmptyClientState />
+      </View>
+    );
   }
 
   if (!client) {

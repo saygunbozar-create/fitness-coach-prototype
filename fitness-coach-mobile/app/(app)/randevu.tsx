@@ -122,6 +122,16 @@ function generateSlotsForDate(rules: AvailabilityRule[], exceptions: Availabilit
   return Array.from(set).sort();
 }
 
+// Bugün için geçmiş saatler randevuya kapalı olmalı — aksi halde saat 15:00'te bile sabah
+// 09:00 slotu boş görünüp seçilebiliyordu. Sadece BUGÜNÜ filtreliyoruz; ileri tarihlerin
+// tüm saatleri açık kalır.
+function dropPastSlots(slots: string[], dateStr: string): string[] {
+  if (dateStr !== localDateStr()) return slots;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return slots.filter((s) => timeToMinutes(s) > nowMinutes);
+}
+
 function hasAnyAvailability(rules: AvailabilityRule[], dateStr: string): boolean {
   const dow = isoWeekday(dateStr);
   return rules.some((r) => r.days_of_week.includes(dow) && dateStr >= r.start_date && dateStr <= r.end_date);
@@ -459,7 +469,10 @@ function SlotPicker({
 }) {
   const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
   const takenQuery = useTakenSlots(trainerId, selectedDate);
-  const slots = useMemo(() => generateSlotsForDate(rules, exceptions, selectedDate), [rules, exceptions, selectedDate]);
+  const slots = useMemo(
+    () => dropPastSlots(generateSlotsForDate(rules, exceptions, selectedDate), selectedDate),
+    [rules, exceptions, selectedDate]
+  );
   const taken = new Set(takenQuery.data ?? []);
 
   return (

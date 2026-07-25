@@ -328,6 +328,12 @@ export function useDeleteClient(trainerId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (clientId: string) => {
+      // progress_photos SATIRLARI clients silinince cascade ile gidiyor ama storage'daki gerçek
+      // dosyalar kalıyordu — danışanın en hassas verisi (vücut fotoğrafları) hesabı silindikten
+      // sonra da kovada duruyordu. Saklama politikamız "hesap silinince veriler de silinir"
+      // olduğu için dosyaları önce burada siliyoruz (sıralamanın nedeni için bkz.
+      // removeAllProgressPhotoFiles).
+      await removeAllProgressPhotoFiles(clientId);
       const { error } = await supabase.from('clients').delete().eq('id', clientId);
       if (error) throw error;
     },
@@ -1589,6 +1595,20 @@ export function useProgressPhotos(clientId: string | undefined) {
   });
 }
 
+// Bir danışanın TÜM ilerleme fotoğraflarını storage'dan siler.
+// ÖNEMLİ — sıralama: bu her zaman `clients` satırı silinmeden ÖNCE çağrılmalı. Storage
+// politikaları (progress_photos_storage_trainer/_client) yetkiyi `clients` tablosuna bakan
+// is_trainer_of_client()/is_owner_client() ile veriyor; danışan satırı silindikten sonra o
+// yetki kaybolduğu için dosyalar bir daha ASLA silinemez ve kovada kalıcı olarak öksüz kalır.
+async function removeAllProgressPhotoFiles(clientId: string): Promise<void> {
+  const { data, error } = await supabase.from('progress_photos').select('storage_path').eq('client_id', clientId);
+  if (error) throw error;
+  const paths = (data ?? []).map((p) => p.storage_path as string);
+  if (!paths.length) return;
+  const { error: rmErr } = await supabase.storage.from('progress-photos').remove(paths);
+  if (rmErr) throw rmErr;
+}
+
 export function useUploadProgressPhoto(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -2538,6 +2558,17 @@ export function useSubmitIntakeForm(clientId: string | undefined) {
 export function useDeleteOwnAccount() {
   return useMutation({
     mutationFn: async () => {
+      // Hesap silinmeden ÖNCE ilgili tüm ilerleme fotoğraflarını storage'dan temizle, yoksa
+      // dosyalar kovada öksüz kalır (bkz. removeAllProgressPhotoFiles'daki sıralama notu).
+      // Buradaki filtresiz select rol sayesinde doğru kümeyi döndürüyor: danışan için
+      // clients_select_own ile sadece kendi satırı, eğitmen için clients_all_as_trainer ile
+      // tüm danışanları — ki eğitmen hesabı silinince clients_trainer_id_fkey ON DELETE CASCADE
+      // ile o danışanların hepsi zaten siliniyor.
+      const { data: rows, error: listErr } = await supabase.from('clients').select('id');
+      if (listErr) throw listErr;
+      for (const row of rows ?? []) {
+        await removeAllProgressPhotoFiles(row.id as string);
+      }
       const { error } = await supabase.rpc('delete_own_account');
       if (error) throw error;
     },
