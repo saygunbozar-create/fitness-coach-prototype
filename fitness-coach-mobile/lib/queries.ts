@@ -20,6 +20,7 @@ import type {
   MealItem,
   MealLog,
   Measurement,
+  Message,
   Payment,
   PlanTier,
   PrLog,
@@ -2456,6 +2457,40 @@ export function useMonthlyPaymentsSummary(trainerId: string | undefined, monthSt
       return { total: paid + pending, paid, pending } as MonthlyPaymentsSummary;
     },
     enabled: !!trainerId,
+  });
+}
+
+// ---------- Mesajlaşma ----------
+
+export function useMessages(trainerId: string | undefined, clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['messages', trainerId, clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('trainer_id', trainerId)
+        .eq('client_id', clientId)
+        .order('created_at');
+      if (error) throw error;
+      return data as Message[];
+    },
+    enabled: !!trainerId && !!clientId,
+    refetchInterval: 5000,
+  });
+}
+
+export function useSendMessage(trainerId: string | undefined, clientId: string | undefined, senderRole: 'trainer' | 'client') {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: string) => {
+      if (!trainerId || !clientId) throw new Error('Danışan/antrenör bilgisi eksik');
+      const { error } = await supabase
+        .from('messages')
+        .insert({ trainer_id: trainerId, client_id: clientId, sender_role: senderRole, body });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', trainerId, clientId] }),
   });
 }
 

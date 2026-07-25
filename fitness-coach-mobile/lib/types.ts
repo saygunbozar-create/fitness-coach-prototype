@@ -16,6 +16,15 @@ export type PlanTier = {
   sort_order: number;
 };
 
+export type Message = {
+  id: string;
+  trainer_id: string;
+  client_id: string;
+  sender_role: Role;
+  body: string;
+  created_at: string;
+};
+
 export type Client = {
   id: string;
   trainer_id: string;

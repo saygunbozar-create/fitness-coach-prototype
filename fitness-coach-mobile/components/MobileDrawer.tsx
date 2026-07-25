@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/(app)/danisan', label: 'Danışan', glyph: '◉', trainerOnly: true },
   { path: '/(app)/odemeler', label: 'Ödemeler', glyph: '₺' },
   { path: '/(app)/randevu', label: 'Randevu', glyph: '◷' },
+  { path: '/(app)/mesajlar', label: 'Mesajlar', glyph: '✉' },
 ];
 
 // ScreenHeader'ın sağ üstüne konan hamburger butonu — gerçek çekmece başka bir yerde (tek
