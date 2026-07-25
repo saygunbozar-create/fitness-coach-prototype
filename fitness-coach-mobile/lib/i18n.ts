@@ -6,9 +6,17 @@ import { useAuth } from './auth';
 // bu ayrı, daha büyük bir karar olarak bekliyor (bkz. proje notları).
 export type Lang = 'tr' | 'en' | 'ar';
 
+// Arapça çevirileri hazır (aşağıdaki `ar` sözlüğü) ama RTL (sağdan sola) yerleşim kararı
+// verilene kadar dil seçicide GÖSTERİLMİYOR — trainer'ın kendi kararı: "şimdilik Arapçayı
+// bekletelim, sadece TR/EN ile devam edelim" (2026-07-25). RTL netleşince ALL_LANGUAGES'tan
+// kopyalayıp buraya eklemek yeterli, çeviri metinleri o zaman yeniden yazılmayacak.
 export const LANGUAGES: { code: Lang; label: string; nativeLabel: string }[] = [
   { code: 'tr', label: 'Turkish', nativeLabel: 'Türkçe' },
   { code: 'en', label: 'English', nativeLabel: 'English' },
+];
+
+export const ALL_LANGUAGES: { code: Lang; label: string; nativeLabel: string }[] = [
+  ...LANGUAGES,
   { code: 'ar', label: 'Arabic', nativeLabel: 'العربية' },
 ];
 
