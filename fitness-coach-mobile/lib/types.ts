@@ -7,6 +7,7 @@ export type Profile = {
   trainer_id: string | null;
   consent_accepted_at: string | null;
   plan_tier: string;
+  brand_name: string | null;
 };
 
 export type PlanTier = {

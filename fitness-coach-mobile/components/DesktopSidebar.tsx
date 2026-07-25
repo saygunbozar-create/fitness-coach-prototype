@@ -1,6 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { useBrandName } from '../lib/branding';
 import { useClient, useClientByProfile, useClients, useNotifications } from '../lib/queries';
 import { useSelectedClient } from '../lib/selectedClient';
 import { C } from '../lib/theme';
@@ -34,6 +35,7 @@ export function DesktopSidebar() {
 
   const activeClients = (clientsQuery.data ?? []).filter((c) => c.is_active).length;
   const contextClient = isTrainer ? selectedClientQuery.data : ownClientQuery.data;
+  const brandName = useBrandName();
 
   return (
     <View style={styles.sidebar}>
@@ -42,7 +44,7 @@ export function DesktopSidebar() {
           <Text style={styles.brandMarkText}>CB</Text>
         </View>
         <View style={{ minWidth: 0 }}>
-          <Text style={styles.brandName}>COACHBOOK</Text>
+          <Text style={styles.brandName}>{brandName.toUpperCase()}</Text>
           <Text style={styles.brandRole}>{isTrainer ? 'Antrenör Paneli' : 'Danışan'}</Text>
         </View>
       </View>

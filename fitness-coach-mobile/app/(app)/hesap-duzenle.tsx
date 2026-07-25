@@ -7,7 +7,7 @@ import { AuthField } from '../../components/AuthField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
-import { useUpdateOwnName } from '../../lib/queries';
+import { useUpdateBrandName, useUpdateOwnName } from '../../lib/queries';
 import { supabase } from '../../lib/supabase';
 import { C } from '../../lib/theme';
 
@@ -17,9 +17,12 @@ function onErr(title: string) {
 
 export default function HesapDuzenleScreen() {
   const { profile, session, refreshProfile } = useAuth();
+  const isTrainer = profile?.role === 'trainer';
   const updateName = useUpdateOwnName(profile?.id);
+  const updateBrandName = useUpdateBrandName(profile?.id);
 
   const [nameDraft, setNameDraft] = useState(profile?.name ?? '');
+  const [brandNameDraft, setBrandNameDraft] = useState(profile?.brand_name ?? '');
   const [emailDraft, setEmailDraft] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
   const [passwordDraft, setPasswordDraft] = useState('');
@@ -79,6 +82,29 @@ export default function HesapDuzenleScreen() {
               })
             }
           />
+
+          {isTrainer && (
+            <>
+              <View style={styles.divider} />
+              <AuthField
+                label="İşletme Adı (danışanlarına 'Coachbook' yerine bu görünür)"
+                value={brandNameDraft}
+                onChangeText={setBrandNameDraft}
+                placeholder="Boş bırakırsan 'Coachbook' görünür"
+              />
+              <PrimaryButton
+                label="İşletme Adını Kaydet"
+                loading={updateBrandName.isPending}
+                disabled={brandNameDraft.trim() === (profile?.brand_name ?? '')}
+                onPress={() =>
+                  updateBrandName.mutate(brandNameDraft.trim(), {
+                    onSuccess: () => refreshProfile(),
+                    onError: onErr('Kaydedilemedi'),
+                  })
+                }
+              />
+            </>
+          )}
 
           <View style={styles.divider} />
 

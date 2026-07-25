@@ -2,6 +2,7 @@ import { router, usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { useBrandName } from '../lib/branding';
 import { closeMobileDrawer, openMobileDrawer, useMobileDrawerOpen } from '../lib/mobileDrawer';
 import { useClient, useClientByProfile, useClients, useNotifications } from '../lib/queries';
 import { useSelectedClient } from '../lib/selectedClient';
@@ -53,6 +54,7 @@ export function MobileDrawer() {
 
   const activeClients = (clientsQuery.data ?? []).filter((c) => c.is_active).length;
   const contextClient = isTrainer ? selectedClientQuery.data : ownClientQuery.data;
+  const brandName = useBrandName();
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -83,7 +85,7 @@ export function MobileDrawer() {
                 <Text style={styles.brandMarkText}>CB</Text>
               </View>
               <View style={{ minWidth: 0 }}>
-                <Text style={styles.brandName}>COACHBOOK</Text>
+                <Text style={styles.brandName}>{brandName.toUpperCase()}</Text>
                 <Text style={styles.brandRole}>{isTrainer ? 'Antrenör Paneli' : 'Danışan'}</Text>
               </View>
             </View>
