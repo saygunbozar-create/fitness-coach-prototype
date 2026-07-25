@@ -7,6 +7,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import {
   useAddPackage,
   useAddPayment,
@@ -29,8 +30,9 @@ import type { Payment } from '../../lib/types';
 
 const todayStr = localDateStr;
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string, fallback?: string) => (e: any) => showAlert(title, e.message ?? fallback ?? t('common.error'));
 }
 
 // "10.05.2026" -> "2026-05-10"
@@ -68,6 +70,7 @@ function formatTime(t: string | null): string {
 }
 
 function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payment; onCancel: () => void; onSave: (v: { date: string; amount: number; note: string }) => void; saving: boolean }) {
+  const t = useT();
   const [date, setDate] = useState(formatTrDate(payment.date));
   const [amount, setAmount] = useState(String(payment.amount));
   const [note, setNote] = useState(payment.note);
@@ -77,17 +80,17 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
   return (
     <View style={styles.editCard}>
       <AuthField
-        label="Tarih (GG.AA.YYYY)"
+        label={t('panel.date_label')}
         value={date}
         onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setError(false); }}
-        placeholder="Ör. 10.05.2026"
+        placeholder={t('odemeler.date_placeholder_generic')}
         keyboardType="number-pad"
         maxLength={10}
       />
-      {error && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir</Text>}
-      <AuthField label="Tutar (₺)" value={amount} onChangeText={(v) => { setAmount(v); setAmountError(false); }} keyboardType="decimal-pad" />
-      {amountError && <Text style={styles.error}>Geçerli bir tutar gir</Text>}
-      <AuthField label="Not" value={note} onChangeText={setNote} />
+      {error && <Text style={styles.error}>{t('odemeler.err_date_generic')}</Text>}
+      <AuthField label={t('odemeler.amount_label')} value={amount} onChangeText={(v) => { setAmount(v); setAmountError(false); }} keyboardType="decimal-pad" />
+      {amountError && <Text style={styles.error}>{t('odemeler.err_amount')}</Text>}
+      <AuthField label={t('odemeler.note_label')} value={note} onChangeText={setNote} />
       <View style={styles.editActions}>
         <Pressable
           style={[styles.editBtn, { backgroundColor: C.lime }]}
@@ -100,10 +103,10 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
             onSave({ date: iso, amount: v, note });
           }}
         >
-          <Text style={[styles.editBtnText, { color: C.bg }]}>Kaydet</Text>
+          <Text style={[styles.editBtnText, { color: C.bg }]}>{t('common.save')}</Text>
         </Pressable>
         <Pressable style={[styles.editBtn, { backgroundColor: C.card }]} disabled={saving} onPress={onCancel}>
-          <Text style={[styles.editBtnText, { color: C.grey }]}>Vazgeç</Text>
+          <Text style={[styles.editBtnText, { color: C.grey }]}>{t('common.cancel')}</Text>
         </Pressable>
       </View>
     </View>
@@ -111,6 +114,8 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
 }
 
 export default function OdemelerScreen() {
+  const t = useT();
+  const onErr = useOnErr();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const { selectedClientId } = useSelectedClient();
@@ -196,7 +201,7 @@ export default function OdemelerScreen() {
   if (isTrainer && !selectedClientId) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Ödemeler" />
+        <ScreenHeader title={t('nav.odemeler')} />
         <EmptyClientState />
       </View>
     );
@@ -225,7 +230,7 @@ export default function OdemelerScreen() {
     setDateError(false);
     addPayment.mutate(
       { date: iso, amount: v, note, paid: iso <= todayStr() },
-      { onSuccess: () => { setDate(''); setAmount(''); setNote(''); }, onError: onErr('Ödeme eklenemedi') }
+      { onSuccess: () => { setDate(''); setAmount(''); setNote(''); }, onError: onErr(t('odemeler.add_payment_failed')) }
     );
   }
 
@@ -237,7 +242,7 @@ export default function OdemelerScreen() {
           payment={p}
           saving={updatePayment.isPending}
           onCancel={() => setEditingId(null)}
-          onSave={(v) => updatePayment.mutate({ id: p.id, ...v }, { onSuccess: () => setEditingId(null), onError: onErr('Kaydedilemedi') })}
+          onSave={(v) => updatePayment.mutate({ id: p.id, ...v }, { onSuccess: () => setEditingId(null), onError: onErr(t('odemeler.saved_failed')) })}
         />
       );
     }
@@ -246,33 +251,33 @@ export default function OdemelerScreen() {
         <Pressable style={{ flex: 1 }} disabled={!isTrainer} onPress={() => setEditingId(p.id)}>
           <Text style={styles.rowAmount}>{nf(p.amount)} ₺</Text>
           {p.note ? <Text style={styles.rowNote}>{p.note}</Text> : null}
-          {isTrainer && <Text style={styles.rowEditHint}>Düzenlemek için dokun</Text>}
+          {isTrainer && <Text style={styles.rowEditHint}>{t('odemeler.edit_hint')}</Text>}
         </Pressable>
         <View style={styles.rowRight}>
           <Text style={styles.rowDate}>{formatTrDate(p.date)}</Text>
           {isTrainer ? (
             <Pressable
               style={[styles.paidBtn, { backgroundColor: p.paid ? 'rgba(198,249,78,.14)' : 'rgba(251,176,64,.14)', borderColor: p.paid ? C.lime : C.orange }]}
-              onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid }, { onError: onErr('Güncellenemedi') })}
+              onPress={() => togglePaid.mutate({ id: p.id, paid: !p.paid }, { onError: onErr(t('common.update_failed_title')) })}
               hitSlop={6}
             >
-              <Text style={[styles.paidBtnText, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? '✓ Ödendi' : 'Ödendi işaretle'}</Text>
+              <Text style={[styles.paidBtnText, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? t('odemeler.paid_check') : t('odemeler.mark_paid')}</Text>
             </Pressable>
           ) : (
-            <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? 'Ödendi' : 'Bekliyor'}</Text>
+            <Text style={[styles.rowStatus, { color: p.paid ? C.lime : C.orange }]}>{p.paid ? t('odemeler.status_paid') : t('odemeler.status_pending')}</Text>
           )}
           {isTrainer && (
             <Pressable
               disabled={deletePayment.isPending}
               onPress={() =>
-                showAlert('Ödemeyi Sil', `${nf(p.amount)} ₺ tutarındaki ödeme kaydı silinsin mi?`, [
-                  { text: 'Vazgeç', style: 'cancel' },
-                  { text: 'Sil', style: 'destructive', onPress: () => deletePayment.mutate(p.id, { onError: onErr('Silinemedi') }) },
+                showAlert(t('odemeler.delete_payment_title'), t('odemeler.delete_payment_body', { amount: nf(p.amount) }), [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  { text: t('common.delete'), style: 'destructive', onPress: () => deletePayment.mutate(p.id, { onError: onErr(t('common.delete_failed_title')) }) },
                 ])
               }
               hitSlop={8}
             >
-              <Text style={styles.rowDelete}>Sil</Text>
+              <Text style={styles.rowDelete}>{t('common.delete')}</Text>
             </Pressable>
           )}
         </View>
@@ -282,31 +287,31 @@ export default function OdemelerScreen() {
 
   return (
     <View style={styles.flex}>
-      <ScreenHeader title="Paket ve Ödemeler" clientName={clientQuery.data.name} showPill={isTrainer} />
+      <ScreenHeader title={t('odemeler.title')} clientName={clientQuery.data.name} showPill={isTrainer} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Panel title="Paket & Seanslar" right={packages.length ? `${packages.length} paket` : undefined}>
+        <Panel title={t('odemeler.package_sessions_title')} right={packages.length ? t('odemeler.package_count', { count: packages.length }) : undefined}>
           {currentPackage ? (
             <View style={styles.packageSummary}>
               <Text style={styles.packageName}>
-                {packages.length > 1 ? `Son alınan: ${currentPackage.name}` : currentPackage.name}
+                {packages.length > 1 ? t('odemeler.last_purchased', { name: currentPackage.name }) : currentPackage.name}
               </Text>
               <View style={styles.packageChips}>
                 <View style={styles.packageChip}>
                   <Text style={styles.packageChipValue}>{totalPurchased}</Text>
-                  <Text style={styles.packageChipLabel}>Toplam</Text>
+                  <Text style={styles.packageChipLabel}>{t('odemeler.total')}</Text>
                 </View>
                 <View style={styles.packageChip}>
                   <Text style={styles.packageChipValue}>{usedSessions.length}</Text>
-                  <Text style={styles.packageChipLabel}>Kullanılan</Text>
+                  <Text style={styles.packageChipLabel}>{t('odemeler.used')}</Text>
                 </View>
                 <View style={styles.packageChip}>
                   <Text style={[styles.packageChipValue, { color: remaining === 0 ? C.orange : C.lime }]}>{remaining}</Text>
-                  <Text style={styles.packageChipLabel}>Kalan</Text>
+                  <Text style={styles.packageChipLabel}>{t('odemeler.remaining')}</Text>
                 </View>
               </View>
               {usedSessions.length > 0 && (
                 <View style={styles.usedDates}>
-                  <Text style={styles.usedDatesLabel}>Kullanılan seans tarihleri:</Text>
+                  <Text style={styles.usedDatesLabel}>{t('odemeler.used_dates_label')}</Text>
                   <Text style={styles.usedDatesValue}>{usedSessions.map((s) => s.date).join(', ')}</Text>
                 </View>
               )}
@@ -314,41 +319,39 @@ export default function OdemelerScreen() {
                 <Pressable
                   disabled={deletePackage.isPending}
                   onPress={() =>
-                    showAlert('Paketi Sil', `"${currentPackage.name}" paketi silinsin mi?`, [
-                      { text: 'Vazgeç', style: 'cancel' },
-                      { text: 'Sil', style: 'destructive', onPress: () => deletePackage.mutate(currentPackage.id, { onError: onErr('Paket silinemedi') }) },
+                    showAlert(t('odemeler.delete_package_title'), t('odemeler.delete_package_body', { name: currentPackage.name }), [
+                      { text: t('common.cancel'), style: 'cancel' },
+                      { text: t('common.delete'), style: 'destructive', onPress: () => deletePackage.mutate(currentPackage.id, { onError: onErr(t('odemeler.delete_package_failed')) }) },
                     ])
                   }
                   hitSlop={8}
                 >
-                  <Text style={styles.rowDelete}>Bu paketi sil</Text>
+                  <Text style={styles.rowDelete}>{t('odemeler.delete_this_package')}</Text>
                 </Pressable>
               )}
             </View>
           ) : (
-            <Text style={styles.empty}>Henüz bir paket tanımlanmadı.</Text>
+            <Text style={styles.empty}>{t('odemeler.no_package')}</Text>
           )}
 
           {packages.length > 1 && (
             <View style={styles.oldPackages}>
-              <Text style={styles.usedDatesLabel}>Geçmiş paketler:</Text>
+              <Text style={styles.usedDatesLabel}>{t('odemeler.old_packages_label')}</Text>
               {packages.slice(1).map((p) => (
                 <View key={p.id} style={styles.oldPackageRow}>
-                  <Text style={styles.oldPackageText}>
-                    {p.name} · {p.total_sessions} seans · {p.start_date}
-                  </Text>
+                  <Text style={styles.oldPackageText}>{t('odemeler.old_package_row', { name: p.name, sessions: p.total_sessions, date: p.start_date })}</Text>
                   {isTrainer && (
                     <Pressable
                       disabled={deletePackage.isPending}
                       onPress={() =>
-                        showAlert('Paketi Sil', `"${p.name}" paketi silinsin mi?`, [
-                          { text: 'Vazgeç', style: 'cancel' },
-                          { text: 'Sil', style: 'destructive', onPress: () => deletePackage.mutate(p.id, { onError: onErr('Paket silinemedi') }) },
+                        showAlert(t('odemeler.delete_package_title'), t('odemeler.delete_package_body', { name: p.name }), [
+                          { text: t('common.cancel'), style: 'cancel' },
+                          { text: t('common.delete'), style: 'destructive', onPress: () => deletePackage.mutate(p.id, { onError: onErr(t('odemeler.delete_package_failed')) }) },
                         ])
                       }
                       hitSlop={8}
                     >
-                      <Text style={styles.rowDelete}>Sil</Text>
+                      <Text style={styles.rowDelete}>{t('common.delete')}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -358,36 +361,36 @@ export default function OdemelerScreen() {
 
           {isTrainer && !addingPackage && (
             <Pressable style={styles.addPackageBtn} onPress={() => setAddingPackage(true)}>
-              <Text style={styles.addPackageBtnText}>+ Yeni Paket Ekle</Text>
+              <Text style={styles.addPackageBtnText}>{t('odemeler.add_package')}</Text>
             </Pressable>
           )}
 
           {isTrainer && addingPackage && (
             <View style={styles.packageForm}>
-              <AuthField label="Paket Adı" value={packageDraft.name} onChangeText={(v) => setPackageDraft((s) => ({ ...s, name: v }))} placeholder="Ör. 12 Seanslık Paket" />
+              <AuthField label={t('odemeler.package_name_label')} value={packageDraft.name} onChangeText={(v) => setPackageDraft((s) => ({ ...s, name: v }))} placeholder={t('odemeler.package_name_placeholder')} />
               <AuthField
-                label="Toplam Seans"
+                label={t('odemeler.total_sessions_label')}
                 value={packageDraft.total_sessions}
                 onChangeText={(v) => setPackageDraft((s) => ({ ...s, total_sessions: v }))}
                 keyboardType="number-pad"
-                placeholder="Ör. 12"
+                placeholder={t('odemeler.total_sessions_placeholder')}
               />
-              <AuthField label="Not" value={packageDraft.note} onChangeText={(v) => setPackageDraft((s) => ({ ...s, note: v }))} placeholder="Opsiyonel" />
+              <AuthField label={t('odemeler.note_label')} value={packageDraft.note} onChangeText={(v) => setPackageDraft((s) => ({ ...s, note: v }))} placeholder={t('odemeler.note_optional_placeholder')} />
               <PrimaryButton
-                label="Paket Ekle"
+                label={t('odemeler.add_package_btn')}
                 loading={addPackage.isPending}
                 disabled={!packageDraft.name.trim() || !packageDraft.total_sessions}
                 onPress={() => {
                   const total = parseInt(packageDraft.total_sessions, 10);
                   if (!total || total <= 0) {
-                    showAlert('Geçersiz Seans Sayısı', 'Toplam seans sayısı için 0\'dan büyük bir tam sayı gir.');
+                    showAlert(t('odemeler.invalid_session_count_title'), t('odemeler.invalid_session_count_body'));
                     return;
                   }
                   addPackage.mutate(
                     { name: packageDraft.name.trim(), total_sessions: total, note: packageDraft.note.trim() },
                     {
                       onSuccess: () => { setPackageDraft({ name: '', total_sessions: '', note: '' }); setAddingPackage(false); },
-                      onError: onErr('Paket eklenemedi'),
+                      onError: onErr(t('odemeler.add_package_failed')),
                     }
                   );
                 }}
@@ -396,10 +399,10 @@ export default function OdemelerScreen() {
           )}
         </Panel>
 
-        <Panel title="Seans Kullan" right={`${recentSessions.length} kayıt`}>
+        <Panel title={t('odemeler.use_session_title')} right={t('odemeler.records_count', { count: recentSessions.length })}>
           {isTrainer && !addingSession && (
             <Pressable style={styles.addPackageBtn} onPress={() => { setSessionDraft({ date: formatTrDate(todayStr()), time: nowTimeStr(), status: 'tamamlandi' }); setSessionError(null); setAddingSession(true); }}>
-              <Text style={styles.addPackageBtnText}>+ Seans Ekle</Text>
+              <Text style={styles.addPackageBtnText}>{t('odemeler.add_session')}</Text>
             </Pressable>
           )}
 
@@ -407,7 +410,7 @@ export default function OdemelerScreen() {
             <View style={styles.packageForm}>
               {days.length > 0 && (
                 <>
-                  <Text style={styles.dayPickLabel}>Hangi program uygulandı?</Text>
+                  <Text style={styles.dayPickLabel}>{t('odemeler.which_program')}</Text>
                   <View style={styles.dayPickRow}>
                     {days.map((d) => (
                       <Pressable
@@ -424,20 +427,20 @@ export default function OdemelerScreen() {
               <View style={styles.rowGap2}>
                 <View style={{ flex: 1 }}>
                   <AuthField
-                    label="Tarih (GG.AA.YYYY)"
+                    label={t('panel.date_label')}
                     value={sessionDraft.date}
                     onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: formatDateInputTr(v, s.date) }))}
-                    placeholder="Ör. 10.07.2026"
+                    placeholder={t('odemeler.date_placeholder_generic')}
                     keyboardType="number-pad"
                     maxLength={10}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <AuthField
-                    label="Saat (SS:DD)"
+                    label={t('panel.time_label')}
                     value={sessionDraft.time}
                     onChangeText={(v) => setSessionDraft((s) => ({ ...s, time: formatTimeInputTr(v, s.time) }))}
-                    placeholder="Ör. 14:30"
+                    placeholder={t('panel.time_placeholder')}
                     keyboardType="number-pad"
                     maxLength={5}
                   />
@@ -450,7 +453,7 @@ export default function OdemelerScreen() {
                     onPress={() => setSessionDraft((s) => ({ ...s, status: st }))}
                     style={[styles.dayPick, sessionDraft.status === st && { backgroundColor: st === 'tamamlandi' ? C.lime : C.red, borderColor: st === 'tamamlandi' ? C.lime : C.red }]}
                   >
-                    <Text style={[styles.dayPickText, sessionDraft.status === st && { color: C.bg }]}>{st === 'tamamlandi' ? 'Tamamlandı' : 'Atlandı'}</Text>
+                    <Text style={[styles.dayPickText, sessionDraft.status === st && { color: C.bg }]}>{st === 'tamamlandi' ? t('odemeler.status_done') : t('odemeler.status_skipped')}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -458,30 +461,30 @@ export default function OdemelerScreen() {
               <View style={styles.rowGap2}>
                 <View style={{ flex: 1 }}>
                   <PrimaryButton
-                    label="Kaydet"
+                    label={t('common.save')}
                     loading={addSessionLog.isPending}
                     onPress={() => {
                       const iso = parseTrDate(sessionDraft.date);
                       const time = sessionDraft.time.trim() ? parseTrTime(sessionDraft.time) : null;
-                      if (!iso) { setSessionError('Tarihi GG.AA.YYYY biçiminde gir.'); return; }
-                      if (sessionDraft.time.trim() && !time) { setSessionError('Saati SS:DD biçiminde gir (Ör. 14:30).'); return; }
+                      if (!iso) { setSessionError(t('odemeler.err_date_format')); return; }
+                      if (sessionDraft.time.trim() && !time) { setSessionError(t('odemeler.err_time_format')); return; }
                       setSessionError(null);
                       addSessionLog.mutate(
                         { date: iso, time, status: sessionDraft.status, workout_day_id: activeDay?.id ?? null },
-                        { onSuccess: () => setAddingSession(false), onError: onErr('Kaydedilemedi') }
+                        { onSuccess: () => setAddingSession(false), onError: onErr(t('odemeler.saved_failed')) }
                       );
                     }}
                   />
                 </View>
                 <Pressable style={styles.cancelBtn} onPress={() => setAddingSession(false)}>
-                  <Text style={styles.cancelBtnText}>Vazgeç</Text>
+                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </Pressable>
               </View>
             </View>
           )}
 
           {recentSessions.length === 0 ? (
-            <Text style={styles.empty}>Henüz seans kaydı yok.</Text>
+            <Text style={styles.empty}>{t('odemeler.no_sessions')}</Text>
           ) : (
             recentSessions.slice(0, 20).map((s) => (
               <View key={s.id} style={styles.row}>
@@ -491,21 +494,21 @@ export default function OdemelerScreen() {
                     {s.time ? ` · ${formatTime(s.time)}` : ''}
                   </Text>
                   <Text style={[styles.rowStatus, { color: s.status === 'tamamlandi' ? C.lime : C.orange, marginTop: 2 }]}>
-                    {s.status === 'tamamlandi' ? 'Tamamlandı' : 'Atlandı'}
+                    {s.status === 'tamamlandi' ? t('odemeler.status_done') : t('odemeler.status_skipped')}
                   </Text>
                 </View>
                 {isTrainer && (
                   <Pressable
                     disabled={deleteSessionLog.isPending}
                     onPress={() =>
-                      showAlert('Seansı Sil', `${formatTrDate(s.date)} tarihli seans kaydı silinsin mi?`, [
-                        { text: 'Vazgeç', style: 'cancel' },
-                        { text: 'Sil', style: 'destructive', onPress: () => deleteSessionLog.mutate(s.id, { onError: onErr('Silinemedi') }) },
+                      showAlert(t('odemeler.delete_session_title'), t('odemeler.delete_session_body', { date: formatTrDate(s.date) }), [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: t('common.delete'), style: 'destructive', onPress: () => deleteSessionLog.mutate(s.id, { onError: onErr(t('common.delete_failed_title')) }) },
                       ])
                     }
                     hitSlop={8}
                   >
-                    <Text style={styles.rowDelete}>Sil</Text>
+                    <Text style={styles.rowDelete}>{t('common.delete')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -514,42 +517,42 @@ export default function OdemelerScreen() {
         </Panel>
 
         {isTrainer && (
-          <Panel title="Toplam Tahsilat" right={clientQuery.data.name}>
+          <Panel title={t('odemeler.total_collected_title')} right={clientQuery.data.name}>
             <Text style={styles.total}>{nf(totalPaid)} ₺</Text>
-            {totalPending > 0 && <Text style={styles.pendingNote}>{nf(totalPending)} ₺ bekleyen ödeme</Text>}
+            {totalPending > 0 && <Text style={styles.pendingNote}>{t('odemeler.pending_note', { amount: nf(totalPending) })}</Text>}
           </Panel>
         )}
 
         {isTrainer && (
-          <Panel title="Yeni Ödeme Ekle" right="geçmiş veya ileri tarihli olabilir">
+          <Panel title={t('odemeler.add_payment_title')} right={t('odemeler.add_payment_subtitle')}>
             <AuthField
-              label="Tarih (GG.AA.YYYY, boş = bugün)"
+              label={t('odemeler.date_empty_today_label')}
               value={date}
               onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setDateError(false); }}
-              placeholder="Ör. 10.05.2026"
+              placeholder={t('odemeler.date_placeholder_generic')}
               keyboardType="number-pad"
               maxLength={10}
             />
-            {dateError && <Text style={styles.error}>Tarihi GG.AA.YYYY biçiminde gir (Ör. 10.05.2026)</Text>}
+            {dateError && <Text style={styles.error}>{t('odemeler.err_date_with_example')}</Text>}
             <AuthField
-              label="Tutar (₺)"
+              label={t('odemeler.amount_label')}
               value={amount}
               onChangeText={(v) => { setAmount(v); setAmountError(false); }}
               keyboardType="decimal-pad"
-              placeholder="Ör. 3000"
+              placeholder={t('odemeler.amount_placeholder')}
             />
-            {amountError && <Text style={styles.error}>Geçerli bir tutar gir</Text>}
-            <AuthField label="Not (paket, ay vb.)" value={note} onChangeText={setNote} placeholder="Ör. Haziran paketi" />
-            <PrimaryButton label="Ödeme Ekle" loading={addPayment.isPending} disabled={!amount} onPress={submit} />
+            {amountError && <Text style={styles.error}>{t('odemeler.err_amount')}</Text>}
+            <AuthField label={t('odemeler.note_payment_label')} value={note} onChangeText={setNote} placeholder={t('odemeler.note_payment_placeholder')} />
+            <PrimaryButton label={t('odemeler.add_payment_btn')} loading={addPayment.isPending} disabled={!amount} onPress={submit} />
           </Panel>
         )}
 
-        <Panel title="Yaklaşan Ödemeler" right={`${upcoming.length} kayıt`}>
-          {upcoming.length === 0 ? <Text style={styles.empty}>Planlı ödeme yok.</Text> : upcoming.map(renderRow)}
+        <Panel title={t('odemeler.upcoming_title')} right={t('odemeler.records_count', { count: upcoming.length })}>
+          {upcoming.length === 0 ? <Text style={styles.empty}>{t('odemeler.no_upcoming')}</Text> : upcoming.map(renderRow)}
         </Panel>
 
-        <Panel title="Ödeme Geçmişi" right={`${history.length} kayıt`}>
-          {history.length === 0 ? <Text style={styles.empty}>Henüz ödeme kaydı yok.</Text> : history.map(renderRow)}
+        <Panel title={t('odemeler.history_title')} right={t('odemeler.records_count', { count: history.length })}>
+          {history.length === 0 ? <Text style={styles.empty}>{t('odemeler.no_history')}</Text> : history.map(renderRow)}
         </Panel>
       </ScrollView>
     </View>
