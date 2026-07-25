@@ -580,6 +580,15 @@ const tr: Dict = {
   'ilerleme_gecmis.measure_calf': 'Baldır',
   'ilerleme_gecmis.unit_steps_suffix': 'adım',
   'ilerleme_gecmis.unit_min_suffix': 'dk',
+
+  'anket.no_survey_trainer': 'Bu ay için henüz anket doldurulmadı.',
+  'anket.no_survey_client': 'Bu ay için anket doldurulmadı.',
+  'anket.name_label': 'İsim',
+  'anket.comments_section_title': 'Paylaşmak istedikleriniz ve önerileriniz',
+  'anket.progress_text': '{{answered}}/{{total}} soru yanıtlandı',
+  'anket.update_btn': 'Güncelle',
+  'anket.submit_btn': 'Anketi Gönder',
+  'anket.err_save': 'Anket kaydedilemedi.',
 };
 
 const en: Dict = {
@@ -1136,6 +1145,15 @@ const en: Dict = {
   'ilerleme_gecmis.measure_calf': 'Calf',
   'ilerleme_gecmis.unit_steps_suffix': 'steps',
   'ilerleme_gecmis.unit_min_suffix': 'min',
+
+  'anket.no_survey_trainer': 'The survey for this month has not been filled out yet.',
+  'anket.no_survey_client': 'The survey for this month was not filled out.',
+  'anket.name_label': 'Name',
+  'anket.comments_section_title': "Anything you'd like to share or suggest",
+  'anket.progress_text': '{{answered}}/{{total}} questions answered',
+  'anket.update_btn': 'Update',
+  'anket.submit_btn': 'Submit Survey',
+  'anket.err_save': 'Could not save the survey.',
 };
 
 const ar: Dict = {

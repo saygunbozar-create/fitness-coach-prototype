@@ -7,12 +7,14 @@ import { AuthField } from '../../components/AuthField';
 import { LikertScale } from '../../components/LikertScale';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { useClient, useSaveWellnessSurvey, useWellnessSurveys } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { C, monthPeriodStr } from '../../lib/theme';
 import { monthLabelTr, SURVEY_SECTIONS } from '../../lib/wellnessSurvey';
 
 export default function AnketScreen() {
+  const t = useT();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const insets = useSafeAreaInsets();
@@ -59,7 +61,7 @@ export default function AnketScreen() {
   function submit() {
     saveSurvey.mutate(
       { period, name: nameDraft.trim(), answers, comment: comment.trim() },
-      { onError: (e: any) => showAlert('Kaydedilemedi', e.message ?? 'Anket kaydedilemedi.') }
+      { onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('anket.err_save')) }
     );
   }
 
@@ -67,9 +69,9 @@ export default function AnketScreen() {
     <View style={styles.flex}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={styles.back}>‹ Geri</Text>
+          <Text style={styles.back}>{t('hesap.back')}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Aylık Değerlendirme Anketi</Text>
+        <Text style={styles.headerTitle}>{t('ilerleme.monthly_survey_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -96,12 +98,12 @@ export default function AnketScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {!isEditable && !existing && (
-            <Text style={styles.empty}>{isTrainer ? 'Bu ay için henüz anket doldurulmadı.' : 'Bu ay için anket doldurulmadı.'}</Text>
+            <Text style={styles.empty}>{isTrainer ? t('anket.no_survey_trainer') : t('anket.no_survey_client')}</Text>
           )}
 
           {(isEditable || existing) && (
             <>
-              <AuthField label="İsim" value={nameDraft} onChangeText={setNameDraft} editable={isEditable} placeholder="Ad Soyad" />
+              <AuthField label={t('anket.name_label')} value={nameDraft} onChangeText={setNameDraft} editable={isEditable} placeholder={t('ayarlar.name')} />
 
               {SURVEY_SECTIONS.map((section) => (
                 <View key={section.title} style={styles.section}>
@@ -120,7 +122,7 @@ export default function AnketScreen() {
               ))}
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Paylaşmak istedikleriniz ve önerileriniz</Text>
+                <Text style={styles.sectionTitle}>{t('anket.comments_section_title')}</Text>
                 <AuthField
                   label=""
                   value={comment}
@@ -128,7 +130,7 @@ export default function AnketScreen() {
                   editable={isEditable}
                   multiline
                   numberOfLines={4}
-                  placeholder="Opsiyonel"
+                  placeholder={t('odemeler.note_optional_placeholder')}
                   style={styles.commentInput}
                 />
               </View>
@@ -136,9 +138,9 @@ export default function AnketScreen() {
               {isEditable && (
                 <>
                   <Text style={styles.progressText}>
-                    {answeredCount}/{totalQuestions} soru yanıtlandı
+                    {t('anket.progress_text', { answered: answeredCount, total: totalQuestions })}
                   </Text>
-                  <PrimaryButton label={existing ? 'Güncelle' : 'Anketi Gönder'} loading={saveSurvey.isPending} onPress={submit} />
+                  <PrimaryButton label={existing ? t('anket.update_btn') : t('anket.submit_btn')} loading={saveSurvey.isPending} onPress={submit} />
                 </>
               )}
             </>
