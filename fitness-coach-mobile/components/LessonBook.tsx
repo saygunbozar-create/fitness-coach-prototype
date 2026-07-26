@@ -13,6 +13,7 @@ import {
   useUpdateWorkoutDayNotes,
   type ProgramLessonWithDay,
 } from '../lib/queries';
+import { useT } from '../lib/i18n';
 import { C } from '../lib/theme';
 import type { WorkoutDay } from '../lib/types';
 import { AuthField } from './AuthField';
@@ -22,8 +23,9 @@ import { SetCard } from './SetCard';
 
 const PAGE_SIZE = 5;
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
 function LessonDetail({
@@ -39,6 +41,8 @@ function LessonDetail({
   dayNotes: string | null;
   onComplete: () => void;
 }) {
+  const t = useT();
+  const onErr = useOnErr();
   const workoutQuery = useLessonDayWorkout(clientId, lesson.workout_day_id ?? undefined, lesson.log_date ?? undefined);
   const updateSetLog = useUpdateLessonSetLog(clientId);
   const updateDayNotes = useUpdateWorkoutDayNotes(clientId);
@@ -70,25 +74,25 @@ function LessonDetail({
                 value={notesDraft}
                 onChangeText={setNotesDraft}
                 multiline
-                placeholder="Bu ders için not yaz…"
+                placeholder={t('lesson_book.notes_placeholder')}
                 placeholderTextColor={C.greyD}
                 textAlignVertical="top"
               />
               <View style={styles.notesEditRow}>
                 <View style={{ flex: 1 }}>
                   <PrimaryButton
-                    label="Kaydet"
+                    label={t('common.save')}
                     loading={updateDayNotes.isPending}
                     onPress={() =>
                       updateDayNotes.mutate(
                         { id: lesson.workout_day_id!, notes: notesDraft },
-                        { onSuccess: () => setEditingNotes(false), onError: onErr('Not kaydedilemedi') }
+                        { onSuccess: () => setEditingNotes(false), onError: onErr(t('antrenman.err_save_notes_title')) }
                       )
                     }
                   />
                 </View>
                 <Pressable style={styles.notesCancelBtn} onPress={() => { setNotesDraft(dayNotes ?? ''); setEditingNotes(false); }} hitSlop={8}>
-                  <Text style={styles.notesCancelText}>Vazgeç</Text>
+                  <Text style={styles.notesCancelText}>{t('common.cancel')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -96,7 +100,7 @@ function LessonDetail({
             <>
               {dayNotes ? <Text style={styles.dayNotesText}>{dayNotes}</Text> : null}
               <Pressable style={styles.editNotesBtn} onPress={() => setEditingNotes(true)}>
-                <Text style={styles.editNotesBtnText}>{dayNotes ? '✎ Notu Düzenle' : '+ Not Ekle'}</Text>
+                <Text style={styles.editNotesBtnText}>{dayNotes ? t('lesson_book.edit_note_btn') : t('lesson_book.add_note_btn')}</Text>
               </Pressable>
             </>
           )}
@@ -104,7 +108,7 @@ function LessonDetail({
       )}
       {!isTrainer && dayNotes ? <Text style={styles.dayNotesText}>{dayNotes}</Text> : null}
       {exercises.length === 0 ? (
-        <Text style={styles.empty}>Bu günde henüz egzersiz yok.</Text>
+        <Text style={styles.empty}>{t('antrenman.no_exercise_this_day')}</Text>
       ) : (
         exercises.map((ex) => (
           <SetCard
@@ -121,7 +125,7 @@ function LessonDetail({
                   current: { repCount: set.repCount, kg: set.kg, done: set.done },
                   patch: { done: !set.done },
                 },
-                { onError: onErr('Kaydedilemedi') }
+                { onError: onErr(t('antrenman.err_save_title')) }
               )
             }
             onAdjustLog={(set, field, delta) =>
@@ -133,7 +137,7 @@ function LessonDetail({
                   current: { repCount: set.repCount, kg: set.kg, done: set.done },
                   patch: field === 'rep' ? { repCount: Math.max(0, set.repCount + delta) } : { kg: Math.max(0, set.kg + delta) },
                 },
-                { onError: onErr('Kaydedilemedi') }
+                { onError: onErr(t('antrenman.err_save_title')) }
               )
             }
             onAdjustTarget={() => {}}
@@ -146,7 +150,7 @@ function LessonDetail({
       )}
 
       <Pressable style={styles.completeBtn} onPress={onComplete}>
-        <Text style={styles.completeBtnText}>{isTrainer ? 'Dersi Bitir' : 'Uygulandı'}</Text>
+        <Text style={styles.completeBtnText}>{isTrainer ? t('lesson_book.finish_lesson_title') : t('lesson_book.mark_done_client')}</Text>
       </Pressable>
     </View>
   );
@@ -165,6 +169,8 @@ export function LessonBook({
   days: WorkoutDay[];
   onQuickAddExercise: (lessonId: string, lessonNumber: number) => void;
 }) {
+  const t = useT();
+  const onErr = useOnErr();
   const insets = useSafeAreaInsets();
   const lessonsQuery = useProgramLessons(clientId, programId);
   const createLessons = useCreateProgramLessons(clientId);
@@ -200,20 +206,20 @@ export function LessonBook({
   }
 
   return (
-    <Panel title="Ders Defteri" right={`${active.length} aktif`}>
+    <Panel title={t('lesson_book.title')} right={t('lesson_book.active_count', { count: active.length })}>
       {isTrainer && (
         <View style={styles.createRow}>
           <View style={{ flex: 1 }}>
-            <AuthField label="Kaç ders eklensin?" value={countDraft} onChangeText={setCountDraft} keyboardType="number-pad" placeholder="Ör. 20" />
+            <AuthField label={t('lesson_book.how_many_label')} value={countDraft} onChangeText={setCountDraft} keyboardType="number-pad" placeholder="Ör. 20" />
           </View>
           <PrimaryButton
-            label="+ Ders Ekle"
+            label={t('lesson_book.add_lessons_btn')}
             loading={createLessons.isPending}
             disabled={!parseInt(countDraft, 10)}
             onPress={() => {
               const count = parseInt(countDraft, 10);
               if (!count || count <= 0) return;
-              createLessons.mutate({ program_id: programId, count }, { onError: onErr('Ders eklenemedi') });
+              createLessons.mutate({ program_id: programId, count }, { onError: onErr(t('lesson_book.err_add_lessons')) });
             }}
           />
         </View>
@@ -223,16 +229,16 @@ export function LessonBook({
         <ActivityIndicator color={C.lime} />
       ) : active.length === 0 ? (
         <Text style={styles.empty}>
-          {isTrainer ? 'Henüz ders yok — yukarıdan ekleyebilirsin.' : 'Antrenörün henüz ders eklemedi.'}
+          {isTrainer ? t('lesson_book.empty_trainer') : t('lesson_book.empty_client')}
         </Text>
       ) : (
         <>
           <View style={styles.grid}>
             {pageLessons.map((l) => (
               <Pressable key={l.id} style={styles.lessonBox} onPress={() => selectLesson(l.id)}>
-                <Text style={styles.lessonBoxNum}>Ders {l.lesson_number}</Text>
+                <Text style={styles.lessonBoxNum}>{t('lesson_book.lesson_num', { number: l.lesson_number })}</Text>
                 <Text style={styles.lessonBoxDay} numberOfLines={1}>
-                  {l.day_label ?? 'Atanmadı'}
+                  {l.day_label ?? t('lesson_book.unassigned')}
                 </Text>
               </Pressable>
             ))}
@@ -241,13 +247,13 @@ export function LessonBook({
           {totalPages > 1 && (
             <View style={styles.pageRow}>
               <Pressable disabled={page === 0} onPress={() => setPage((p) => Math.max(0, p - 1))} hitSlop={8}>
-                <Text style={[styles.pageBtn, page === 0 && styles.pageBtnOff]}>‹ Önceki</Text>
+                <Text style={[styles.pageBtn, page === 0 && styles.pageBtnOff]}>{t('lesson_book.prev_page')}</Text>
               </Pressable>
               <Text style={styles.pageLabel}>
-                Sayfa {page + 1}/{totalPages}
+                {t('lesson_book.page_label', { page: page + 1, total: totalPages })}
               </Text>
               <Pressable disabled={page >= totalPages - 1} onPress={() => setPage((p) => Math.min(totalPages - 1, p + 1))} hitSlop={8}>
-                <Text style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnOff]}>Sonraki ›</Text>
+                <Text style={[styles.pageBtn, page >= totalPages - 1 && styles.pageBtnOff]}>{t('lesson_book.next_page')}</Text>
               </Pressable>
             </View>
           )}
@@ -259,18 +265,18 @@ export function LessonBook({
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
               <View style={[styles.modalHeader, { paddingTop: insets.top + 14 }]}>
-                <Text style={styles.modalHeaderText}>Ders {openLesson.lesson_number}</Text>
+                <Text style={styles.modalHeaderText}>{t('lesson_book.lesson_num', { number: openLesson.lesson_number })}</Text>
                 <View style={styles.modalHeaderActions}>
                   {isTrainer && (
                     <Pressable
                       onPress={() =>
-                        showAlert('Dersi Sil', `Ders ${openLesson.lesson_number} silinsin mi?`, [
-                          { text: 'Vazgeç', style: 'cancel' },
+                        showAlert(t('lesson_book.delete_lesson_title'), t('lesson_book.delete_lesson_body', { number: openLesson.lesson_number }), [
+                          { text: t('common.cancel'), style: 'cancel' },
                           {
-                            text: 'Sil',
+                            text: t('common.delete'),
                             style: 'destructive',
                             onPress: () => {
-                              deleteLesson.mutate({ id: openLesson.id, program_id: programId }, { onError: onErr('Silinemedi') });
+                              deleteLesson.mutate({ id: openLesson.id, program_id: programId }, { onError: onErr(t('common.delete_failed_title')) });
                               closeModal();
                             },
                           },
@@ -279,11 +285,11 @@ export function LessonBook({
                       hitSlop={8}
                       style={styles.deleteLessonBtn}
                     >
-                      <Text style={styles.deleteLessonText}>Dersi Sil</Text>
+                      <Text style={styles.deleteLessonText}>{t('lesson_book.delete_lesson_title')}</Text>
                     </Pressable>
                   )}
                   <Pressable onPress={closeModal} hitSlop={10}>
-                    <Text style={styles.modalCloseText}>✕ Kapat</Text>
+                    <Text style={styles.modalCloseText}>{t('antrenman.modal_close')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -294,7 +300,7 @@ export function LessonBook({
                     assigningLessonId === openLesson.id ? (
                       <View style={styles.dayPickRow}>
                         {days.length === 0 ? (
-                          <Text style={styles.empty}>Önce "Programı düzenle" ile en az bir gün oluştur.</Text>
+                          <Text style={styles.empty}>{t('lesson_book.assign_day_hint')}</Text>
                         ) : (
                           days.map((d) => (
                             <Pressable
@@ -303,7 +309,7 @@ export function LessonBook({
                               onPress={() =>
                                 assignDay.mutate(
                                   { id: openLesson.id, program_id: programId, workout_day_id: d.id, log_date: openLesson.log_date },
-                                  { onError: onErr('Atanamadı') }
+                                  { onError: onErr(t('lesson_book.err_assign')) }
                                 )
                               }
                             >
@@ -315,7 +321,7 @@ export function LessonBook({
                     ) : (
                       <View style={styles.assignRow}>
                         <Pressable style={[styles.assignBtn, { flex: 1 }]} onPress={() => setAssigningLessonId(openLesson.id)}>
-                          <Text style={styles.assignBtnText}>+ Gün Ata</Text>
+                          <Text style={styles.assignBtnText}>{t('lesson_book.assign_day_btn')}</Text>
                         </Pressable>
                         <Pressable
                           style={[styles.assignBtn, { flex: 1 }]}
@@ -328,12 +334,12 @@ export function LessonBook({
                             onQuickAddExercise(id, num);
                           }}
                         >
-                          <Text style={styles.assignBtnText}>+ Program Yaz</Text>
+                          <Text style={styles.assignBtnText}>{t('lesson_book.write_program_btn')}</Text>
                         </Pressable>
                       </View>
                     )
                   ) : (
-                    <Text style={styles.empty}>Antrenörün bu ders için henüz bir program atamadı.</Text>
+                    <Text style={styles.empty}>{t('lesson_book.no_program_assigned')}</Text>
                   )
                 ) : (
                   <LessonDetail
@@ -343,16 +349,16 @@ export function LessonBook({
                     dayNotes={days.find((d) => d.id === openLesson.workout_day_id)?.notes ?? null}
                     onComplete={() =>
                       showAlert(
-                        'Dersi Bitir',
-                        `Ders ${openLesson.lesson_number} tamamlandı olarak işaretlenip Program Geçmişi'ne taşınsın mı?`,
+                        t('lesson_book.finish_lesson_title'),
+                        t('lesson_book.finish_lesson_body', { number: openLesson.lesson_number }),
                         [
-                          { text: 'Vazgeç', style: 'cancel' },
+                          { text: t('common.cancel'), style: 'cancel' },
                           {
-                            text: 'Bitir',
+                            text: t('lesson_book.finish_btn'),
                             onPress: () =>
                               toggleComplete.mutate(
                                 { id: openLesson.id, program_id: programId, completed: true },
-                                { onSuccess: closeModal, onError: onErr('Güncellenemedi') }
+                                { onSuccess: closeModal, onError: onErr(t('common.update_failed_title')) }
                               ),
                           },
                         ]
