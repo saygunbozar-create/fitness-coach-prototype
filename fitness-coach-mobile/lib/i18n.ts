@@ -711,6 +711,9 @@ const tr: Dict = {
   'meal_item_row.protein_abbrev': 'P (g)',
   'meal_item_row.carb_abbrev': 'K (g)',
   'meal_item_row.fat_abbrev': 'Y (g)',
+
+  'danisan.language_label': 'Danışanın Dili',
+  'danisan.language_hint': 'Başlangıç programı/beslenme planı bu dilde kurulur ve danışan kaydolduğunda uygulamayı bu dilde görür.',
 };
 
 const en: Dict = {
@@ -1396,6 +1399,9 @@ const en: Dict = {
   'meal_item_row.protein_abbrev': 'P (g)',
   'meal_item_row.carb_abbrev': 'C (g)',
   'meal_item_row.fat_abbrev': 'F (g)',
+
+  'danisan.language_label': "Client's Language",
+  'danisan.language_hint': 'The starter workout/nutrition plan is created in this language, and the client sees the app in it once they sign up.',
 };
 
 const ar: Dict = {

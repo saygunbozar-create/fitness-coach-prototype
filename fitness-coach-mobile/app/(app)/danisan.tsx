@@ -8,7 +8,7 @@ import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
-import { useT } from '../../lib/i18n';
+import { LANGUAGES, useLanguage, useT } from '../../lib/i18n';
 import { PARQ_QUESTIONS } from '../../lib/parq';
 import { useAddClient, useClients, useDeleteClient, useIntakeForm, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
@@ -120,6 +120,11 @@ const emptyForm = {
   email: '',
   goal: GOALS[0],
   gender: GENDERS[0],
+  // Yeni danışan varsayılan olarak eğitmenin kendi dilini alır; eğitmen İngilizce konuşan bir
+  // danışan eklerken bunu değiştirir. Sadece EKLEME formunda var — düzenleme formunda değil,
+  // çünkü şablon zaten kurulmuş olur ve sonradan değiştirmek hiçbir şeyi güncellemez
+  // (danışan kendi dilini Ayarlar'dan değiştirebilir).
+  language: 'tr',
   start_weight: '',
   kcal_target: '',
   tdee: '',
@@ -137,6 +142,7 @@ function clientToForm(c: Client) {
     email: c.email,
     goal: c.goal,
     gender: c.gender || GENDERS[0],
+    language: c.language || 'tr',
     start_weight: String(c.start_weight),
     kcal_target: String(c.kcal_target),
     tdee: String(c.tdee),
@@ -159,8 +165,10 @@ export default function DanisanScreen() {
   const updateClient = useUpdateClient(profile?.id);
   const deleteClient = useDeleteClient(profile?.id);
   const toggleActive = useToggleClientActive(profile?.id);
+  const trainerLang = useLanguage();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  // Yeni danışan formu eğitmenin kendi diliyle açılır (çoğu danışan aynı dili konuşur).
+  const [form, setForm] = useState({ ...emptyForm, language: trainerLang });
   const [error, setError] = useState<string | null>(null);
 
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
@@ -214,8 +222,9 @@ export default function DanisanScreen() {
         birthday,
         height: n(form.height),
         gender: form.gender,
+        language: form.language,
       });
-      setForm(emptyForm);
+      setForm({ ...emptyForm, language: trainerLang });
       setShowForm(false);
       if (result.seedError) {
         showAlert(t('danisan.add_client_toast_title'), t('danisan.add_client_seed_error', { error: result.seedError }));
@@ -460,6 +469,16 @@ export default function DanisanScreen() {
               ))}
             </View>
 
+            <Text style={styles.label}>{t('danisan.language_label')}</Text>
+            <View style={styles.goalRow}>
+              {LANGUAGES.map((l) => (
+                <Pressable key={l.code} onPress={() => set('language', l.code)} style={[styles.goalPill, form.language === l.code && styles.goalPillActive]}>
+                  <Text style={[styles.goalPillText, form.language === l.code && { color: C.bg }]}>{l.nativeLabel}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.languageHint}>{t('danisan.language_hint')}</Text>
+
             <AuthField label={t('danisan.height_label')} value={form.height} onChangeText={(v) => set('height', v)} keyboardType="decimal-pad" />
             <AuthField label={t('danisan.start_weight_label')} value={form.start_weight} onChangeText={(v) => set('start_weight', v)} keyboardType="decimal-pad" />
             {(() => {
@@ -516,6 +535,7 @@ const styles = StyleSheet.create({
   goalPillActive: { backgroundColor: C.lime, borderColor: C.lime },
   goalPillText: { fontSize: 12, fontWeight: '700', color: C.grey },
   bmiText: { fontSize: 12, fontWeight: '700', color: C.lime, marginTop: -8, marginBottom: 14 },
+  languageHint: { fontSize: 10.5, color: C.greyD, lineHeight: 15, marginTop: -8, marginBottom: 14 },
   formEmpty: { fontSize: 12.5, color: C.greyD, fontStyle: 'italic' },
   formWarning: { fontSize: 12.5, fontWeight: '700', color: C.orange, marginBottom: 6 },
   formFlaggedItem: { fontSize: 12, color: C.grey, lineHeight: 18, marginBottom: 2 },

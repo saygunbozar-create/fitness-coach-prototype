@@ -130,7 +130,11 @@ export function useClientByProfile(profileId: string | undefined) {
   });
 }
 
-const DEFAULT_WORKOUT = [
+// Yeni danışana kurulan başlangıç şablonu. Bu içerik VERİTABANINA YAZILIYOR (arayüz metni değil),
+// yani sonradan çevrilemez — eğitmenin kendi düzenlemelerini ezerdi. Bu yüzden dil, danışan
+// eklenirken bir kez seçiliyor (clients.language) ve şablon o dilde kuruluyor. İngilizce konuşan
+// bir danışan aksi halde, eğitmen planı kişiselleştirene kadar Türkçe şablon görüyordu.
+const DEFAULT_WORKOUT_TR = [
   {
     day_key: 'Pzt',
     label: 'GÖĞÜS & TRICEPS',
@@ -164,7 +168,41 @@ const DEFAULT_WORKOUT = [
   },
 ];
 
-const DEFAULT_MEALS = [
+const DEFAULT_WORKOUT_EN = [
+  {
+    day_key: 'Mon',
+    label: 'CHEST & TRICEPS',
+    rows: [
+      { ex: 'Bench Press', grp: 'Chest', set_count: 4, rep_count: 8, kg: 60 },
+      { ex: 'Incline DB Press', grp: 'Chest (Upper)', set_count: 4, rep_count: 10, kg: 22 },
+      { ex: 'Cable Fly', grp: 'Chest', set_count: 3, rep_count: 12, kg: 12 },
+      { ex: 'Dips', grp: 'Chest/Triceps', set_count: 3, rep_count: 10, kg: 0 },
+      { ex: 'Triceps Pushdown', grp: 'Triceps', set_count: 3, rep_count: 12, kg: 20 },
+    ],
+  },
+  {
+    day_key: 'Tue',
+    label: 'BACK & BICEPS',
+    rows: [
+      { ex: 'Barbell Row', grp: 'Back', set_count: 4, rep_count: 8, kg: 50 },
+      { ex: 'Lat Pulldown', grp: 'Back (Lats)', set_count: 4, rep_count: 10, kg: 45 },
+      { ex: 'Seated Cable Row', grp: 'Back (Mid)', set_count: 3, rep_count: 12, kg: 40 },
+      { ex: 'Barbell Curl', grp: 'Biceps', set_count: 3, rep_count: 10, kg: 25 },
+    ],
+  },
+  {
+    day_key: 'Wed',
+    label: 'LEGS',
+    rows: [
+      { ex: 'Squat', grp: 'Legs', set_count: 4, rep_count: 8, kg: 70 },
+      { ex: 'Romanian Deadlift', grp: 'Legs (Hamstrings)', set_count: 4, rep_count: 10, kg: 55 },
+      { ex: 'Leg Press', grp: 'Legs', set_count: 3, rep_count: 12, kg: 110 },
+      { ex: 'Calf Raise', grp: 'Calves', set_count: 4, rep_count: 15, kg: 50 },
+    ],
+  },
+];
+
+const DEFAULT_MEALS_TR = [
   {
     name: 'Kahvaltı',
     items: [
@@ -191,20 +229,52 @@ const DEFAULT_MEALS = [
   },
 ];
 
+const DEFAULT_MEALS_EN = [
+  {
+    name: 'Breakfast',
+    items: [
+      { food: 'Egg (boiled)', unit: 'piece', kcal: 70, p: 6, k: 1, y: 5, default_qty: 3 },
+      { food: 'Oatmeal 60 g', unit: 'serving', kcal: 230, p: 8, k: 40, y: 4, default_qty: 1 },
+      { food: 'Banana', unit: 'piece', kcal: 105, p: 1, k: 27, y: 0, default_qty: 1 },
+    ],
+  },
+  {
+    name: 'Lunch',
+    items: [
+      { food: 'Chicken Breast (grilled) 100 g', unit: 'serving', kcal: 165, p: 31, k: 0, y: 4, default_qty: 1.8 },
+      { food: 'Basmati Rice 100 g', unit: 'serving', kcal: 130, p: 3, k: 28, y: 0, default_qty: 1.5 },
+      { food: 'Green Salad + Olive Oil', unit: 'serving', kcal: 120, p: 2, k: 6, y: 10, default_qty: 1 },
+    ],
+  },
+  {
+    name: 'Dinner',
+    items: [
+      { food: 'Salmon (baked) 120 g', unit: 'serving', kcal: 230, p: 25, k: 0, y: 14, default_qty: 1 },
+      { food: 'Quinoa 100 g', unit: 'serving', kcal: 120, p: 4, k: 21, y: 2, default_qty: 1 },
+      { food: 'Steamed Vegetables', unit: 'serving', kcal: 60, p: 3, k: 10, y: 0, default_qty: 1 },
+    ],
+  },
+];
+
+const DEFAULT_PROGRAM_NAME: Record<string, string> = { tr: 'Programım', en: 'My Program' };
+
 // Returns an error message if seeding partially failed, or null on full success. Never throws:
 // the client row is already committed by the time this runs, so a mid-seed failure should not
 // make the whole "add client" action look like it failed (that leaves an invisible client behind
 // and a retry hits the trainer_id/email unique constraint with a confusing raw Postgres error).
-async function seedClientDefaults(clientId: string): Promise<string | null> {
+async function seedClientDefaults(clientId: string, language: string): Promise<string | null> {
+  const workout = language === 'en' ? DEFAULT_WORKOUT_EN : DEFAULT_WORKOUT_TR;
+  const meals = language === 'en' ? DEFAULT_MEALS_EN : DEFAULT_MEALS_TR;
+  const programName = DEFAULT_PROGRAM_NAME[language] ?? DEFAULT_PROGRAM_NAME.tr;
   try {
     const { data: programRow, error: programErr } = await supabase
       .from('workout_programs')
-      .insert({ client_id: clientId, name: 'Programım' })
+      .insert({ client_id: clientId, name: programName })
       .select()
       .single();
     if (programErr) throw programErr;
 
-    for (const [i, day] of DEFAULT_WORKOUT.entries()) {
+    for (const [i, day] of workout.entries()) {
       const { data: dayRow, error: dayErr } = await supabase
         .from('workout_days')
         .insert({ client_id: clientId, program_id: programRow.id, day_key: day.day_key, label: day.label, sort_order: i })
@@ -229,7 +299,7 @@ async function seedClientDefaults(clientId: string): Promise<string | null> {
       }
     }
 
-    for (const [i, meal] of DEFAULT_MEALS.entries()) {
+    for (const [i, meal] of meals.entries()) {
       const { data: mealRow, error: mealErr } = await supabase
         .from('meals')
         .insert({ client_id: clientId, name: meal.name, sort_order: i })
@@ -277,6 +347,7 @@ export function useAddClient(trainerId: string | undefined) {
       birthday: string | null;
       height: number;
       gender: string;
+      language: string;
     }) => {
       if (!trainerId) throw new Error('trainerId eksik');
       const { data, error } = await supabase
@@ -285,7 +356,7 @@ export function useAddClient(trainerId: string | undefined) {
         .select()
         .single();
       if (error) throw error;
-      const seedError = await seedClientDefaults(data.id);
+      const seedError = await seedClientDefaults(data.id, input.language);
       return { client: data as Client, seedError };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clients', trainerId] }),

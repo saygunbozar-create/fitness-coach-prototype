@@ -55,6 +55,9 @@ export type Client = {
   birthday: string | null;
   height: number;
   gender: string;
+  // Eğitmenin danışan eklerken seçtiği dil: başlangıç şablonunun dilini ve danışan kaydolduğunda
+  // profiles.language'in başlangıç değerini belirler (bkz. migration 0065).
+  language: string;
 };
 
 export type WeightLog = { id: string; client_id: string; date: string; weight: number };
