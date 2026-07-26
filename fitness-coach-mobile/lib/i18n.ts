@@ -693,6 +693,24 @@ const tr: Dict = {
   'monthly_nutrition.no_food_yet': 'Henüz besin eklenmedi.',
   'monthly_nutrition.add_meal_btn': '+ Öğün Ekle',
   'monthly_nutrition.meal_name_placeholder': 'Ör. Kahvaltı',
+
+  'pr_chart.min_records_hint': 'Grafik için en az 2 kayıt gerekli.',
+
+  'set_card.reps_suffix': 'tekrar',
+  'set_card.target_prefix': 'Hedef: {{reps}} tekrar · {{kg}} kg',
+  'set_card.add_set_btn': '+ Set Ekle',
+  'set_card.last_time': 'Geçen sefer ({{date}}): {{count}} set · en ağır {{kg}} kg',
+  'set_card.hide': 'Gizle',
+  'set_card.more': '+{{count}} daha',
+
+  'meal_item_row.food_label': 'Besin',
+  'meal_item_row.suggestions': 'Öneriler',
+  'meal_item_row.pick_from_library': 'Kütüphaneden seç',
+  'meal_item_row.unit_label': 'Birim',
+  'meal_item_row.default_qty_label': 'Varsayılan Miktar',
+  'meal_item_row.protein_abbrev': 'P (g)',
+  'meal_item_row.carb_abbrev': 'K (g)',
+  'meal_item_row.fat_abbrev': 'Y (g)',
 };
 
 const en: Dict = {
@@ -1360,6 +1378,24 @@ const en: Dict = {
   'monthly_nutrition.no_food_yet': 'No food added yet.',
   'monthly_nutrition.add_meal_btn': '+ Add Meal',
   'monthly_nutrition.meal_name_placeholder': 'e.g. Breakfast',
+
+  'pr_chart.min_records_hint': 'At least 2 records are needed for the chart.',
+
+  'set_card.reps_suffix': 'reps',
+  'set_card.target_prefix': 'Target: {{reps}} reps · {{kg}} kg',
+  'set_card.add_set_btn': '+ Add Set',
+  'set_card.last_time': 'Last time ({{date}}): {{count}} sets · heaviest {{kg}} kg',
+  'set_card.hide': 'Hide',
+  'set_card.more': '+{{count}} more',
+
+  'meal_item_row.food_label': 'Food',
+  'meal_item_row.suggestions': 'Suggestions',
+  'meal_item_row.pick_from_library': 'Pick from library',
+  'meal_item_row.unit_label': 'Unit',
+  'meal_item_row.default_qty_label': 'Default Quantity',
+  'meal_item_row.protein_abbrev': 'P (g)',
+  'meal_item_row.carb_abbrev': 'C (g)',
+  'meal_item_row.fat_abbrev': 'F (g)',
 };
 
 const ar: Dict = {

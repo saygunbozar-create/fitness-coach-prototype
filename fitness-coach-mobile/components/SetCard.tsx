@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useT } from '../lib/i18n';
 import { C, nf } from '../lib/theme';
 import type { ExerciseSession, SetRow } from '../lib/queries';
 import type { WorkoutExercise } from '../lib/types';
@@ -31,6 +32,7 @@ export function SetCard({
   onRename: () => void;
   onDeleteExercise: () => void;
 }) {
+  const t = useT();
   const [showHistory, setShowHistory] = useState(false);
   const vol = exercise.sets.reduce((a, s) => a + s.repCount * s.kg, 0);
   const lastSession = history && history.length > 0 ? history[0] : null;
@@ -67,7 +69,7 @@ export function SetCard({
                   <Pressable disabled={readOnly} onPress={() => onAdjustTarget(s, 'rep', -1)} hitSlop={8}>
                     <Text style={[styles.miniBtn, readOnly && styles.miniBtnOff]}>−</Text>
                   </Pressable>
-                  <Text style={styles.miniVal}>{s.templateRepCount} tekrar</Text>
+                  <Text style={styles.miniVal}>{s.templateRepCount} {t('set_card.reps_suffix')}</Text>
                   <Pressable disabled={readOnly} onPress={() => onAdjustTarget(s, 'rep', 1)} hitSlop={8}>
                     <Text style={[styles.miniBtn, readOnly && styles.miniBtnOff]}>+</Text>
                   </Pressable>
@@ -91,7 +93,7 @@ export function SetCard({
                   <Pressable disabled={readOnly} onPress={() => onAdjustLog(s, 'rep', -1)} hitSlop={8}>
                     <Text style={[styles.miniBtn, readOnly && styles.miniBtnOff]}>−</Text>
                   </Pressable>
-                  <Text style={styles.miniVal}>{s.repCount} tekrar</Text>
+                  <Text style={styles.miniVal}>{s.repCount} {t('set_card.reps_suffix')}</Text>
                   <Pressable disabled={readOnly} onPress={() => onAdjustLog(s, 'rep', 1)} hitSlop={8}>
                     <Text style={[styles.miniBtn, readOnly && styles.miniBtnOff]}>+</Text>
                   </Pressable>
@@ -113,7 +115,7 @@ export function SetCard({
           </View>
           {!editMode && (
             <Text style={styles.hedefText}>
-              Hedef: {s.templateRepCount} tekrar · {nf(s.templateKg, 1)} kg
+              {t('set_card.target_prefix', { reps: s.templateRepCount, kg: nf(s.templateKg, 1) })}
             </Text>
           )}
         </View>
@@ -121,16 +123,16 @@ export function SetCard({
 
       {editMode && !readOnly && (
         <Pressable style={styles.addSet} onPress={onAddSet}>
-          <Text style={styles.addSetText}>+ Set Ekle</Text>
+          <Text style={styles.addSetText}>{t('set_card.add_set_btn')}</Text>
         </Pressable>
       )}
 
       {!editMode && lastSession && (
         <Pressable onPress={() => setShowHistory((v) => !v)} style={styles.lastRow}>
           <Text style={styles.lastText}>
-            Geçen sefer ({lastSession.date.slice(5)}): {lastSession.sets.length} set · en ağır {nf(bestKgLast, 1)} kg
+            {t('set_card.last_time', { date: lastSession.date.slice(5), count: lastSession.sets.length, kg: nf(bestKgLast, 1) })}
           </Text>
-          {history!.length > 1 && <Text style={styles.lastToggle}>{showHistory ? 'Gizle' : `+${history!.length - 1} daha`}</Text>}
+          {history!.length > 1 && <Text style={styles.lastToggle}>{showHistory ? t('set_card.hide') : t('set_card.more', { count: history!.length - 1 })}</Text>}
         </Pressable>
       )}
 

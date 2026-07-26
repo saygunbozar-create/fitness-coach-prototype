@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthField } from './AuthField';
+import { useT } from '../lib/i18n';
 import { C } from '../lib/theme';
 
 export type MealItemFormValue = {
@@ -32,6 +33,7 @@ export function MealItemEditRow({
   saving?: boolean;
   suggestions?: FoodSuggestion[];
 }) {
+  const t = useT();
   const [form, setForm] = useState<MealItemFormValue>(initial ?? empty);
 
   function num(s: string) {
@@ -48,10 +50,10 @@ export function MealItemEditRow({
 
   return (
     <View style={styles.card}>
-      <AuthField label="Besin" value={form.food} onChangeText={(v) => setForm((f) => ({ ...f, food: v }))} placeholder="Ör. Yulaf Ezmesi 60 g" />
+      <AuthField label={t('meal_item_row.food_label')} value={form.food} onChangeText={(v) => setForm((f) => ({ ...f, food: v }))} placeholder="Ör. Yulaf Ezmesi 60 g" />
       {matches.length > 0 && (
         <View style={styles.suggestBlock}>
-          <Text style={styles.suggestLabel}>{form.food.trim() ? 'Öneriler' : 'Kütüphaneden seç'}</Text>
+          <Text style={styles.suggestLabel}>{form.food.trim() ? t('meal_item_row.suggestions') : t('meal_item_row.pick_from_library')}</Text>
           <View style={styles.suggestRow}>
             {matches.map((s) => (
               <Pressable
@@ -67,11 +69,11 @@ export function MealItemEditRow({
       )}
       <View style={styles.row}>
         <View style={styles.half}>
-          <AuthField label="Birim" value={form.unit} onChangeText={(v) => setForm((f) => ({ ...f, unit: v }))} placeholder="porsiyon" />
+          <AuthField label={t('meal_item_row.unit_label')} value={form.unit} onChangeText={(v) => setForm((f) => ({ ...f, unit: v }))} placeholder="porsiyon" />
         </View>
         <View style={styles.half}>
           <AuthField
-            label="Varsayılan Miktar"
+            label={t('meal_item_row.default_qty_label')}
             value={String(form.default_qty)}
             onChangeText={(v) => setForm((f) => ({ ...f, default_qty: num(v) }))}
             keyboardType="decimal-pad"
@@ -83,13 +85,13 @@ export function MealItemEditRow({
           <AuthField label="kcal" value={String(form.kcal)} onChangeText={(v) => setForm((f) => ({ ...f, kcal: num(v) }))} keyboardType="decimal-pad" />
         </View>
         <View style={styles.quarter}>
-          <AuthField label="P (g)" value={String(form.p)} onChangeText={(v) => setForm((f) => ({ ...f, p: num(v) }))} keyboardType="decimal-pad" />
+          <AuthField label={t('meal_item_row.protein_abbrev')} value={String(form.p)} onChangeText={(v) => setForm((f) => ({ ...f, p: num(v) }))} keyboardType="decimal-pad" />
         </View>
         <View style={styles.quarter}>
-          <AuthField label="K (g)" value={String(form.k)} onChangeText={(v) => setForm((f) => ({ ...f, k: num(v) }))} keyboardType="decimal-pad" />
+          <AuthField label={t('meal_item_row.carb_abbrev')} value={String(form.k)} onChangeText={(v) => setForm((f) => ({ ...f, k: num(v) }))} keyboardType="decimal-pad" />
         </View>
         <View style={styles.quarter}>
-          <AuthField label="Y (g)" value={String(form.y)} onChangeText={(v) => setForm((f) => ({ ...f, y: num(v) }))} keyboardType="decimal-pad" />
+          <AuthField label={t('meal_item_row.fat_abbrev')} value={String(form.y)} onChangeText={(v) => setForm((f) => ({ ...f, y: num(v) }))} keyboardType="decimal-pad" />
         </View>
       </View>
       <View style={styles.actions}>
@@ -98,16 +100,16 @@ export function MealItemEditRow({
           onPress={() => onSave(form)}
           disabled={saving || !form.food.trim()}
         >
-          <Text style={[styles.actionText, { color: C.bg }]}>Kaydet</Text>
+          <Text style={[styles.actionText, { color: C.bg }]}>{t('common.save')}</Text>
         </Pressable>
         {onDelete && (
           <Pressable style={[styles.actionBtn, { backgroundColor: C.card }]} onPress={onDelete} disabled={saving}>
-            <Text style={[styles.actionText, { color: C.red }]}>Sil</Text>
+            <Text style={[styles.actionText, { color: C.red }]}>{t('common.delete')}</Text>
           </Pressable>
         )}
         {onCancel && (
           <Pressable style={[styles.actionBtn, { backgroundColor: C.card }]} onPress={onCancel} disabled={saving}>
-            <Text style={[styles.actionText, { color: C.grey }]}>Vazgeç</Text>
+            <Text style={[styles.actionText, { color: C.grey }]}>{t('common.cancel')}</Text>
           </Pressable>
         )}
       </View>

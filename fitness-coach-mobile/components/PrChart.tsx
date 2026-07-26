@@ -1,13 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
+import { useT } from '../lib/i18n';
 import { C, nf } from '../lib/theme';
 
 export function PrChart({ points, h = 140 }: { points: { date: string; weight: number }[]; h?: number }) {
+  const t = useT();
   const w = 320;
   if (points.length < 2) {
     return (
       <View style={[styles.empty, { height: h }]}>
-        <Text style={styles.emptyText}>Grafik için en az 2 kayıt gerekli.</Text>
+        <Text style={styles.emptyText}>{t('pr_chart.min_records_hint')}</Text>
       </View>
     );
   }
