@@ -5,6 +5,7 @@ import { MealItemEditRow } from './MealItemEditRow';
 import { Panel } from './Panel';
 import { PrimaryButton } from './PrimaryButton';
 import { showAlert } from '../lib/alert';
+import { useT } from '../lib/i18n';
 import {
   useAddMeal,
   useAddMealItem,
@@ -16,8 +17,9 @@ import {
 } from '../lib/queries';
 import { C, TR_MONTHS, TR_WEEKDAY_SHORT, daysInMonth, localDateStr, nf } from '../lib/theme';
 
-function onErr(title: string) {
-  return (e: any) => showAlert(title, e.message ?? 'Bir hata oluştu.');
+function useOnErr() {
+  const t = useT();
+  return (title: string) => (e: any) => showAlert(title, e.message ?? t('common.error'));
 }
 
 export function MonthlyNutritionPlan({
@@ -29,6 +31,8 @@ export function MonthlyNutritionPlan({
   isTrainer: boolean;
   trainerId?: string;
 }) {
+  const t = useT();
+  const onErr = useOnErr();
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
@@ -77,7 +81,7 @@ export function MonthlyNutritionPlan({
   }
 
   return (
-    <Panel title="Aylık Beslenme Planı" right={`${total} gün`}>
+    <Panel title={t('monthly_nutrition.title')} right={t('monthly_nutrition.days_count', { count: total })}>
       <View style={styles.monthNav}>
         <Pressable onPress={() => changeMonth(-1)} hitSlop={8}>
           <Text style={styles.monthNavText}>‹ {TR_MONTHS[(viewMonth + 11) % 12]}</Text>
@@ -112,18 +116,18 @@ export function MonthlyNutritionPlan({
               >
                 <View style={styles.dayNumBox}>
                   <Text style={[styles.dayNum, isToday && styles.dayNumToday]}>{day}</Text>
-                  <Text style={styles.dayWeekday}>{isToday ? 'Bugün' : weekday}</Text>
+                  <Text style={styles.dayWeekday}>{isToday ? t('monthly_nutrition.today') : weekday}</Text>
                 </View>
                 {meals.length === 0 ? (
-                  <Text style={styles.dayEmpty}>Plan girilmedi</Text>
+                  <Text style={styles.dayEmpty}>{t('monthly_nutrition.no_plan')}</Text>
                 ) : (
-                  <Text style={styles.daySummary}>{meals.length} öğün planlandı</Text>
+                  <Text style={styles.daySummary}>{t('monthly_nutrition.meals_planned', { count: meals.length })}</Text>
                 )}
                 <View style={{ flex: 1 }} />
                 {meals.length > 0 ? (
                   <Text style={styles.dayKcal}>{nf(dayTotals.kcal)} kcal</Text>
                 ) : isTrainer ? (
-                  <Text style={styles.dayAddHint}>+ Plan Yaz</Text>
+                  <Text style={styles.dayAddHint}>{t('monthly_nutrition.write_plan_hint')}</Text>
                 ) : null}
               </Pressable>
             );
@@ -134,9 +138,9 @@ export function MonthlyNutritionPlan({
               <Pressable style={styles.dayCardHeader} onPress={() => setExpandedDate(null)}>
                 <View style={styles.dayNumBox}>
                   <Text style={[styles.dayNum, isToday && styles.dayNumToday]}>{day}</Text>
-                  <Text style={styles.dayWeekday}>{isToday ? 'Bugün' : weekday}</Text>
+                  <Text style={styles.dayWeekday}>{isToday ? t('monthly_nutrition.today') : weekday}</Text>
                 </View>
-                <Text style={styles.dayCardTitle}>{weekday} planı</Text>
+                <Text style={styles.dayCardTitle}>{t('monthly_nutrition.day_plan_title', { weekday })}</Text>
                 <View style={{ flex: 1 }} />
                 <Text style={styles.dayKcal}>{nf(dayTotals.kcal)} kcal</Text>
               </Pressable>
@@ -145,15 +149,15 @@ export function MonthlyNutritionPlan({
                 <View style={styles.macroChips}>
                   <View style={styles.macroChip}>
                     <Text style={[styles.macroChipVal, { color: C.blue }]}>{nf(dayTotals.p)}g</Text>
-                    <Text style={styles.macroChipLabel}>Protein</Text>
+                    <Text style={styles.macroChipLabel}>{t('beslenme.protein_label')}</Text>
                   </View>
                   <View style={styles.macroChip}>
                     <Text style={[styles.macroChipVal, { color: C.orange }]}>{nf(dayTotals.k)}g</Text>
-                    <Text style={styles.macroChipLabel}>Karb.</Text>
+                    <Text style={styles.macroChipLabel}>{t('monthly_nutrition.carb_abbrev')}</Text>
                   </View>
                   <View style={styles.macroChip}>
                     <Text style={[styles.macroChipVal, { color: C.red }]}>{nf(dayTotals.y)}g</Text>
-                    <Text style={styles.macroChipLabel}>Yağ</Text>
+                    <Text style={styles.macroChipLabel}>{t('beslenme.fat_label')}</Text>
                   </View>
                 </View>
               )}
@@ -164,22 +168,22 @@ export function MonthlyNutritionPlan({
                     <Text style={styles.mealBlockTitle}>{m.name}</Text>
                     <Text style={styles.mealBlockKcal}>{nf(m.kcal)} kcal</Text>
                     {isTrainer && (
-                      <Pressable onPress={() => deleteMeal.mutate(m.id, { onError: onErr('Öğün silinemedi') })} hitSlop={8}>
-                        <Text style={styles.mealBlockDelete}>Sil</Text>
+                      <Pressable onPress={() => deleteMeal.mutate(m.id, { onError: onErr(t('beslenme.err_delete_meal')) })} hitSlop={8}>
+                        <Text style={styles.mealBlockDelete}>{t('common.delete')}</Text>
                       </Pressable>
                     )}
                   </View>
 
                   {m.items.length === 0 ? (
-                    <Text style={styles.mealEmptyText}>Henüz besin eklenmedi.</Text>
+                    <Text style={styles.mealEmptyText}>{t('monthly_nutrition.no_food_yet')}</Text>
                   ) : isTrainer ? (
                     m.items.map((it) => (
                       <MealItemEditRow
                         key={it.id}
                         initial={{ food: it.food, unit: it.unit, kcal: it.kcal, p: it.p, k: it.k, y: it.y, default_qty: it.default_qty }}
                         saving={updateMealItem.isPending || deleteMealItem.isPending}
-                        onSave={(v) => updateMealItem.mutate({ id: it.id, ...v }, { onError: onErr('Kaydedilemedi') })}
-                        onDelete={() => deleteMealItem.mutate(it.id, { onError: onErr('Silinemedi') })}
+                        onSave={(v) => updateMealItem.mutate({ id: it.id, ...v }, { onError: onErr(t('antrenman.err_save_title')) })}
+                        onDelete={() => deleteMealItem.mutate(it.id, { onError: onErr(t('common.delete_failed_title')) })}
                       />
                     ))
                   ) : (
@@ -197,14 +201,14 @@ export function MonthlyNutritionPlan({
                         onSave={(v) =>
                           addMealItem.mutate(
                             { meal_id: m.id, sort_order: m.items.length, ...v },
-                            { onSuccess: () => setAddingItemForMeal(null), onError: onErr('Besin eklenemedi') }
+                            { onSuccess: () => setAddingItemForMeal(null), onError: onErr(t('beslenme.err_add_food')) }
                           )
                         }
                         onCancel={() => setAddingItemForMeal(null)}
                       />
                     ) : (
                       <Pressable style={styles.addItemBtn} onPress={() => setAddingItemForMeal(m.id)}>
-                        <Text style={styles.addItemText}>+ Besin Ekle</Text>
+                        <Text style={styles.addItemText}>{t('beslenme.add_item_btn')}</Text>
                       </Pressable>
                     ))}
                 </View>
@@ -212,21 +216,21 @@ export function MonthlyNutritionPlan({
 
               {isTrainer && !addingMeal && (
                 <Pressable style={styles.addMealBtn} onPress={() => setAddingMeal(true)}>
-                  <Text style={styles.addMealText}>+ Öğün Ekle</Text>
+                  <Text style={styles.addMealText}>{t('monthly_nutrition.add_meal_btn')}</Text>
                 </Pressable>
               )}
 
               {isTrainer && addingMeal && (
                 <View style={styles.addMealCard}>
-                  <AuthField label="Öğün Adı" value={newMealName} onChangeText={setNewMealName} placeholder="Ör. Kahvaltı" />
+                  <AuthField label={t('beslenme.meal_name_label')} value={newMealName} onChangeText={setNewMealName} placeholder={t('monthly_nutrition.meal_name_placeholder')} />
                   <PrimaryButton
-                    label="Öğün Ekle"
+                    label={t('beslenme.add_meal_confirm_btn')}
                     loading={addMeal.isPending}
                     disabled={!newMealName.trim()}
                     onPress={() =>
                       addMeal.mutate(
                         { name: newMealName.trim(), sort_order: meals.length, plan_date: date },
-                        { onSuccess: () => { setNewMealName(''); setAddingMeal(false); }, onError: onErr('Öğün eklenemedi') }
+                        { onSuccess: () => { setNewMealName(''); setAddingMeal(false); }, onError: onErr(t('beslenme.err_add_meal')) }
                       )
                     }
                   />

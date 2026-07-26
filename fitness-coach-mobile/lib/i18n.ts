@@ -681,6 +681,18 @@ const tr: Dict = {
   'lesson_book.edit_note_btn': '✎ Notu Düzenle',
   'lesson_book.add_note_btn': '+ Not Ekle',
   'lesson_book.mark_done_client': 'Uygulandı',
+
+  'monthly_nutrition.title': 'Aylık Beslenme Planı',
+  'monthly_nutrition.days_count': '{{count}} gün',
+  'monthly_nutrition.today': 'Bugün',
+  'monthly_nutrition.no_plan': 'Plan girilmedi',
+  'monthly_nutrition.meals_planned': '{{count}} öğün planlandı',
+  'monthly_nutrition.write_plan_hint': '+ Plan Yaz',
+  'monthly_nutrition.day_plan_title': '{{weekday}} planı',
+  'monthly_nutrition.carb_abbrev': 'Karb.',
+  'monthly_nutrition.no_food_yet': 'Henüz besin eklenmedi.',
+  'monthly_nutrition.add_meal_btn': '+ Öğün Ekle',
+  'monthly_nutrition.meal_name_placeholder': 'Ör. Kahvaltı',
 };
 
 const en: Dict = {
@@ -1336,6 +1348,18 @@ const en: Dict = {
   'lesson_book.edit_note_btn': '✎ Edit Note',
   'lesson_book.add_note_btn': '+ Add Note',
   'lesson_book.mark_done_client': 'Done',
+
+  'monthly_nutrition.title': 'Monthly Nutrition Plan',
+  'monthly_nutrition.days_count': '{{count}} days',
+  'monthly_nutrition.today': 'Today',
+  'monthly_nutrition.no_plan': 'No plan entered',
+  'monthly_nutrition.meals_planned': '{{count}} meal(s) planned',
+  'monthly_nutrition.write_plan_hint': '+ Write Plan',
+  'monthly_nutrition.day_plan_title': '{{weekday}} plan',
+  'monthly_nutrition.carb_abbrev': 'Carb',
+  'monthly_nutrition.no_food_yet': 'No food added yet.',
+  'monthly_nutrition.add_meal_btn': '+ Add Meal',
+  'monthly_nutrition.meal_name_placeholder': 'e.g. Breakfast',
 };
 
 const ar: Dict = {
