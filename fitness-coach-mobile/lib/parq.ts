@@ -1,14 +1,17 @@
-// PAR-Q (Physical Activity Readiness Questionnaire) standart 7 sorusunun Türkçe çevirisi.
-// Feragatname metni bir taslaktır — yayına almadan önce eğitmenin gözden geçirip onaylaması gerekir
-// (KVKK/Gizlilik/Kullanım Şartları metinlerinde izlenen aynı yöntem).
-export const PARQ_QUESTIONS: { key: string; text: string }[] = [
-  { key: 'q1', text: 'Doktorunuz size kalple ilgili bir rahatsızlığınız olduğunu ve sadece doktor önerdiği fiziksel aktiviteyi yapmanız gerektiğini hiç söyledi mi?' },
-  { key: 'q2', text: 'Fiziksel aktivite yaparken göğsünüzde ağrı hissediyor musunuz?' },
-  { key: 'q3', text: 'Geçtiğimiz bir ay içinde, fiziksel aktivite yapmadığınız zamanlarda göğüs ağrınız oldu mu?' },
-  { key: 'q4', text: 'Baş dönmesi nedeniyle dengenizi kaybediyor musunuz ya da hiç bilincinizi kaybettiniz mi?' },
-  { key: 'q5', text: 'Fiziksel aktiviteyle kötüleşebilecek bir kemik veya eklem probleminiz (ör. sırt, diz, kalça, omuz) var mı?' },
-  { key: 'q6', text: 'Doktorunuz şu anda kalp veya tansiyon için size ilaç veriyor mu?' },
-  { key: 'q7', text: 'Fiziksel aktivite yapmamanız gerektiğini düşündüren başka bir sağlık nedeni biliyor musunuz?' },
+// PAR-Q (Physical Activity Readiness Questionnaire) standart 7 sorusu — metinleri lib/i18n.ts'te
+// parq.q1..q7 anahtarları altında TR/EN olarak tutuluyor (standart, uluslararası sağlık taraması
+// soruları olduğu için çevrildi). Feragatname metni (WAIVER_TEXT) BİLEREK ÇEVRİLMEDİ — bu bir
+// hukuki sorumluluk reddi taslağı, KVKK/Gizlilik/Kullanım Şartları ile aynı kategoride; yayına
+// almadan önce eğitmenin gözden geçirip onaylaması ve olası bir çevirinin de ayrıca onaylanması
+// gerekir.
+export const PARQ_QUESTIONS: { key: string; textKey: string }[] = [
+  { key: 'q1', textKey: 'parq.q1' },
+  { key: 'q2', textKey: 'parq.q2' },
+  { key: 'q3', textKey: 'parq.q3' },
+  { key: 'q4', textKey: 'parq.q4' },
+  { key: 'q5', textKey: 'parq.q5' },
+  { key: 'q6', textKey: 'parq.q6' },
+  { key: 'q7', textKey: 'parq.q7' },
 ];
 
 export const WAIVER_TEXT =

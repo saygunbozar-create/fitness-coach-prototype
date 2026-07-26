@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { useT } from '../lib/i18n';
 import { useAcceptConsent } from '../lib/queries';
 import { C } from '../lib/theme';
 import { ConsentCheckbox } from './ConsentCheckbox';
@@ -8,6 +9,7 @@ import { ConsentCheckbox } from './ConsentCheckbox';
 // Bu hesap, KVKK onay kutusu uygulamaya eklenmeden (22 Temmuz 2026) önce oluşturulmuş —
 // yani onay kaydı hiç alınmamış. Devam edebilmek için geriye dönük olarak burada isteniyor.
 export function ConsentGate({ profileId }: { profileId: string }) {
+  const t = useT();
   const { signOut, refreshProfile } = useAuth();
   const [checked, setChecked] = useState(false);
   const acceptConsent = useAcceptConsent(profileId);
@@ -20,13 +22,12 @@ export function ConsentGate({ profileId }: { profileId: string }) {
   return (
     <View style={styles.wrap}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Gizlilik onayı gerekiyor</Text>
+        <Text style={styles.title}>{t('consent_gate.title')}</Text>
         <Text style={styles.body}>
-          Hesabın, aşağıdaki metinler uygulamaya eklenmeden önce oluşturulmuş. Devam edebilmek için okuyup
-          onaylaman gerekiyor.
+          {t('consent_gate.body')}
         </Text>
         <ConsentCheckbox checked={checked} onToggle={() => setChecked((v) => !v)} />
-        {acceptConsent.isError ? <Text style={styles.error}>Bir şeyler ters gitti, tekrar dener misin?</Text> : null}
+        {acceptConsent.isError ? <Text style={styles.error}>{t('consent_gate.err')}</Text> : null}
         <Pressable
           style={[styles.button, (!checked || acceptConsent.isPending) && styles.buttonDisabled]}
           onPress={handleAccept}
@@ -35,11 +36,11 @@ export function ConsentGate({ profileId }: { profileId: string }) {
           {acceptConsent.isPending ? (
             <ActivityIndicator color={C.bg} />
           ) : (
-            <Text style={styles.buttonText}>Kabul Ediyorum, Devam Et</Text>
+            <Text style={styles.buttonText}>{t('consent_gate.accept_btn')}</Text>
           )}
         </Pressable>
         <Pressable onPress={signOut} hitSlop={10} style={styles.signOutRow}>
-          <Text style={styles.signOutLink}>Çıkış yap</Text>
+          <Text style={styles.signOutLink}>{t('consent_gate.sign_out')}</Text>
         </Pressable>
       </ScrollView>
     </View>

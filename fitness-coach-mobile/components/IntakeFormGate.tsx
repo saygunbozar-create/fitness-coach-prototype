@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { useT } from '../lib/i18n';
 import { PARQ_QUESTIONS, WAIVER_TEXT } from '../lib/parq';
 import { useSubmitIntakeForm } from '../lib/queries';
 import { C } from '../lib/theme';
 
 export function IntakeFormGate({ clientId }: { clientId: string }) {
+  const t = useT();
   const { signOut, profile } = useAuth();
   const [answers, setAnswers] = useState<Record<string, boolean | null>>({});
   const [healthNotes, setHealthNotes] = useState('');
@@ -28,60 +30,59 @@ export function IntakeFormGate({ clientId }: { clientId: string }) {
   return (
     <View style={styles.wrap}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Sağlık Formu</Text>
+        <Text style={styles.title}>{t('danisan.health_form_title')}</Text>
         <Text style={styles.body}>
-          Antrenmana başlamadan önce birkaç sağlık sorusunu yanıtlaman ve feragatnameyi onaylaman gerekiyor. Bu bilgiler
-          sadece antrenörünle paylaşılır.
+          {t('intake_gate.body')}
         </Text>
 
         {PARQ_QUESTIONS.map((q) => (
           <View key={q.key} style={styles.question}>
-            <Text style={styles.questionText}>{q.text}</Text>
+            <Text style={styles.questionText}>{t(q.textKey)}</Text>
             <View style={styles.answerRow}>
               <Pressable
                 style={[styles.answerBtn, answers[q.key] === true && styles.answerBtnActive]}
                 onPress={() => setAnswers((a) => ({ ...a, [q.key]: true }))}
               >
-                <Text style={[styles.answerBtnText, answers[q.key] === true && styles.answerBtnTextActive]}>Evet</Text>
+                <Text style={[styles.answerBtnText, answers[q.key] === true && styles.answerBtnTextActive]}>{t('intake_gate.yes')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.answerBtn, answers[q.key] === false && styles.answerBtnActive]}
                 onPress={() => setAnswers((a) => ({ ...a, [q.key]: false }))}
               >
-                <Text style={[styles.answerBtnText, answers[q.key] === false && styles.answerBtnTextActive]}>Hayır</Text>
+                <Text style={[styles.answerBtnText, answers[q.key] === false && styles.answerBtnTextActive]}>{t('intake_gate.no')}</Text>
               </Pressable>
             </View>
           </View>
         ))}
 
-        <Text style={styles.label}>Eklemek istediğin bir sağlık notu var mı? (opsiyonel)</Text>
+        <Text style={styles.label}>{t('intake_gate.health_note_label')}</Text>
         <TextInput
           style={styles.textarea}
           value={healthNotes}
           onChangeText={setHealthNotes}
-          placeholder="Örn. geçirdiğin bir ameliyat, kronik bir rahatsızlık..."
+          placeholder={t('intake_gate.health_note_placeholder')}
           placeholderTextColor={C.greyD}
           multiline
         />
 
-        <Text style={styles.waiverTitle}>Sorumluluk Feragatnamesi</Text>
+        <Text style={styles.waiverTitle}>{t('intake_gate.waiver_title')}</Text>
         <Text style={styles.waiverText}>{WAIVER_TEXT}</Text>
 
-        <Text style={styles.label}>E-imza olarak ad soyadını yaz</Text>
+        <Text style={styles.label}>{t('intake_gate.signature_label')}</Text>
         <TextInput style={styles.input} value={signatureName} onChangeText={setSignatureName} placeholder="Ad Soyad" placeholderTextColor={C.greyD} />
 
         <Pressable style={styles.checkRow} onPress={() => setWaiverChecked((v) => !v)} hitSlop={8}>
           <View style={[styles.checkbox, waiverChecked && styles.checkboxOn]}>{waiverChecked ? <Text style={styles.checkMark}>✓</Text> : null}</View>
-          <Text style={styles.checkLabel}>Yukarıdaki feragatnameyi okudum, kabul ediyorum.</Text>
+          <Text style={styles.checkLabel}>{t('intake_gate.waiver_checkbox_label')}</Text>
         </Pressable>
 
-        {submit.isError ? <Text style={styles.error}>Bir şeyler ters gitti, tekrar dener misin?</Text> : null}
+        {submit.isError ? <Text style={styles.error}>{t('consent_gate.err')}</Text> : null}
 
         <Pressable style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={!canSubmit || submit.isPending}>
-          {submit.isPending ? <ActivityIndicator color={C.bg} /> : <Text style={styles.submitBtnText}>Gönder ve Devam Et</Text>}
+          {submit.isPending ? <ActivityIndicator color={C.bg} /> : <Text style={styles.submitBtnText}>{t('intake_gate.submit_btn')}</Text>}
         </Pressable>
         <Pressable onPress={signOut} hitSlop={10} style={styles.signOutRow}>
-          <Text style={styles.signOutLink}>Çıkış yap</Text>
+          <Text style={styles.signOutLink}>{t('consent_gate.sign_out')}</Text>
         </Pressable>
       </ScrollView>
     </View>

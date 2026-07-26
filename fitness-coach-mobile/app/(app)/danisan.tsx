@@ -40,7 +40,7 @@ function IntakeFormSummary({ clientId }: { clientId: string }) {
           <Text style={styles.formWarning}>{t('danisan.health_form_flagged', { count: flagged.length })}</Text>
           {flagged.map((q) => (
             <Text key={q.key} style={styles.formFlaggedItem}>
-              · {q.text}
+              · {t(q.textKey)}
             </Text>
           ))}
         </>

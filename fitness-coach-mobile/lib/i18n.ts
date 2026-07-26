@@ -628,6 +628,32 @@ const tr: Dict = {
   'consent.agree_prefix': 'Okudum ve kabul ediyorum:',
   'consent.and': 've',
   'consent.agree_suffix_tr': "'nı okudum, kabul ediyorum.",
+
+  'consent_gate.title': 'Gizlilik onayı gerekiyor',
+  'consent_gate.body':
+    'Hesabın, aşağıdaki metinler uygulamaya eklenmeden önce oluşturulmuş. Devam edebilmek için okuyup onaylaman gerekiyor.',
+  'consent_gate.err': 'Bir şeyler ters gitti, tekrar dener misin?',
+  'consent_gate.accept_btn': 'Kabul Ediyorum, Devam Et',
+  'consent_gate.sign_out': 'Çıkış yap',
+
+  'intake_gate.body':
+    'Antrenmana başlamadan önce birkaç sağlık sorusunu yanıtlaman ve feragatnameyi onaylaman gerekiyor. Bu bilgiler sadece antrenörünle paylaşılır.',
+  'intake_gate.yes': 'Evet',
+  'intake_gate.no': 'Hayır',
+  'intake_gate.health_note_label': 'Eklemek istediğin bir sağlık notu var mı? (opsiyonel)',
+  'intake_gate.health_note_placeholder': 'Örn. geçirdiğin bir ameliyat, kronik bir rahatsızlık...',
+  'intake_gate.waiver_title': 'Sorumluluk Feragatnamesi',
+  'intake_gate.signature_label': 'E-imza olarak ad soyadını yaz',
+  'intake_gate.waiver_checkbox_label': 'Yukarıdaki feragatnameyi okudum, kabul ediyorum.',
+  'intake_gate.submit_btn': 'Gönder ve Devam Et',
+
+  'parq.q1': 'Doktorunuz size kalple ilgili bir rahatsızlığınız olduğunu ve sadece doktor önerdiği fiziksel aktiviteyi yapmanız gerektiğini hiç söyledi mi?',
+  'parq.q2': 'Fiziksel aktivite yaparken göğsünüzde ağrı hissediyor musunuz?',
+  'parq.q3': 'Geçtiğimiz bir ay içinde, fiziksel aktivite yapmadığınız zamanlarda göğüs ağrınız oldu mu?',
+  'parq.q4': 'Baş dönmesi nedeniyle dengenizi kaybediyor musunuz ya da hiç bilincinizi kaybettiniz mi?',
+  'parq.q5': 'Fiziksel aktiviteyle kötüleşebilecek bir kemik veya eklem probleminiz (ör. sırt, diz, kalça, omuz) var mı?',
+  'parq.q6': 'Doktorunuz şu anda kalp veya tansiyon için size ilaç veriyor mu?',
+  'parq.q7': 'Fiziksel aktivite yapmamanız gerektiğini düşündüren başka bir sağlık nedeni biliyor musunuz?',
 };
 
 const en: Dict = {
@@ -1230,6 +1256,32 @@ const en: Dict = {
   'consent.agree_prefix': 'I have read and agree to the',
   'consent.and': 'and',
   'consent.agree_suffix_tr': '.',
+
+  'consent_gate.title': 'Privacy consent required',
+  'consent_gate.body':
+    'Your account was created before these terms were added to the app. To continue, you need to read and accept them.',
+  'consent_gate.err': 'Something went wrong — want to try again?',
+  'consent_gate.accept_btn': 'I Accept, Continue',
+  'consent_gate.sign_out': 'Log out',
+
+  'intake_gate.body':
+    'Before starting your training, you need to answer a few health questions and accept the waiver. This information is shared only with your trainer.',
+  'intake_gate.yes': 'Yes',
+  'intake_gate.no': 'No',
+  'intake_gate.health_note_label': "Any health note you'd like to add? (optional)",
+  'intake_gate.health_note_placeholder': 'e.g. a past surgery, a chronic condition...',
+  'intake_gate.waiver_title': 'Liability Waiver',
+  'intake_gate.signature_label': 'Type your full name as your e-signature',
+  'intake_gate.waiver_checkbox_label': 'I have read and agree to the waiver above.',
+  'intake_gate.submit_btn': 'Submit and Continue',
+
+  'parq.q1': 'Has your doctor ever told you that you have a heart condition and that you should only do physical activity recommended by a doctor?',
+  'parq.q2': 'Do you feel pain in your chest when you do physical activity?',
+  'parq.q3': 'In the past month, have you had chest pain when you were not doing physical activity?',
+  'parq.q4': 'Do you lose your balance because of dizziness or have you ever lost consciousness?',
+  'parq.q5': 'Do you have a bone or joint problem (e.g. back, knee, hip, shoulder) that could be made worse by physical activity?',
+  'parq.q6': 'Is your doctor currently prescribing medication for your heart or blood pressure?',
+  'parq.q7': 'Do you know of any other reason why you should not do physical activity?',
 };
 
 const ar: Dict = {
