@@ -22,6 +22,25 @@ const tags = `    <meta name="description" content="Antrenör ve danışanların
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Coachbook" />
+    <style>
+      /* Mobilde istenmeyen yakınlaşmayı engelle. Üç ayrı davranış var, üçü de ayrı ayrı kapatılmalı: */
+
+      /* 1) Çift dokunuşla yakınlaştırma. */
+      html, body { touch-action: manipulation; }
+
+      /* 2) Yatay çevirince iOS'un metni otomatik büyütmesi. */
+      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+      /* 3) EN ÖNEMLİSİ: iOS'ta bir metin alanına dokununca sayfanın kendiliğinden yakınlaşması.
+         iOS bunu SADECE yazı boyutu 16px'in altındaysa yapar ve viewport'taki user-scalable=no
+         ayarını (iOS 10'dan beri, erişilebilirlik gerekçesiyle) yok sayar — yani tek gerçek
+         çözüm alanların yazı boyutunu 16px'e çıkarmak. Uygulamanın kendi tasarımı 14px; bu
+         kural sadece dokunmatik cihazlarda geçerli, masaüstü görünümü değişmiyor.
+         RNW kendi sınıflarıyla inline boyut verdiği için !important gerekiyor. */
+      @media (hover: none) and (pointer: coarse) {
+        input, textarea, select { font-size: 16px !important; }
+      }
+    </style>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
@@ -30,6 +49,22 @@ const tags = `    <meta name="description" content="Antrenör ve danışanların
       }
     </script>
 `;
+
+// Expo'nun ürettiği viewport etiketi yakınlaştırmaya izin veriyor; onu kilitli sürümle
+// DEĞİŞTİRİYORUZ (ikinci bir viewport etiketi eklemek yerine — iki etiket olduğunda hangisinin
+// kazandığı tarayıcıya göre değişir). viewport-fit=cover, çentikli ekranlarda güvenli alan
+// hesabının doğru çalışması için (uygulama zaten useSafeAreaInsets kullanıyor).
+const LOCKED_VIEWPORT =
+  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />';
+
+const viewportRe = /<meta\s+name="viewport"[^>]*>/i;
+if (viewportRe.test(html)) {
+  html = html.replace(viewportRe, LOCKED_VIEWPORT);
+  console.log('[inject-pwa-head] viewport etiketi yakınlaşmayı engelleyecek şekilde değiştirildi.');
+} else {
+  html = html.replace('<head>', '<head>\n    ' + LOCKED_VIEWPORT);
+  console.log('[inject-pwa-head] viewport etiketi bulunamadı, yenisi eklendi.');
+}
 
 html = html.replace('</head>', tags + '</head>');
 fs.writeFileSync(indexPath, html);

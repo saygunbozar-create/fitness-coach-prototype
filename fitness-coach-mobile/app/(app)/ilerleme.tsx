@@ -16,6 +16,7 @@ import { useAuth } from '../../lib/auth';
 import { useT } from '../../lib/i18n';
 import {
   useAddInjuryLog,
+  useCardioLogForDate,
   useCardioLogs,
   useClient,
   useDeleteInjuryLog,
@@ -108,36 +109,26 @@ export default function IlerlemeScreen() {
   });
   const [measureDateInput, setMeasureDateInput] = useState('');
   const [cardioDraft, setCardioDraft] = useState({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
+  const [cardioDateInput, setCardioDateInput] = useState('');
   const [injuryDraft, setInjuryDraft] = useState({ body_part: '', severity: 3, note: '' });
   const [viewingPhoto, setViewingPhoto] = useState<{ url: string | null; date: string } | null>(null);
 
   // Boş tarih alanı = bugün, doluysa girilen (geçmişe dönük olabilir) tarih.
   const weightDateIso = weightDateInput.trim() ? parseTrDate(weightDateInput) : localDateStr();
   const measureDateIso = measureDateInput.trim() ? parseTrDate(measureDateInput) : localDateStr();
+  const cardioDateIso = cardioDateInput.trim() ? parseTrDate(cardioDateInput) : localDateStr();
 
   // Kardiyo/Ölçüm/Kilo kayıtları client_id+date üzerinden upsert ediliyor (o günün TÜM satırını
   // değiştiriyor) — form boş bir alanla açılıp öyle kaydedilirse, o tarihte zaten girilmiş diğer
   // alanlar sessizce 0'a düşerdi. Seçili tarihe ait bir kayıt varsa formu onunla dolduruyoruz,
   // böylece sadece değiştirilen alan güncellenmiş, diğerleri korunmuş olur. Bu artık SADECE
   // bugün için değil, geçmişe dönük seçilen herhangi bir tarih için de çalışıyor.
-  const todayCardio = (cardioQuery.data ?? []).find((c) => c.date === localDateStr());
+  // cardioQuery sadece son 7 günü kapsıyor (grafik için) — form geçmişe dönük herhangi bir tarihe
+  // ayarlanabildiği için o tarihi noktasal olarak ayrıca sorguluyoruz.
+  const cardioForDateQuery = useCardioLogForDate(selectedClientId ?? undefined, cardioDateIso ?? undefined);
+  const selectedCardio = cardioForDateQuery.data ?? undefined;
   const selectedMeasurement = measureDateIso ? (measurementsQuery.data ?? []).find((m) => m.date === measureDateIso) : undefined;
   const selectedWeightLog = weightDateIso ? (weightLogsQuery.data ?? []).find((w) => w.date === weightDateIso) : undefined;
-
-  useEffect(() => {
-    if (todayCardio) {
-      setCardioDraft({
-        cardio_type: todayCardio.cardio_type ?? '',
-        duration_minutes: todayCardio.duration_minutes ? String(todayCardio.duration_minutes) : '',
-        distance_km: todayCardio.distance_km ? String(todayCardio.distance_km) : '',
-        steps: todayCardio.steps ? String(todayCardio.steps) : '',
-        calories: todayCardio.calories ? String(todayCardio.calories) : '',
-      });
-    } else {
-      setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayCardio?.date, selectedClientId]);
 
   // Ölçüm/kilo formunun önizlemesi iki farklı durumu AYIRIYOR:
   //  • Danışan değişti  → formu sıfırla + tarih alanını boşalt (bugüne dön). Aksi halde önceki
@@ -182,6 +173,30 @@ export default function IlerlemeScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weightDateIso, selectedWeightLog?.date, selectedClientId]);
+
+  // Kardiyo formu da artık geçmişe dönük tarih kabul ediyor — yukarıdaki ölçüm/kilo mantığının
+  // aynısı. Upsert client_id+date üzerinden çalıştığı için, seçili tarihte kayıt varsa formu
+  // onunla dolduruyoruz; aksi halde sadece adımı girip kaydetmek o günün mesafe/kalori
+  // değerlerini sessizce 0'a düşürürdü.
+  const prevClientCardioRef = useRef(selectedClientId);
+  useEffect(() => {
+    const clientSwitched = prevClientCardioRef.current !== selectedClientId;
+    prevClientCardioRef.current = selectedClientId;
+    if (cardioDateInput.trim() && !cardioDateIso) return;
+    if (selectedCardio) {
+      setCardioDraft({
+        cardio_type: selectedCardio.cardio_type ?? '',
+        duration_minutes: selectedCardio.duration_minutes ? String(selectedCardio.duration_minutes) : '',
+        distance_km: selectedCardio.distance_km ? String(selectedCardio.distance_km) : '',
+        steps: selectedCardio.steps ? String(selectedCardio.steps) : '',
+        calories: selectedCardio.calories ? String(selectedCardio.calories) : '',
+      });
+    } else if (clientSwitched) {
+      setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' });
+      setCardioDateInput('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardioDateIso, selectedCardio?.date, selectedClientId]);
 
   const client = clientQuery.data;
 
@@ -456,6 +471,15 @@ export default function IlerlemeScreen() {
             <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
+          <AuthField
+            label={t('ilerleme.date_empty_today')}
+            value={cardioDateInput}
+            onChangeText={(v) => setCardioDateInput((prev) => formatDateInputTr(v, prev))}
+            placeholder="GG.AA.YYYY"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          {cardioDateInput.trim() && !cardioDateIso && <Text style={styles.dateError}>{t('ilerleme.date_format_err')}</Text>}
           <View style={styles.formGrid}>
             <View style={styles.measureFormItem}>
               <AuthField
@@ -506,17 +530,19 @@ export default function IlerlemeScreen() {
             label={t('ilerleme.save_cardio_btn')}
             loading={logCardio.isPending}
             disabled={
-              !cardioDraft.cardio_type.trim() &&
-              !cardioDraft.duration_minutes &&
-              !cardioDraft.distance_km &&
-              !cardioDraft.steps &&
-              !cardioDraft.calories
+              (!cardioDraft.cardio_type.trim() &&
+                !cardioDraft.duration_minutes &&
+                !cardioDraft.distance_km &&
+                !cardioDraft.steps &&
+                !cardioDraft.calories) ||
+              (!!cardioDateInput.trim() && !cardioDateIso)
             }
             onPress={() => {
               if (!selectedClientId) {
                 showAlert(t('beslenme.wait_title'), t('beslenme.client_not_loaded'));
                 return;
               }
+              if (!cardioDateIso) return;
               const n = (s: string) => parseFloat(s.replace(',', '.')) || 0;
               logCardio.mutate(
                 {
@@ -525,9 +551,13 @@ export default function IlerlemeScreen() {
                   distance_km: n(cardioDraft.distance_km),
                   steps: Math.round(n(cardioDraft.steps)),
                   calories: n(cardioDraft.calories),
+                  date: cardioDateIso,
                 },
                 {
-                  onSuccess: () => setCardioDraft({ cardio_type: '', duration_minutes: '', distance_km: '', steps: '', calories: '' }),
+                  // Formu BİLEREK boşaltmıyoruz (Ölçüm formundaki davranışın aynısı): bu bir
+                  // upsert, kaydedilen değerlerin ekranda kalması doğru geri bildirim. Ayrıca
+                  // boşaltmak, yukarıdaki hidrasyon efekti kaydı yeniden yükleyince titremeye
+                  // yol açardı.
                   onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('ilerleme.err_cardio_save')),
                 }
               );

@@ -1794,17 +1794,46 @@ export function useCardioLogs(clientId: string | undefined, days = 7) {
   });
 }
 
+// Seçili tarihe ait TEK kardiyo kaydı. useCardioLogs bilerek sadece son 7 günü çekiyor (üstteki
+// grafik ve "Ort. N adım" bunun üzerine kurulu) — İlerleme ekranındaki kardiyo formu geçmişe dönük
+// bir tarihe ayarlandığında o günün mevcut kaydını göremezdi ve kaydetme upsert'i (client_id+date)
+// o günün diğer alanlarını sessizce 0'a düşürürdü. Kilo/Ölçüm sorguları tüm geçmişi çektiği için
+// onlarda bu sorun yok; kardiyoda formu doldurmak için bu noktasal sorguyu kullanıyoruz.
+export function useCardioLogForDate(clientId: string | undefined, date: string | undefined) {
+  return useQuery({
+    queryKey: ['cardio_log_for_date', clientId, date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cardio_logs')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('date', date)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as CardioLog | null) ?? null;
+    },
+    enabled: !!clientId && !!date,
+  });
+}
+
 export function useLogCardio(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { cardio_type: string; duration_minutes: number; distance_km: number; steps: number; calories: number }) => {
+    mutationFn: async (
+      input: { cardio_type: string; duration_minutes: number; distance_km: number; steps: number; calories: number; date?: string }
+    ) => {
       if (!clientId) throw new Error('clientId eksik');
+      // Tarih verilmezse bugün — Kilo/Ölçüm formlarındaki "boş = bugün" davranışının aynısı.
+      const { date, ...rest } = input;
       const { error } = await supabase
         .from('cardio_logs')
-        .upsert({ client_id: clientId, date: todayStr(), ...input }, { onConflict: 'client_id,date' });
+        .upsert({ client_id: clientId, date: date ?? todayStr(), ...rest }, { onConflict: 'client_id,date' });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] });
+      qc.invalidateQueries({ queryKey: ['cardio_log_for_date', clientId] });
+    },
   });
 }
 
@@ -1815,7 +1844,10 @@ export function useDeleteCardioLog(clientId: string | undefined) {
       const { error } = await supabase.from('cardio_logs').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cardio_logs', clientId] });
+      qc.invalidateQueries({ queryKey: ['cardio_log_for_date', clientId] });
+    },
   });
 }
 

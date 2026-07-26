@@ -427,7 +427,7 @@ const tr: Dict = {
   'ilerleme.duration_label': 'Süre (dk)',
   'ilerleme.distance_label': 'Mesafe (km)',
   'ilerleme.calories_label': 'Kalori',
-  'ilerleme.save_cardio_btn': 'Bugünün kardiyosunu kaydet',
+  'ilerleme.save_cardio_btn': 'Kardiyoyu Kaydet',
   'ilerleme.err_cardio_save': 'Kardiyo kaydı kaydedilemedi.',
 
   'ilerleme.measurements_title': 'Ölçümler',
@@ -1116,7 +1116,7 @@ const en: Dict = {
   'ilerleme.duration_label': 'Duration (min)',
   'ilerleme.distance_label': 'Distance (km)',
   'ilerleme.calories_label': 'Calories',
-  'ilerleme.save_cardio_btn': "Save today's cardio",
+  'ilerleme.save_cardio_btn': 'Save Cardio',
   'ilerleme.err_cardio_save': 'Could not save the cardio record.',
 
   'ilerleme.measurements_title': 'Measurements',
