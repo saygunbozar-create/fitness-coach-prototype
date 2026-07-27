@@ -23,6 +23,11 @@ const tags = `    <meta name="description" content="Antrenör ve danışanların
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Coachbook" />
     <style>
+      /* Sayfanın kendi (uygulama dışı) zemini de koyu olsun. Aksi halde içerik viewport'u tam
+         doldurmadığında ya da aşırı kaydırma (overscroll) sırasında altta/üstte beyaz şerit
+         görünüyor — telefonda tam olarak bu yaşandı. */
+      html, body, #root { background-color: #0B0D12; }
+
       /* Mobilde istenmeyen yakınlaşmayı engelle. Üç ayrı davranış var, üçü de ayrı ayrı kapatılmalı: */
 
       /* 1) Çift dokunuşla yakınlaştırma. */
@@ -52,10 +57,12 @@ const tags = `    <meta name="description" content="Antrenör ve danışanların
 
 // Expo'nun ürettiği viewport etiketi yakınlaştırmaya izin veriyor; onu kilitli sürümle
 // DEĞİŞTİRİYORUZ (ikinci bir viewport etiketi eklemek yerine — iki etiket olduğunda hangisinin
-// kazandığı tarayıcıya göre değişir). viewport-fit=cover, çentikli ekranlarda güvenli alan
-// hesabının doğru çalışması için (uygulama zaten useSafeAreaInsets kullanıyor).
+// kazandığı tarayıcıya göre değişir).
+// NOT: Buraya bir ara `viewport-fit=cover` de eklenmişti; iPhone'da sayfayı güvenli alanın altına
+// taşıyıp ekranın altında beyaz bir şerit bıraktığı için kaldırıldı. Yakınlaşmayı engellemek için
+// gerekli değildi zaten — uygulama güvenli alanı useSafeAreaInsets ile kendisi yönetiyor.
 const LOCKED_VIEWPORT =
-  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />';
+  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />';
 
 const viewportRe = /<meta\s+name="viewport"[^>]*>/i;
 if (viewportRe.test(html)) {
