@@ -2491,6 +2491,18 @@ export function useCancelRescheduleRequest(trainerId: string | undefined, client
 }
 
 // Antrenörün onay kutusu: bekleyen değişiklik talebi olan randevular + danışan adı.
+// Takvim abonelik adresini iptal eder ve yenisini üretir. Adres bir "taşıyıcı sır" olduğu için
+// (takvim uygulamaları başlık gönderemiyor) yanlış kişiye gittiğinde tek çare bu.
+export function useRegenerateCalendarToken() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('regenerate_calendar_token');
+      if (error) throw error;
+      return data as string;
+    },
+  });
+}
+
 export function useRescheduleRequests(trainerId: string | undefined) {
   return useQuery({
     queryKey: ['reschedule_requests', trainerId],

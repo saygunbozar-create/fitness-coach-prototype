@@ -712,6 +712,22 @@ const tr: Dict = {
   'meal_item_row.carb_abbrev': 'K (g)',
   'meal_item_row.fat_abbrev': 'Y (g)',
 
+  'takvim.title': 'Takvime Ekle',
+  'takvim.intro':
+    'Derslerini Apple Takvim veya Google Takvim\'e ekleyebilirsin. Bir kez eklediğinde ders saatlerin değiştikçe takvimin de kendiliğinden güncellenir.',
+  'takvim.apple_btn': 'Apple Takvim\'e ekle',
+  'takvim.google_btn': 'Google Takvim\'e ekle',
+  'takvim.copy_btn': 'Bağlantıyı kopyala',
+  'takvim.copied': 'Bağlantı kopyalandı.',
+  'takvim.warning':
+    'Bu bağlantı bir şifre gibidir: takvim uygulamaları parola gönderemediği için adresin kendisi anahtar görevi görür. Paylaşan kişi ders saatlerini görebilir (isim/telefon gibi bilgiler yer almaz). Yanlışlıkla paylaşırsan aşağıdan yenile.',
+  'takvim.regenerate_btn': 'Bağlantıyı yenile',
+  'takvim.regenerate_confirm_title': 'Bağlantıyı yenile',
+  'takvim.regenerate_confirm_body':
+    'Eski bağlantı anında geçersiz olur ve takvim uygulamalarında güncelleme durur. Yeni bağlantıyı takvimine tekrar eklemen gerekir. Devam edilsin mi?',
+  'takvim.regenerated': 'Bağlantı yenilendi. Takvimindeki eski aboneliği silip yenisini ekle.',
+  'takvim.err_regenerate': 'Bağlantı yenilenemedi.',
+
   'randevu.request_change_title': 'Değişiklik Talebi Gönder',
   'randevu.request_change_body': '{{old}} yerine {{date}} · {{time}} talep edilsin mi? Antrenörün onaylaması gerekiyor.',
   'randevu.request_btn': 'Talep Gönder',
@@ -1422,6 +1438,22 @@ const en: Dict = {
   'meal_item_row.protein_abbrev': 'P (g)',
   'meal_item_row.carb_abbrev': 'C (g)',
   'meal_item_row.fat_abbrev': 'F (g)',
+
+  'takvim.title': 'Add to Calendar',
+  'takvim.intro':
+    "You can add your sessions to Apple Calendar or Google Calendar. Add it once and your calendar keeps itself up to date as your session times change.",
+  'takvim.apple_btn': 'Add to Apple Calendar',
+  'takvim.google_btn': 'Add to Google Calendar',
+  'takvim.copy_btn': 'Copy link',
+  'takvim.copied': 'Link copied.',
+  'takvim.warning':
+    'Treat this link like a password: calendar apps cannot send credentials, so the address itself is the key. Anyone you share it with can see your session times (no names or phone numbers are included). If you share it by accident, regenerate it below.',
+  'takvim.regenerate_btn': 'Regenerate link',
+  'takvim.regenerate_confirm_title': 'Regenerate link',
+  'takvim.regenerate_confirm_body':
+    'The old link stops working immediately and calendar apps will stop updating. You will need to add the new link to your calendar again. Continue?',
+  'takvim.regenerated': 'Link regenerated. Remove the old subscription from your calendar and add the new one.',
+  'takvim.err_regenerate': 'Could not regenerate the link.',
 
   'randevu.request_change_title': 'Send Change Request',
   'randevu.request_change_body': 'Request {{date}} · {{time}} instead of {{old}}? Your trainer has to approve it.',

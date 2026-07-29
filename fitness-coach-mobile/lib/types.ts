@@ -9,6 +9,10 @@ export type Profile = {
   plan_tier: string;
   brand_name: string | null;
   language: string;
+  // Apple/Google Takvim aboneliği için kişiye özel gizli anahtar (bkz. migration 0067).
+  // Adresin kendisi kimlik doğrulama görevi görüyor, o yüzden paylaşılmamalı; Ayarlar'dan
+  // yenilenince eski adres anında geçersiz olur.
+  calendar_token: string;
 };
 
 export type PlanTier = {
