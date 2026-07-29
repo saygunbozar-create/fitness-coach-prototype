@@ -2325,6 +2325,11 @@ export function useAvailabilityRules(trainerId: string | undefined) {
       return data as AvailabilityRule[];
     },
     enabled: !!trainerId,
+    // Antrenör yeni bir müsaitlik kuralı eklediğinde, Randevu ekranı zaten AÇIK olan danışanda
+    // saatler kendiliğinden belirsin. Bunlar seyrek değiştiği için dolu-saat sorgusundan daha
+    // uzun aralık yeterli. (Önceden hiç tazelenmiyordu: expo-router sekmeyi kapatmadığı için
+    // sorgu yeniden bağlanmıyor, danışanın uygulamayı tamamen kapatıp açması gerekiyordu.)
+    refetchInterval: 30_000,
   });
 }
 
@@ -2376,6 +2381,8 @@ export function useAvailabilityExceptions(trainerId: string | undefined) {
       return data as AvailabilityException[];
     },
     enabled: !!trainerId,
+    // Antrenör bir aralığı kapattığında o saatler danışanın ekranından da düşsün.
+    refetchInterval: 30_000,
   });
 }
 
@@ -2413,6 +2420,12 @@ export function useTakenSlots(trainerId: string | undefined, date: string | unde
       return (data as { slot_time: string }[]).map((r) => r.slot_time.slice(0, 5));
     },
     enabled: !!trainerId && !!date,
+    // Dolu saatler periyodik tazeleniyor: başka bir danışan bir saati aldığında, ekranı AÇIK olan
+    // diğer danışanlarda o saat kendiliğinden kaybolsun. Aksi halde slot boş görünmeye devam edip
+    // seçildiğinde "bu saat az önce alındı" hatasına düşüyordu (veri bütünlüğü zaten
+    // unique(trainer_id,date,time) ile korunuyor — bu tamamen görünürlük sorunu).
+    // En kısa aralık bunda, çünkü yanlış görünen tek şey bu.
+    refetchInterval: 10_000,
   });
 }
 
@@ -2468,6 +2481,9 @@ export function useMyUpcomingAppointments(clientId: string | undefined) {
       return data as LessonScheduleEntry[];
     },
     enabled: !!clientId,
+    // Antrenör bir randevuyu Panel'deki takvimden iptal ettiğinde danışanın "Randevularım"
+    // listesinden de düşsün.
+    refetchInterval: 30_000,
   });
 }
 
