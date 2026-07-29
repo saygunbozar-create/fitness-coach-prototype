@@ -231,7 +231,14 @@ export type LessonScheduleEntry = {
   notified: boolean;
   created_at: string;
   booked_by_client: boolean;
+  // Danışanın önerdiği yeni tarih/saat — antrenör onaylayana kadar randevu taşınmaz
+  // (bkz. migration 0066). Onaylanınca date/time'a taşınır ve bu alanlar temizlenir.
+  pending_date: string | null;
+  pending_time: string | null;
+  pending_requested_at: string | null;
 };
+
+export type RescheduleRequest = LessonScheduleEntry & { client_name: string | null };
 
 export type AvailabilityRule = {
   id: string;

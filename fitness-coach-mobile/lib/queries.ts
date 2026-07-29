@@ -15,6 +15,7 @@ import type {
   InjuryLog,
   IntakeForm,
   LessonScheduleEntry,
+  RescheduleRequest,
   LibraryExercise,
   LibraryFood,
   Meal,
@@ -2451,17 +2452,108 @@ export function useBookAppointment(trainerId: string | undefined, clientId: stri
 // oluşturmuyor, sadece mevcut randevunun tarih/saatini günceller. RLS (lesson_schedule_
 // client_reschedule) sadece booked_by_client=true olan, danışanın kendi satırlarında
 // çalışmasına izin veriyor — elle eklenmiş bir ders taşınamaz.
-export function useRescheduleAppointment(trainerId: string | undefined, clientId: string | undefined) {
+// Danışan artık randevuyu doğrudan taşımıyor, ÖNERİ bırakıyor: antrenör onaylayana kadar
+// gerçek date/time değişmez (migration 0066'daki tetikleyici date/time değişikliğini danışan
+// için tamamen reddediyor). Bekleyen öneri yalnızca pending_* alanlarında durur.
+export function useRequestReschedule(trainerId: string | undefined, clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; date: string; time: string }) => {
-      const { error } = await supabase.from('lesson_schedule').update({ date: input.date, time: input.time }).eq('id', input.id);
+      const { error } = await supabase
+        .from('lesson_schedule')
+        .update({ pending_date: input.date, pending_time: input.time, pending_requested_at: new Date().toISOString() })
+        .eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['my_appointments', clientId] });
+      qc.invalidateQueries({ queryKey: ['reschedule_requests', trainerId] });
+    },
+  });
+}
+
+// Danışan kendi bekleyen talebini geri çekebilir (henüz onaylanmadıysa).
+export function useCancelRescheduleRequest(trainerId: string | undefined, clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('lesson_schedule')
+        .update({ pending_date: null, pending_time: null, pending_requested_at: null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my_appointments', clientId] });
+      qc.invalidateQueries({ queryKey: ['reschedule_requests', trainerId] });
+    },
+  });
+}
+
+// Antrenörün onay kutusu: bekleyen değişiklik talebi olan randevular + danışan adı.
+export function useRescheduleRequests(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['reschedule_requests', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lesson_schedule')
+        .select('*, clients(name)')
+        .eq('trainer_id', trainerId)
+        .not('pending_date', 'is', null)
+        .order('pending_requested_at');
+      if (error) throw error;
+      return (data as any[]).map((r) => ({ ...r, client_name: r.clients?.name ?? null })) as RescheduleRequest[];
+    },
+    enabled: !!trainerId,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useApproveReschedule(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; pending_date: string; pending_time: string }) => {
+      // Bekleyen saat bu arada başkası tarafından alınmış olabilir — pending_* satırları slot
+      // ızgarasında "dolu" göstermiyor (henüz onaylanmadıkları için). O durumda
+      // unique(trainer_id,date,time) devreye girer; hatayı çağıran tarafa anlaşılır şekilde
+      // iletmek için burada işaretliyoruz.
+      const { error } = await supabase
+        .from('lesson_schedule')
+        .update({
+          date: input.pending_date,
+          time: input.pending_time,
+          pending_date: null,
+          pending_time: null,
+          pending_requested_at: null,
+        })
+        .eq('id', input.id);
+      if (error) {
+        if (error.message?.includes('duplicate')) throw new Error('SLOT_TAKEN');
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reschedule_requests', trainerId] });
       qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] });
       qc.invalidateQueries({ queryKey: ['taken_slots', trainerId] });
+      qc.invalidateQueries({ queryKey: ['my_appointments'] });
+    },
+  });
+}
+
+export function useRejectReschedule(trainerId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('lesson_schedule')
+        .update({ pending_date: null, pending_time: null, pending_requested_at: null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reschedule_requests', trainerId] });
+      qc.invalidateQueries({ queryKey: ['my_appointments'] });
     },
   });
 }

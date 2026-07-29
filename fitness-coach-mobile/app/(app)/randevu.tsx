@@ -16,8 +16,12 @@ import {
   useClient,
   useDeleteAvailabilityException,
   useDeleteAvailabilityRule,
+  useApproveReschedule,
+  useCancelRescheduleRequest,
   useMyUpcomingAppointments,
-  useRescheduleAppointment,
+  useRejectReschedule,
+  useRequestReschedule,
+  useRescheduleRequests,
   useTakenSlots,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
@@ -148,6 +152,7 @@ export default function RandevuScreen() {
       <View style={styles.flex}>
         <ScreenHeader title={t('randevu.availability_title')} />
         <ScrollView contentContainerStyle={styles.content}>
+          <TrainerRescheduleRequestsPanel trainerId={profile?.id} />
           <TrainerAvailabilityPanel trainerId={profile?.id} />
           <TrainerExceptionsPanel trainerId={profile?.id} />
         </ScrollView>
@@ -156,6 +161,76 @@ export default function RandevuScreen() {
   }
 
   return <ClientAppointmentScreen />;
+}
+
+// Danışanların gönderdiği randevu değişiklik talepleri. Antrenör onaylayana kadar randevu
+// taşınmaz (bkz. migration 0066) — bu panel o onayın yapıldığı yer.
+function TrainerRescheduleRequestsPanel({ trainerId }: { trainerId: string | undefined }) {
+  const t = useT();
+  const requestsQuery = useRescheduleRequests(trainerId);
+  const approve = useApproveReschedule(trainerId);
+  const reject = useRejectReschedule(trainerId);
+  const requests = requestsQuery.data ?? [];
+
+  return (
+    <Panel title={t('randevu.requests_title')} right={t('randevu.requests_count', { count: requests.length })}>
+      {requests.length === 0 ? (
+        <Text style={styles.noteText}>{t('randevu.no_requests')}</Text>
+      ) : (
+        requests.map((r) => (
+          <View key={r.id} style={styles.ruleCard}>
+            <View style={[styles.ruleDot, { backgroundColor: C.orange }]} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.ruleDays}>{r.client_name ?? '—'}</Text>
+              <Text style={styles.ruleMeta}>
+                {t('randevu.request_row', {
+                  from: `${formatTrDateLong(r.date)} · ${r.time.slice(0, 5)}`,
+                  to: `${formatTrDateLong(r.pending_date!)} · ${r.pending_time!.slice(0, 5)}`,
+                })}
+              </Text>
+            </View>
+            <Pressable
+              style={styles.approveBtn}
+              disabled={approve.isPending}
+              onPress={() =>
+                approve.mutate(
+                  { id: r.id, pending_date: r.pending_date!, pending_time: r.pending_time! },
+                  {
+                    onError: (e: any) =>
+                      showAlert(
+                        t('randevu.err_approve_title'),
+                        e.message === 'SLOT_TAKEN' ? t('randevu.err_approve_taken') : e.message ?? t('randevu.err_approve_generic')
+                      ),
+                  }
+                )
+              }
+              hitSlop={6}
+            >
+              <Text style={styles.approveBtnText}>{t('randevu.approve_btn')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                showAlert(t('randevu.reject_confirm_title'), t('randevu.reject_confirm_body', { name: r.client_name ?? '—' }), [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  {
+                    text: t('randevu.reject_btn'),
+                    style: 'destructive',
+                    onPress: () =>
+                      reject.mutate(r.id, {
+                        onError: (e: any) => showAlert(t('randevu.err_approve_title'), e.message ?? t('randevu.err_reject')),
+                      }),
+                  },
+                ])
+              }
+              hitSlop={6}
+            >
+              <Text style={styles.ruleDelete}>{t('randevu.reject_btn')}</Text>
+            </Pressable>
+          </View>
+        ))
+      )}
+    </Panel>
+  );
 }
 
 function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined }) {
@@ -575,7 +650,8 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
   const appointmentsQuery = useMyUpcomingAppointments(clientId);
   const rulesQuery = useAvailabilityRules(trainerId);
   const exceptionsQuery = useAvailabilityExceptions(trainerId);
-  const reschedule = useRescheduleAppointment(trainerId, clientId);
+  const requestReschedule = useRequestReschedule(trainerId, clientId);
+  const cancelRequest = useCancelRescheduleRequest(trainerId, clientId);
   const appointments = appointmentsQuery.data ?? [];
   const rules = rulesQuery.data ?? [];
   const exceptions = exceptionsQuery.data ?? [];
@@ -589,18 +665,18 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
     setRescheduleDate(upcomingDays.find((d) => hasAnyAvailability(rules, d)) ?? upcomingDays[0]);
   }
 
-  function confirmReschedule(id: string, oldLabel: string, time: string) {
-    showAlert(t('randevu.reschedule_title'), t('randevu.reschedule_body', { old: oldLabel, date: formatTrDateLong(rescheduleDate), time }), [
+  // Artık doğrudan taşımıyor: antrenörün onayına giden bir TALEP oluşturuyor.
+  function confirmRescheduleRequest(id: string, oldLabel: string, time: string) {
+    showAlert(t('randevu.request_change_title'), t('randevu.request_change_body', { old: oldLabel, date: formatTrDateLong(rescheduleDate), time }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('randevu.move_btn'),
+        text: t('randevu.request_btn'),
         onPress: () =>
-          reschedule.mutate(
+          requestReschedule.mutate(
             { id, date: rescheduleDate, time },
             {
               onSuccess: () => setReschedulingId(null),
-              onError: (e: any) =>
-                showAlert(t('randevu.err_reschedule_title'), e.message?.includes('duplicate') ? t('randevu.err_slot_taken') : e.message ?? t('randevu.err_reschedule_generic')),
+              onError: (e: any) => showAlert(t('randevu.err_request_title'), e.message ?? t('randevu.err_request_generic')),
             }
           ),
       },
@@ -612,32 +688,59 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
       {appointments.length === 0 ? (
         <Text style={styles.noteText}>{t('randevu.no_upcoming_appt')}</Text>
       ) : (
-        appointments.map((a) => (
-          <View key={a.id} style={styles.apptBlock}>
-            <View style={styles.apptRow}>
-              <View>
-                <Text style={styles.apptDate}>{formatTrDateLong(a.date)}</Text>
-                <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
+        appointments.map((a) => {
+          const isPending = !!a.pending_date && !!a.pending_time;
+          return (
+            <View key={a.id} style={styles.apptBlock}>
+              <View style={styles.apptRow}>
+                <View>
+                  <Text style={styles.apptDate}>{formatTrDateLong(a.date)}</Text>
+                  <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
+                </View>
+                {/* Bekleyen bir talep varken yeni talep açtırmıyoruz — tek randevunun aynı anda
+                    yalnızca bir bekleyen değişikliği olabilir. Onun yerine geri çekme sunuluyor. */}
+                {!isPending && (
+                  <Pressable onPress={() => (reschedulingId === a.id ? setReschedulingId(null) : openReschedule(a.id))} hitSlop={8}>
+                    <Text style={styles.apptChange}>{reschedulingId === a.id ? t('common.cancel') : t('randevu.change_btn')}</Text>
+                  </Pressable>
+                )}
               </View>
-              <Pressable onPress={() => (reschedulingId === a.id ? setReschedulingId(null) : openReschedule(a.id))} hitSlop={8}>
-                <Text style={styles.apptChange}>{reschedulingId === a.id ? t('common.cancel') : t('randevu.change_btn')}</Text>
-              </Pressable>
+
+              {isPending && (
+                <View style={styles.pendingRow}>
+                  <Text style={styles.pendingText}>
+                    {t('randevu.pending_badge', { date: formatTrDateLong(a.pending_date!), time: a.pending_time!.slice(0, 5) })}
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      cancelRequest.mutate(a.id, {
+                        onError: (e: any) => showAlert(t('randevu.err_request_title'), e.message ?? t('randevu.err_withdraw')),
+                      })
+                    }
+                    hitSlop={8}
+                  >
+                    <Text style={styles.withdrawText}>{t('randevu.withdraw_request')}</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {reschedulingId === a.id && !isPending && (
+                <View style={styles.rescheduleBox}>
+                  <Text style={styles.approvalHint}>{t('randevu.change_hint_needs_approval')}</Text>
+                  <SlotPicker
+                    trainerId={trainerId}
+                    rules={rules}
+                    exceptions={exceptions}
+                    selectedDate={rescheduleDate}
+                    onSelectDate={setRescheduleDate}
+                    onPickSlot={(time) => confirmRescheduleRequest(a.id, `${formatTrDateLong(a.date)} · ${a.time.slice(0, 5)}`, time)}
+                    picking={requestReschedule.isPending}
+                  />
+                </View>
+              )}
             </View>
-            {reschedulingId === a.id && (
-              <View style={styles.rescheduleBox}>
-                <SlotPicker
-                  trainerId={trainerId}
-                  rules={rules}
-                  exceptions={exceptions}
-                  selectedDate={rescheduleDate}
-                  onSelectDate={setRescheduleDate}
-                  onPickSlot={(time) => confirmReschedule(a.id, `${formatTrDateLong(a.date)} · ${a.time.slice(0, 5)}`, time)}
-                  picking={reschedule.isPending}
-                />
-              </View>
-            )}
-          </View>
-        ))
+          );
+        })
       )}
       <Text style={styles.trainerHint}>{t('randevu.cancel_hint')}</Text>
     </Panel>
@@ -693,4 +796,20 @@ const styles = StyleSheet.create({
   apptTime: { fontSize: 12.5, color: C.lime, fontWeight: '800', marginTop: 2 },
   apptChange: { fontSize: 11, fontWeight: '700', color: C.lime },
   rescheduleBox: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.edge },
+  approvalHint: { fontSize: 11, color: C.greyD, marginBottom: 10, fontStyle: 'italic' },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 8,
+    backgroundColor: 'rgba(251,176,64,.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  pendingText: { flex: 1, fontSize: 11.5, color: C.orange, fontWeight: '700' },
+  withdrawText: { fontSize: 11, color: C.grey, fontWeight: '700' },
+  approveBtn: { backgroundColor: C.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  approveBtnText: { fontSize: 11.5, fontWeight: '800', color: C.bg },
 });
