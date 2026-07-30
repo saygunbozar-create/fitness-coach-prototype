@@ -37,7 +37,7 @@ import {
   type ProgramLessonWithDay,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, nf } from '../../lib/theme';
+import { C, monthNamesShort, nf, type TFn } from '../../lib/theme';
 import type { WorkoutLog } from '../../lib/types';
 
 function formatTrDate(iso: string): string {
@@ -45,10 +45,9 @@ function formatTrDate(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
-const TR_MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-function formatTrDateShort(iso: string): string {
+function formatDateShort(iso: string, t: TFn): string {
   const [, m, d] = iso.split('-');
-  return `${parseInt(d, 10)} ${TR_MONTHS_SHORT[parseInt(m, 10) - 1]}`;
+  return t('format.date_short', { day: parseInt(d, 10), month: monthNamesShort(t)[parseInt(m, 10) - 1] });
 }
 
 function useOnErr() {
@@ -723,7 +722,7 @@ export default function AntrenmanScreen() {
                       style={[styles.dateChip, on && styles.dateChipOn]}
                       onPress={() => setExpandedHistoryDate((v) => (v === s.date ? null : s.date))}
                     >
-                      <Text style={[styles.dateChipText, on && styles.dateChipTextOn]}>{formatTrDateShort(s.date)}</Text>
+                      <Text style={[styles.dateChipText, on && styles.dateChipTextOn]}>{formatDateShort(s.date, t)}</Text>
                       {s.time ? <Text style={[styles.dateChipTime, on && styles.dateChipTextOn]}>{s.time.slice(0, 5)}</Text> : null}
                     </Pressable>
                   );

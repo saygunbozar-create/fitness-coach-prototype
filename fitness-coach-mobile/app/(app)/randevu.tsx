@@ -25,27 +25,14 @@ import {
   useTakenSlots,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, TR_MONTHS } from '../../lib/theme';
+import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, monthNames, type TFn } from '../../lib/theme';
 import type { AvailabilityException, AvailabilityRule } from '../../lib/types';
 
-const DAY_CHIPS: { iso: number; short: string }[] = [
-  { iso: 1, short: 'Pzt' },
-  { iso: 2, short: 'Sal' },
-  { iso: 3, short: 'Çar' },
-  { iso: 4, short: 'Per' },
-  { iso: 5, short: 'Cum' },
-  { iso: 6, short: 'Cmt' },
-  { iso: 7, short: 'Paz' },
-];
-const DAY_FULL: Record<number, string> = {
-  1: 'Pazartesi',
-  2: 'Salı',
-  3: 'Çarşamba',
-  4: 'Perşembe',
-  5: 'Cuma',
-  6: 'Cumartesi',
-  7: 'Pazar',
-};
+// Bu ekran her yerde ISO gramerini kullanıyor: 1=Pazartesi..7=Pazar.
+const ISO_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const ISO_DAYS = [1, 2, 3, 4, 5, 6, 7];
+const dayFull = (iso: number, t: TFn) => t(`weekday.${ISO_DAY_KEYS[iso - 1]}`);
+const dayShort = (iso: number, t: TFn) => t(`weekday.short.${ISO_DAY_KEYS[iso - 1]}`);
 const DURATIONS = [30, 45, 60, 90];
 
 // JS Date.getDay(): 0=Pazar..6=Cumartesi. Uygulamanın geri kalanının kullandığı ISO gramerine
@@ -85,9 +72,13 @@ function formatDateInputTr(value: string, prev: string): string {
   return out;
 }
 
-function formatTrDateLong(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return `${d} ${TR_MONTHS[m - 1]} ${DAY_FULL[isoWeekday(dateStr)]}`;
+function formatDateLong(dateStr: string, t: TFn): string {
+  const [, m, d] = dateStr.split('-').map(Number);
+  return t('format.date_long', {
+    day: d,
+    month: monthNames(t)[m - 1],
+    weekday: dayFull(isoWeekday(dateStr), t),
+  });
 }
 
 function formatTrDateShort(dateStr: string): string {
@@ -184,8 +175,8 @@ function TrainerRescheduleRequestsPanel({ trainerId }: { trainerId: string | und
               <Text style={styles.ruleDays}>{r.client_name ?? '—'}</Text>
               <Text style={styles.ruleMeta}>
                 {t('randevu.request_row', {
-                  from: `${formatTrDateLong(r.date)} · ${r.time.slice(0, 5)}`,
-                  to: `${formatTrDateLong(r.pending_date!)} · ${r.pending_time!.slice(0, 5)}`,
+                  from: `${formatDateLong(r.date, t)} · ${r.time.slice(0, 5)}`,
+                  to: `${formatDateLong(r.pending_date!, t)} · ${r.pending_time!.slice(0, 5)}`,
                 })}
               </Text>
             </View>
@@ -289,13 +280,13 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
     <Panel title={t('randevu.rules_title')} right={t('randevu.active_rules_count', { count: rules.length })}>
       <Text style={styles.fieldLabel}>{t('randevu.which_days')}</Text>
       <View style={styles.dayRow}>
-        {DAY_CHIPS.map((d) => (
+        {ISO_DAYS.map((iso) => (
           <Pressable
-            key={d.iso}
-            style={[styles.dayChip, selectedDays.includes(d.iso) && styles.dayChipOn]}
-            onPress={() => toggleDay(d.iso)}
+            key={iso}
+            style={[styles.dayChip, selectedDays.includes(iso) && styles.dayChipOn]}
+            onPress={() => toggleDay(iso)}
           >
-            <Text style={[styles.dayChipText, selectedDays.includes(d.iso) && styles.dayChipTextOn]}>{d.short[0]}</Text>
+            <Text style={[styles.dayChipText, selectedDays.includes(iso) && styles.dayChipTextOn]}>{dayShort(iso, t)[0]}</Text>
           </Pressable>
         ))}
       </View>
@@ -352,7 +343,7 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
           <View key={r.id} style={styles.ruleCard}>
             <View style={styles.ruleDot} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.ruleDays}>{r.days_of_week.map((d) => DAY_FULL[d]).join(' · ')}</Text>
+              <Text style={styles.ruleDays}>{r.days_of_week.map((d) => dayFull(d, t)).join(' · ')}</Text>
               <Text style={styles.ruleMeta}>
                 {t('randevu.rule_meta', { start: r.start_time.slice(0, 5), end: r.end_time.slice(0, 5), minutes: r.session_minutes, date: formatTrDateShort(r.end_date) })}
               </Text>
@@ -422,7 +413,7 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
     if (conflicts > 0) {
       showAlert(
         t('randevu.conflict_title'),
-        t('randevu.conflict_body', { date: formatTrDateLong(parsedDate), start, end, count: conflicts }),
+        t('randevu.conflict_body', { date: formatDateLong(parsedDate, t), start, end, count: conflicts }),
         [
           { text: t('common.cancel'), style: 'cancel' },
           { text: t('randevu.close_anyway_btn'), onPress: doSubmit },
@@ -482,7 +473,7 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
           <View key={e.id} style={styles.ruleCard}>
             <View style={[styles.ruleDot, { backgroundColor: C.orange }]} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.ruleDays}>{formatTrDateLong(e.date)}</Text>
+              <Text style={styles.ruleDays}>{formatDateLong(e.date, t)}</Text>
               <Text style={styles.ruleMeta}>
                 {e.start_time.slice(0, 5)}–{e.end_time.slice(0, 5)}
                 {e.note ? ` · ${e.note}` : ''}
@@ -569,14 +560,14 @@ function SlotPicker({
               style={[styles.dateCard, on && styles.dateCardOn, !available && styles.dateCardOff]}
               onPress={() => onSelectDate(d)}
             >
-              <Text style={[styles.dateDow, on && styles.dateDowOn]}>{DAY_FULL[isoWeekday(d)].slice(0, 3)}</Text>
+              <Text style={[styles.dateDow, on && styles.dateDowOn]}>{dayShort(isoWeekday(d), t)}</Text>
               <Text style={[styles.dateNum, on && styles.dateNumOn]}>{parseInt(dayNum, 10)}</Text>
             </Pressable>
           );
         })}
       </ScrollView>
 
-      <Text style={styles.fieldLabel}>{formatTrDateLong(selectedDate)} {t('randevu.empty_slots_suffix')}</Text>
+      <Text style={styles.fieldLabel}>{formatDateLong(selectedDate, t)} {t('randevu.empty_slots_suffix')}</Text>
       {takenQuery.isLoading ? (
         <ActivityIndicator color={C.lime} />
       ) : slots.length === 0 ? (
@@ -610,7 +601,7 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
   const bookAppointment = useBookAppointment(trainerId, clientId);
 
   function confirmBooking(time: string) {
-    showAlert(t('randevu.confirm_booking_title'), t('randevu.confirm_booking_body', { date: formatTrDateLong(selectedDate), time }), [
+    showAlert(t('randevu.confirm_booking_title'), t('randevu.confirm_booking_body', { date: formatDateLong(selectedDate, t), time }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('randevu.book_btn'),
@@ -667,7 +658,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
 
   // Artık doğrudan taşımıyor: antrenörün onayına giden bir TALEP oluşturuyor.
   function confirmRescheduleRequest(id: string, oldLabel: string, time: string) {
-    showAlert(t('randevu.request_change_title'), t('randevu.request_change_body', { old: oldLabel, date: formatTrDateLong(rescheduleDate), time }), [
+    showAlert(t('randevu.request_change_title'), t('randevu.request_change_body', { old: oldLabel, date: formatDateLong(rescheduleDate, t), time }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('randevu.request_btn'),
@@ -690,26 +681,33 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
       ) : (
         appointments.map((a) => {
           const isPending = !!a.pending_date && !!a.pending_time;
+          // Değişiklik talebi SADECE danışanın kendi aldığı randevularda mümkün:
+          // lesson_schedule_client_reschedule politikası booked_by_client=true şartı koyuyor, yani
+          // antrenörün elle eklediği bir derste güncelleme RLS tarafından sessizce 0 satır etkiler
+          // (hata da dönmez). Butonu göstermek, danışanın saat seçip hiçbir şey olmadığını görmesine
+          // yol açıyordu — o yüzden bu durumda hiç göstermiyoruz.
+          const canRequestChange = a.booked_by_client;
           return (
             <View key={a.id} style={styles.apptBlock}>
               <View style={styles.apptRow}>
                 <View>
-                  <Text style={styles.apptDate}>{formatTrDateLong(a.date)}</Text>
+                  <Text style={styles.apptDate}>{formatDateLong(a.date, t)}</Text>
                   <Text style={styles.apptTime}>{a.time.slice(0, 5)}</Text>
                 </View>
                 {/* Bekleyen bir talep varken yeni talep açtırmıyoruz — tek randevunun aynı anda
                     yalnızca bir bekleyen değişikliği olabilir. Onun yerine geri çekme sunuluyor. */}
-                {!isPending && (
+                {!isPending && canRequestChange && (
                   <Pressable onPress={() => (reschedulingId === a.id ? setReschedulingId(null) : openReschedule(a.id))} hitSlop={8}>
                     <Text style={styles.apptChange}>{reschedulingId === a.id ? t('common.cancel') : t('randevu.change_btn')}</Text>
                   </Pressable>
                 )}
+                {!isPending && !canRequestChange && <Text style={styles.byTrainerNote}>{t('randevu.added_by_trainer')}</Text>}
               </View>
 
               {isPending && (
                 <View style={styles.pendingRow}>
                   <Text style={styles.pendingText}>
-                    {t('randevu.pending_badge', { date: formatTrDateLong(a.pending_date!), time: a.pending_time!.slice(0, 5) })}
+                    {t('randevu.pending_badge', { date: formatDateLong(a.pending_date!, t), time: a.pending_time!.slice(0, 5) })}
                   </Text>
                   <Pressable
                     onPress={() =>
@@ -724,7 +722,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
                 </View>
               )}
 
-              {reschedulingId === a.id && !isPending && (
+              {reschedulingId === a.id && !isPending && canRequestChange && (
                 <View style={styles.rescheduleBox}>
                   <Text style={styles.approvalHint}>{t('randevu.change_hint_needs_approval')}</Text>
                   <SlotPicker
@@ -733,7 +731,7 @@ function MyAppointmentsPanel({ trainerId, clientId }: { trainerId: string; clien
                     exceptions={exceptions}
                     selectedDate={rescheduleDate}
                     onSelectDate={setRescheduleDate}
-                    onPickSlot={(time) => confirmRescheduleRequest(a.id, `${formatTrDateLong(a.date)} · ${a.time.slice(0, 5)}`, time)}
+                    onPickSlot={(time) => confirmRescheduleRequest(a.id, `${formatDateLong(a.date, t)} · ${a.time.slice(0, 5)}`, time)}
                     picking={requestReschedule.isPending}
                   />
                 </View>
@@ -809,6 +807,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pendingText: { flex: 1, fontSize: 11.5, color: C.orange, fontWeight: '700' },
+  byTrainerNote: { fontSize: 10.5, color: C.greyD, fontStyle: 'italic' },
   withdrawText: { fontSize: 11, color: C.grey, fontWeight: '700' },
   approveBtn: { backgroundColor: C.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   approveBtnText: { fontSize: 11.5, fontWeight: '800', color: C.bg },

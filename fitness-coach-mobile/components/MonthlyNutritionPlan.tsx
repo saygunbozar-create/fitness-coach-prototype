@@ -15,7 +15,7 @@ import {
   useMonthlyMealPlan,
   useUpdateMealItem,
 } from '../lib/queries';
-import { C, TR_MONTHS, TR_WEEKDAY_SHORT, daysInMonth, localDateStr, nf } from '../lib/theme';
+import { C, daysInMonth, localDateStr, monthNames, nf, weekdayNamesShort } from '../lib/theme';
 
 function useOnErr() {
   const t = useT();
@@ -33,6 +33,8 @@ export function MonthlyNutritionPlan({
 }) {
   const t = useT();
   const onErr = useOnErr();
+  const MONTHS = monthNames(t);
+  const WEEKDAY_SHORT = weekdayNamesShort(t);
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
@@ -84,11 +86,11 @@ export function MonthlyNutritionPlan({
     <Panel title={t('monthly_nutrition.title')} right={t('monthly_nutrition.days_count', { count: total })}>
       <View style={styles.monthNav}>
         <Pressable onPress={() => changeMonth(-1)} hitSlop={8}>
-          <Text style={styles.monthNavText}>‹ {TR_MONTHS[(viewMonth + 11) % 12]}</Text>
+          <Text style={styles.monthNavText}>‹ {MONTHS[(viewMonth + 11) % 12]}</Text>
         </Pressable>
-        <Text style={styles.monthLabel}>{TR_MONTHS[viewMonth]} {viewYear}</Text>
+        <Text style={styles.monthLabel}>{MONTHS[viewMonth]} {viewYear}</Text>
         <Pressable onPress={() => changeMonth(1)} hitSlop={8}>
-          <Text style={styles.monthNavText}>{TR_MONTHS[(viewMonth + 1) % 12]} ›</Text>
+          <Text style={styles.monthNavText}>{MONTHS[(viewMonth + 1) % 12]} ›</Text>
         </Pressable>
       </View>
 
@@ -100,7 +102,7 @@ export function MonthlyNutritionPlan({
           const meals = mealsByDate.get(date) ?? [];
           const isToday = date === todayStr;
           const isExpanded = expandedDate === date;
-          const weekday = TR_WEEKDAY_SHORT[new Date(viewYear, viewMonth, day).getDay()];
+          const weekday = WEEKDAY_SHORT[new Date(viewYear, viewMonth, day).getDay()];
           const dayTotals = meals.reduce(
             (a, m) => ({ kcal: a.kcal + m.kcal, p: a.p + m.p, k: a.k + m.k, y: a.y + m.y }),
             { kcal: 0, p: 0, k: 0, y: 0 }

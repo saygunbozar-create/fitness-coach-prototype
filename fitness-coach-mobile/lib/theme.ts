@@ -54,12 +54,21 @@ export const addDaysToDateStr = (dateStr: string, days: number) => {
   return localDateStr(date);
 };
 
-export const TR_MONTHS = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-] as const;
+// Ay/gün adları kullanıcının diline göre değişir, o yüzden sabit dizi olarak tutulamıyorlar:
+// çağıran taraf useT()'den aldığı t'yi veriyor. İndeksleme JS ile aynı kalıyor —
+// aylar 0=Ocak, günler 0=Pazar (Date.getMonth()/getDay()).
+export type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
-export const TR_WEEKDAY_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'] as const;
+export const monthNames = (t: TFn) =>
+  Array.from({ length: 12 }, (_, i) => t(`month.${i + 1}`));
+
+export const monthNamesShort = (t: TFn) =>
+  Array.from({ length: 12 }, (_, i) => t(`month.short.${i + 1}`));
+
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+export const weekdayNamesShort = (t: TFn) =>
+  WEEKDAY_KEYS.map((k) => t(`weekday.short.${k}`));
 
 export const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 
