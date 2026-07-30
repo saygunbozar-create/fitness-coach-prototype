@@ -1,5 +1,6 @@
 import * as Localization from 'expo-localization';
 import { useAuth } from './auth';
+import { getPreLoginLang, usePreLoginLang } from './preLoginLang';
 
 // Çoklu dil desteği — pilot aşaması, sadece Ayarlar ekranı kapsıyor (bkz. proje notları).
 // Her kullanıcı kendi dilini bağımsız seçer (profiles.language), tek bir global ayar değil.
@@ -136,6 +137,12 @@ const tr: Dict = {
   // Kalıbı da çeviri olarak tutmak zorundayız, yoksa İngilizce ekranda sözcük sırası bozuk çıkıyor.
   'format.date_long': '{{day}} {{month}} {{weekday}}',
   'format.date_short': '{{day}} {{month}}',
+
+  // Örnek isimler de çeviri: İngilizce bir forma "Ör. Ahmet Yılmaz" yazmak, ekranın geri
+  // kalanı İngilizceyken tek başına Türkçe kalıyordu.
+  'placeholder.example_email': 'ornek@eposta.com',
+  'placeholder.example_name': 'Ör. Mert K.',
+  'placeholder.example_trainer_name': 'Ör. Ahmet Yılmaz',
 
   'panel.weekly_calendar': 'Haftalık Ders Takvimi',
   'panel.prev_week': '‹ Önceki hafta',
@@ -897,6 +904,10 @@ const en: Dict = {
 
   'format.date_long': '{{weekday}}, {{month}} {{day}}',
   'format.date_short': '{{month}} {{day}}',
+
+  'placeholder.example_email': 'name@example.com',
+  'placeholder.example_name': 'e.g. John S.',
+  'placeholder.example_trainer_name': 'e.g. John Smith',
 
   'panel.weekly_calendar': 'Weekly Lesson Calendar',
   'panel.prev_week': '‹ Previous week',
@@ -1674,10 +1685,17 @@ export function getDeviceLang(): Lang {
   }
 }
 
+// Giriş ekranındaki TR/EN seçimi varsa cihaz dilinden önce gelir. Kayıt olurken profile
+// yazılacak dil de bu — kullanıcı formu İngilizce doldurduysa hesabı da İngilizce açılmalı.
+export function preLoginLanguage(): Lang {
+  return getPreLoginLang() ?? getDeviceLang();
+}
+
 export function useLanguage(): Lang {
   const { profile } = useAuth();
+  const preLogin = usePreLoginLang();
   if (profile?.language) return normalizeLang(profile.language);
-  return getDeviceLang();
+  return preLogin ?? getDeviceLang();
 }
 
 export function useIsRTL(): boolean {

@@ -51,7 +51,7 @@ export default function ForgotPassword() {
         ) : (
           <>
             <Text style={styles.info}>{t('auth.forgot_password_intro')}</Text>
-            <AuthField label={t('ayarlar.email')} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="ornek@eposta.com" />
+            <AuthField label={t('ayarlar.email')} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder={t('placeholder.example_email')} />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <PrimaryButton label={t('auth.send_reset_link_btn')} onPress={onSubmit} loading={loading} disabled={!email.trim()} />
             <Text style={styles.link} onPress={() => router.back()}>

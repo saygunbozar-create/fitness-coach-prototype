@@ -74,7 +74,7 @@ export default function HesapDuzenleScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Panel title={t('hesap.title')} right={t('hesap.subtitle')}>
-          <AuthField label={t('ayarlar.name')} value={nameDraft} onChangeText={setNameDraft} placeholder="Ör. Mert K." />
+          <AuthField label={t('ayarlar.name')} value={nameDraft} onChangeText={setNameDraft} placeholder={t('placeholder.example_name')} />
           <PrimaryButton
             label={t('hesap.save_name_btn')}
             loading={updateName.isPending}

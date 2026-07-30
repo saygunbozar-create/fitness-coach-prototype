@@ -290,8 +290,8 @@ export default function DanisanScreen() {
 
     return (
       <Panel title={t('danisan.edit_title')} right={t('danisan.edit_subtitle')}>
-        <AuthField label={t('ayarlar.name')} value={editForm.name} onChangeText={(v) => setEdit('name', v)} placeholder="Ör. Mert K." />
-        <AuthField label={t('ayarlar.email')} value={editForm.email} onChangeText={(v) => setEdit('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
+        <AuthField label={t('ayarlar.name')} value={editForm.name} onChangeText={(v) => setEdit('name', v)} placeholder={t('placeholder.example_name')} />
+        <AuthField label={t('ayarlar.email')} value={editForm.email} onChangeText={(v) => setEdit('email', v)} keyboardType="email-address" placeholder={t('placeholder.example_email')} />
 
         <Text style={styles.label}>{t('danisan.goal_label')}</Text>
         <View style={styles.goalRow}>
@@ -448,8 +448,8 @@ export default function DanisanScreen() {
 
         {!editingClientId && (showForm ? (
           <Panel title={t('danisan.new_client_title')} right={t('danisan.new_client_subtitle')}>
-            <AuthField label={t('ayarlar.name')} value={form.name} onChangeText={(v) => set('name', v)} placeholder="Ör. Mert K." />
-            <AuthField label={t('ayarlar.email')} value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder="ornek@eposta.com" />
+            <AuthField label={t('ayarlar.name')} value={form.name} onChangeText={(v) => set('name', v)} placeholder={t('placeholder.example_name')} />
+            <AuthField label={t('ayarlar.email')} value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder={t('placeholder.example_email')} />
 
             <Text style={styles.label}>{t('danisan.goal_label')}</Text>
             <View style={styles.goalRow}>

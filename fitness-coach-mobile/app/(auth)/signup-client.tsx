@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { AuthField } from '../../components/AuthField';
 import { ConsentCheckbox } from '../../components/ConsentCheckbox';
+import { PreLoginLangToggle } from '../../components/PreLoginLangToggle';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAuth } from '../../lib/auth';
 import { useT } from '../../lib/i18n';
@@ -31,6 +32,7 @@ export default function SignupClient() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <PreLoginLangToggle />
         <Text style={styles.brand}>COACHBOOK</Text>
         <Text style={styles.title}>{t('auth.signup_client_title')}</Text>
         <Text style={styles.hint}>
@@ -44,13 +46,13 @@ export default function SignupClient() {
           </>
         ) : (
           <>
-            <AuthField label={t('ayarlar.name')} value={name} onChangeText={setName} placeholder="Ör. Mert K." />
+            <AuthField label={t('ayarlar.name')} value={name} onChangeText={setName} placeholder={t('placeholder.example_name')} />
             <AuthField
               label={t('auth.email_trainer_added_label')}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
-              placeholder="ornek@eposta.com"
+              placeholder={t('placeholder.example_email')}
             />
             <AuthField label={t('auth.password_label')} value={password} onChangeText={setPassword} secureTextEntry placeholder={t('hesap.new_password_placeholder')} />
             <ConsentCheckbox checked={consent} onToggle={() => setConsent((v) => !v)} />
