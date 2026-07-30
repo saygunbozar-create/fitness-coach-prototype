@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { DateField } from '../../components/DateField';
 import { ClientCard } from '../../components/ClientCard';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -13,7 +14,7 @@ import { PARQ_QUESTIONS } from '../../lib/parq';
 import { useAddClient, useClients, useDeleteClient, useIntakeForm, useToggleClientActive, useUpdateClient, useWeightLogs } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, formatDateInputTr } from '../../lib/theme';
+import { C } from '../../lib/theme';
 import type { Client } from '../../lib/types';
 
 function IntakeFormSummary({ clientId }: { clientId: string }) {
@@ -323,13 +324,12 @@ export default function DanisanScreen() {
         <AuthField label={t('danisan.protein_label')} value={editForm.macro_p} onChangeText={(v) => setEdit('macro_p', v)} keyboardType="decimal-pad" />
         <AuthField label={t('danisan.carb_label')} value={editForm.macro_k} onChangeText={(v) => setEdit('macro_k', v)} keyboardType="decimal-pad" />
         <AuthField label={t('danisan.fat_label')} value={editForm.macro_y} onChangeText={(v) => setEdit('macro_y', v)} keyboardType="decimal-pad" />
-        <AuthField
+        <DateField
           label={t('danisan.birthday_label')}
           value={editForm.birthday}
-          onChangeText={(v) => setEdit('birthday', formatDateInputTr(v, editForm.birthday))}
+          onChangeText={(v) => setEdit('birthday', v)}
           placeholder={t('danisan.birthday_placeholder')}
-          keyboardType="number-pad"
-          maxLength={10}
+          clearable
         />
 
         {editError ? <Text style={styles.error}>{editError}</Text> : null}
@@ -497,13 +497,12 @@ export default function DanisanScreen() {
             <AuthField label={t('danisan.carb_label')} value={form.macro_k} onChangeText={(v) => set('macro_k', v)} keyboardType="decimal-pad" />
             <AuthField label={t('danisan.fat_label')} value={form.macro_y} onChangeText={(v) => set('macro_y', v)} keyboardType="decimal-pad" />
             <AuthField label={t('danisan.pr_label')} value={form.pr} onChangeText={(v) => set('pr', v)} keyboardType="decimal-pad" />
-            <AuthField
+            <DateField
               label={t('danisan.birthday_label')}
               value={form.birthday}
-              onChangeText={(v) => set('birthday', formatDateInputTr(v, form.birthday))}
+              onChangeText={(v) => set('birthday', v)}
               placeholder={t('danisan.birthday_placeholder')}
-              keyboardType="number-pad"
-              maxLength={10}
+              clearable
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}

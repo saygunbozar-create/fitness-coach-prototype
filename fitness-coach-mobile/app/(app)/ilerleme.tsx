@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { DateField } from '../../components/DateField';
 import { EmptyClientState } from '../../components/EmptyClientState';
 import { HBar } from '../../components/HBar';
 import { Panel } from '../../components/Panel';
@@ -34,7 +35,7 @@ import {
   useWellnessSurveys,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, checkinWeekStart, formatDateInputTr, localDateStr, monthPeriodStr, nf } from '../../lib/theme';
+import { C, checkinWeekStart, localDateStr, monthPeriodStr, nf } from '../../lib/theme';
 import { monthLabelTr } from '../../lib/wellnessSurvey';
 
 const WEEKS = 12;
@@ -433,13 +434,11 @@ export default function IlerlemeScreen() {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <AuthField
+              <DateField
                 label={t('ilerleme.date_empty_today')}
                 value={weightDateInput}
-                onChangeText={(v) => setWeightDateInput((prev) => formatDateInputTr(v, prev))}
-                placeholder="GG.AA.YYYY"
-                keyboardType="number-pad"
-                maxLength={10}
+                onChangeText={setWeightDateInput}
+                placeholder={t('placeholder.date_format')}
               />
             </View>
           </View>
@@ -471,13 +470,11 @@ export default function IlerlemeScreen() {
             <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
-          <AuthField
+          <DateField
             label={t('ilerleme.date_empty_today')}
             value={cardioDateInput}
-            onChangeText={(v) => setCardioDateInput((prev) => formatDateInputTr(v, prev))}
-            placeholder="GG.AA.YYYY"
-            keyboardType="number-pad"
-            maxLength={10}
+            onChangeText={setCardioDateInput}
+            placeholder={t('placeholder.date_format')}
           />
           {cardioDateInput.trim() && !cardioDateIso && <Text style={styles.dateError}>{t('ilerleme.date_format_err')}</Text>}
           <View style={styles.formGrid}>
@@ -596,13 +593,11 @@ export default function IlerlemeScreen() {
             <Text style={styles.historyBtnText}>{t('ilerleme.history_btn')}</Text>
           </Pressable>
 
-          <AuthField
+          <DateField
             label={t('ilerleme.date_empty_today')}
             value={measureDateInput}
-            onChangeText={(v) => setMeasureDateInput((prev) => formatDateInputTr(v, prev))}
-            placeholder="GG.AA.YYYY"
-            keyboardType="number-pad"
-            maxLength={10}
+            onChangeText={setMeasureDateInput}
+            placeholder={t('placeholder.date_format')}
           />
           {measureDateInput.trim() && !measureDateIso && <Text style={styles.dateError}>{t('ilerleme.date_format_err')}</Text>}
           <View style={styles.formGrid}>

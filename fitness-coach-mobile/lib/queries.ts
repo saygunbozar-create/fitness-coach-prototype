@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
-import { localDateStr } from './theme';
+import { compareTrNames, localDateStr } from './theme';
 import type {
   AppNotification,
   AvailabilityException,
@@ -99,9 +99,13 @@ export function useClients(trainerId: string | undefined) {
   return useQuery({
     queryKey: ['clients', trainerId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('*').eq('trainer_id', trainerId).order('created_at');
+      const { data, error } = await supabase.from('clients').select('*').eq('trainer_id', trainerId);
       if (error) throw error;
-      return data as Client[];
+      // Alfabetik sırala. Veritabanının `order('name')`'i kullanılmıyor: sunucu collation'ı
+      // Türkçe harfleri (Ç, Ğ, İ, Ş...) doğru yerleştirmiyor. Buradan sıralamak aynı zamanda
+      // danışan listesini, Panel'in danışan seçicisini ve sidebar/çekmece değiştiricisini
+      // tek noktadan hizalıyor — hepsi bu sorguyu okuyor.
+      return (data as Client[]).slice().sort((a, b) => compareTrNames(a.name, b.name));
     },
     enabled: !!trainerId,
   });

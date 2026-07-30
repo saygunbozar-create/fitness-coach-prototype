@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { DateField } from '../../components/DateField';
 import { EmptyClientState } from '../../components/EmptyClientState';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -25,7 +26,7 @@ import {
   useWorkoutDaysList,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { C, formatDateInputTr, formatTimeInputTr, localDateStr, nf } from '../../lib/theme';
+import { C, formatTimeInputTr, localDateStr, nf } from '../../lib/theme';
 import type { Payment } from '../../lib/types';
 
 const todayStr = localDateStr;
@@ -79,13 +80,11 @@ function EditPaymentForm({ payment, onCancel, onSave, saving }: { payment: Payme
 
   return (
     <View style={styles.editCard}>
-      <AuthField
+      <DateField
         label={t('panel.date_label')}
         value={date}
-        onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setError(false); }}
+        onChangeText={(v) => { setDate(v); setError(false); }}
         placeholder={t('odemeler.date_placeholder_generic')}
-        keyboardType="number-pad"
-        maxLength={10}
       />
       {error && <Text style={styles.error}>{t('odemeler.err_date_generic')}</Text>}
       <AuthField label={t('odemeler.amount_label')} value={amount} onChangeText={(v) => { setAmount(v); setAmountError(false); }} keyboardType="decimal-pad" />
@@ -426,13 +425,11 @@ export default function OdemelerScreen() {
               )}
               <View style={styles.rowGap2}>
                 <View style={{ flex: 1 }}>
-                  <AuthField
+                  <DateField
                     label={t('panel.date_label')}
                     value={sessionDraft.date}
-                    onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: formatDateInputTr(v, s.date) }))}
+                    onChangeText={(v) => setSessionDraft((s) => ({ ...s, date: v }))}
                     placeholder={t('odemeler.date_placeholder_generic')}
-                    keyboardType="number-pad"
-                    maxLength={10}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -525,13 +522,11 @@ export default function OdemelerScreen() {
 
         {isTrainer && (
           <Panel title={t('odemeler.add_payment_title')} right={t('odemeler.add_payment_subtitle')}>
-            <AuthField
+            <DateField
               label={t('odemeler.date_empty_today_label')}
               value={date}
-              onChangeText={(v) => { setDate((prev) => formatDateInputTr(v, prev)); setDateError(false); }}
+              onChangeText={(v) => { setDate(v); setDateError(false); }}
               placeholder={t('odemeler.date_placeholder_generic')}
-              keyboardType="number-pad"
-              maxLength={10}
             />
             {dateError && <Text style={styles.error}>{t('odemeler.err_date_with_example')}</Text>}
             <AuthField

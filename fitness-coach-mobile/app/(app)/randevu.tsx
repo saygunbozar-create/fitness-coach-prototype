@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { DateField } from '../../components/DateField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -58,18 +59,6 @@ function parseTrDate(input: string): string | null {
   const mm = mo.padStart(2, '0');
   if (+dd < 1 || +dd > 31 || +mm < 1 || +mm > 12) return null;
   return `${y}-${mm}-${dd}`;
-}
-
-function formatDateInputTr(value: string, prev: string): string {
-  let v = value;
-  if (v.length === prev.length - 1 && prev.endsWith('.') && v === prev.slice(0, -1)) v = v.slice(0, -1);
-  const digits = v.replace(/\D/g, '').slice(0, 8);
-  let out = digits.slice(0, 2);
-  if (digits.length > 2) out += '.' + digits.slice(2, 4);
-  else if (digits.length === 2) out += '.';
-  if (digits.length > 4) out += '.' + digits.slice(4, 8);
-  else if (digits.length === 4) out += '.';
-  return out;
 }
 
 function formatDateLong(dateStr: string, t: TFn): string {
@@ -323,13 +312,11 @@ function TrainerAvailabilityPanel({ trainerId }: { trainerId: string | undefined
         ))}
       </View>
 
-      <AuthField
+      <DateField
         label={t('randevu.rule_valid_until_label')}
         value={endDateInput}
-        onChangeText={(v) => setEndDateInput((prev) => formatDateInputTr(v, prev))}
+        onChangeText={setEndDateInput}
         placeholder={t('randevu.rule_valid_until_placeholder')}
-        keyboardType="number-pad"
-        maxLength={10}
       />
       {formError && <Text style={styles.errorText}>{formError}</Text>}
 
@@ -430,13 +417,11 @@ function TrainerExceptionsPanel({ trainerId }: { trainerId: string | undefined }
         {t('randevu.exceptions_hint')}
       </Text>
       <View style={{ height: 12 }} />
-      <AuthField
+      <DateField
         label={t('randevu.date_label')}
         value={dateInput}
-        onChangeText={(v) => setDateInput((prev) => formatDateInputTr(v, prev))}
+        onChangeText={setDateInput}
         placeholder={t('randevu.date_placeholder')}
-        keyboardType="number-pad"
-        maxLength={10}
       />
       <View style={styles.rowGap}>
         <View style={{ flex: 1 }}>

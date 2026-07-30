@@ -140,6 +140,11 @@ const tr: Dict = {
 
   // Örnek isimler de çeviri: İngilizce bir forma "Ör. Ahmet Yılmaz" yazmak, ekranın geri
   // kalanı İngilizceyken tek başına Türkçe kalıyordu.
+  'placeholder.date_format': 'GG.AA.YYYY',
+  'datepicker.open': 'Takvimi aç',
+  'datepicker.today': 'Bugün',
+  'datepicker.clear': 'Temizle',
+
   'placeholder.example_email': 'ornek@eposta.com',
   'placeholder.example_name': 'Ör. Mert K.',
   'placeholder.example_trainer_name': 'Ör. Ahmet Yılmaz',
@@ -904,6 +909,11 @@ const en: Dict = {
 
   'format.date_long': '{{weekday}}, {{month}} {{day}}',
   'format.date_short': '{{month}} {{day}}',
+
+  'placeholder.date_format': 'DD.MM.YYYY',
+  'datepicker.open': 'Open calendar',
+  'datepicker.today': 'Today',
+  'datepicker.clear': 'Clear',
 
   'placeholder.example_email': 'name@example.com',
   'placeholder.example_name': 'e.g. John S.',

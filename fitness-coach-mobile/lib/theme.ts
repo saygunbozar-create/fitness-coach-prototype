@@ -16,6 +16,32 @@ export const C = {
 export const nf = (v: number, d = 0) =>
   v.toLocaleString('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
+// Türkçe alfabe sırası — q/w/x yabancı isimler için araya yerleştirilmiş durumda.
+// `localeCompare(b, 'tr')` KULLANILMIYOR: Hermes'te Intl desteği platforma göre değişiyor ve
+// locale argümanı sessizce yok sayılabiliyor, o zaman "Çiğdem" Z'den sonraya düşerdi. Sırayı
+// elle tanımlamak her motorda aynı sonucu veriyor. ASCII isimlerde sıra İngilizceyle birebir
+// aynı çıkıyor, o yüzden dilden bağımsız tek bir sıralama yeterli.
+const TR_ALPHABET = 'abcçdefgğhıijklmnoöpqrsştuüvwxyz';
+const LETTER_RANK = new Map([...TR_ALPHABET].map((ch, i) => [ch, i]));
+
+// Türkçe küçültme: I → ı, İ → i (JS'in varsayılan toLowerCase'i ikisini de 'i' yapıyor).
+const trLower = (s: string) => s.replace(/I/g, 'ı').replace(/İ/g, 'i').toLowerCase();
+
+// Harf olmayanlar (boşluk, kısa çizgi, rakam) her harften ÖNCE geliyor — telefon rehberi
+// mantığı: "Ali B." < "Alican", çünkü kelime bitişi kelimenin devamından önce gelir.
+const rank = (ch: string) => LETTER_RANK.get(ch) ?? ch.charCodeAt(0) - 10000;
+
+export function compareTrNames(a: string, b: string): number {
+  const A = trLower(a.trim());
+  const B = trLower(b.trim());
+  const len = Math.min(A.length, B.length);
+  for (let i = 0; i < len; i++) {
+    const d = rank(A[i]) - rank(B[i]);
+    if (d !== 0) return d;
+  }
+  return A.length - B.length;
+}
+
 // Local calendar date as YYYY-MM-DD. Never use toISOString().slice(0,10) for "today" —
 // that reads the UTC date, which is still "yesterday" from local midnight to 3am in
 // Turkey (UTC+3) and silently mismatches date-keyed upserts/filters around that window.

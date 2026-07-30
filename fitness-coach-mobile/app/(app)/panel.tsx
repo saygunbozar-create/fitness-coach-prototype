@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
+import { DateField } from '../../components/DateField';
 import { Panel } from '../../components/Panel';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -20,7 +21,7 @@ import {
   useWeeklyCompletedSessionCount,
 } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
-import { addDaysToDateStr, C, formatDateInputTr, formatTimeInputTr, localDateStr, mondayOfWeek, nf } from '../../lib/theme';
+import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, mondayOfWeek, nf } from '../../lib/theme';
 
 function formatTrDateShort(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -220,13 +221,11 @@ function LessonScheduleCard() {
           </View>
           <View style={styles.rowGap}>
             <View style={{ flex: 1 }}>
-              <AuthField
+              <DateField
                 label={t('panel.date_label')}
                 value={lessonDate}
-                onChangeText={(v) => setLessonDate((prev) => formatDateInputTr(v, prev))}
+                onChangeText={setLessonDate}
                 placeholder={t('panel.date_placeholder')}
-                keyboardType="number-pad"
-                maxLength={10}
               />
             </View>
             <View style={{ flex: 1 }}>
