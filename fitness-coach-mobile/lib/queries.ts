@@ -2783,22 +2783,35 @@ export function useMonthlyPaymentsSummary(trainerId: string | undefined, monthSt
 export type PaymentPerson = { clientId: string; name: string; total: number; count: number; oldestDate: string };
 export type PaymentsOverview = {
   paidThisMonth: PaymentPerson[];
+  upcoming: PaymentPerson[];
   unpaidPrevious: PaymentPerson[];
   paidTotal: number;
+  upcomingTotal: number;
   unpaidTotal: number;
 };
 
 // Panel'in altındaki "kimden aldım / kim borçlu" listesi. Ödemeler ekranı tek danışanı
 // gösteriyor; buradaki soru tüm danışanlar genelinde olduğu için ayrı bir sorgu.
 //
-// İki isteği paralel atıyoruz ve ikisi de dar kapsamlı: bu ayın TAHSİL EDİLENLERİ ve
-// önceki aylardan ÖDENMEMİŞ olanlar. Tüm ödeme geçmişini çekip client tarafında filtrelemek
-// zamanla büyüyecek bir yük olurdu — eski ödenmemişler zaten az sayıda kalıyor.
+// Üç dar sorgu paralel gidiyor; hepsi birlikte ödemelerin tamamını kapsıyor:
+//   1. bu ay TAHSİL EDİLENLER          (paid,  monthStart..monthEnd)
+//   2. YAKLAŞANLAR — henüz alınmamış    (!paid, monthStart ve sonrası, geleceği de içerir)
+//   3. GECİKENLER — önceki aylardan     (!paid, monthStart öncesi)
+// 2. kategori ilk sürümde yoktu ve ödenmemiş ama tarihi bu ay/ileride olan kayıtlar hiçbir
+// listeye düşmüyordu — antrenör "gelecek ödemeleri göremiyorum" dedi, doğruydu.
+// Tüm ödeme geçmişini çekip client tarafında filtrelemek zamanla büyüyecek bir yük olurdu.
 export function usePaymentsOverview(trainerId: string | undefined, monthStart: string, monthEnd: string) {
   return useQuery({
     queryKey: ['payments_overview', trainerId, monthStart, monthEnd],
     queryFn: async () => {
-      const empty: PaymentsOverview = { paidThisMonth: [], unpaidPrevious: [], paidTotal: 0, unpaidTotal: 0 };
+      const empty: PaymentsOverview = {
+        paidThisMonth: [],
+        upcoming: [],
+        unpaidPrevious: [],
+        paidTotal: 0,
+        upcomingTotal: 0,
+        unpaidTotal: 0,
+      };
       const { data: clients, error: clErr } = await supabase.from('clients').select('id, name').eq('trainer_id', trainerId);
       if (clErr) throw clErr;
       const clientRows = clients as { id: string; name: string }[];
@@ -2806,11 +2819,13 @@ export function usePaymentsOverview(trainerId: string | undefined, monthStart: s
       const nameById = new Map(clientRows.map((c) => [c.id, c.name]));
       const ids = clientRows.map((c) => c.id);
 
-      const [paidRes, oweRes] = await Promise.all([
+      const [paidRes, upcomingRes, oweRes] = await Promise.all([
         supabase.from('payments').select('client_id, amount, date').in('client_id', ids).eq('paid', true).gte('date', monthStart).lte('date', monthEnd),
+        supabase.from('payments').select('client_id, amount, date').in('client_id', ids).eq('paid', false).gte('date', monthStart),
         supabase.from('payments').select('client_id, amount, date').in('client_id', ids).eq('paid', false).lt('date', monthStart),
       ]);
       if (paidRes.error) throw paidRes.error;
+      if (upcomingRes.error) throw upcomingRes.error;
       if (oweRes.error) throw oweRes.error;
 
       const group = (rows: { client_id: string; amount: number; date: string }[]): PaymentPerson[] => {
@@ -2832,13 +2847,17 @@ export function usePaymentsOverview(trainerId: string | undefined, monthStart: s
       };
 
       const paidThisMonth = group(paidRes.data as any).sort((a, b) => compareTrNames(a.name, b.name));
-      // Borçlular en eskiden yeniye — en çok geciken en üstte, asıl takip edilmesi gereken o.
+      // Yaklaşanlar tarihe göre — en yakın vade en üstte. (oldestDate burada "en yakın vade".)
+      const upcoming = group(upcomingRes.data as any).sort((a, b) => a.oldestDate.localeCompare(b.oldestDate));
+      // Gecikenler en eskiden yeniye — en çok geciken en üstte, asıl takip edilmesi gereken o.
       const unpaidPrevious = group(oweRes.data as any).sort((a, b) => a.oldestDate.localeCompare(b.oldestDate));
 
       return {
         paidThisMonth,
+        upcoming,
         unpaidPrevious,
         paidTotal: paidThisMonth.reduce((a, p) => a + p.total, 0),
+        upcomingTotal: upcoming.reduce((a, p) => a + p.total, 0),
         unpaidTotal: unpaidPrevious.reduce((a, p) => a + p.total, 0),
       } as PaymentsOverview;
     },

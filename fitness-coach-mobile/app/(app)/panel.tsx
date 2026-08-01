@@ -293,17 +293,25 @@ function PaymentStatusCard() {
 
   const monthLabel = `${monthNames(t)[now.getMonth()]} ${now.getFullYear()}`;
 
-  function PersonRow({ p, overdue }: { p: PaymentPerson; overdue?: boolean }) {
+  function PersonRow({ p, kind }: { p: PaymentPerson; kind: 'paid' | 'upcoming' | 'overdue' }) {
+    const note =
+      kind === 'overdue'
+        ? ` · ${t('panel.oldest_since', { date: formatTrDateShort(p.oldestDate) })}`
+        : kind === 'upcoming'
+          ? ` · ${t('panel.due_on', { date: formatTrDateShort(p.oldestDate) })}`
+          : '';
     return (
       <Pressable style={styles.payRow} onPress={() => openClient(p.clientId)}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.payName}>{p.name}</Text>
           <Text style={styles.payMeta}>
             {t('panel.payment_count', { count: p.count })}
-            {overdue ? ` · ${t('panel.oldest_since', { date: formatTrDateShort(p.oldestDate) })}` : ''}
+            {note}
           </Text>
         </View>
-        <Text style={[styles.payAmount, overdue && styles.payAmountOwed]}>{nf(p.total)} ₺</Text>
+        <Text style={[styles.payAmount, kind === 'overdue' && styles.payAmountOwed, kind === 'upcoming' && styles.payAmountDue]}>
+          {nf(p.total)} ₺
+        </Text>
       </Pressable>
     );
   }
@@ -321,7 +329,17 @@ function PaymentStatusCard() {
           {data.paidThisMonth.length === 0 ? (
             <Text style={styles.payEmpty}>{t('panel.no_paid_this_month')}</Text>
           ) : (
-            data.paidThisMonth.map((p) => <PersonRow key={p.clientId} p={p} />)
+            data.paidThisMonth.map((p) => <PersonRow key={p.clientId} p={p} kind="paid" />)
+          )}
+
+          <View style={[styles.paySectionHead, { marginTop: 16 }]}>
+            <Text style={styles.paySectionTitle}>{t('panel.upcoming_payments')}</Text>
+            <Text style={[styles.paySectionSum, styles.payAmountDue]}>{nf(data.upcomingTotal)} ₺</Text>
+          </View>
+          {data.upcoming.length === 0 ? (
+            <Text style={styles.payEmpty}>{t('panel.no_upcoming')}</Text>
+          ) : (
+            data.upcoming.map((p) => <PersonRow key={p.clientId} p={p} kind="upcoming" />)
           )}
 
           <View style={[styles.paySectionHead, { marginTop: 16 }]}>
@@ -331,7 +349,7 @@ function PaymentStatusCard() {
           {data.unpaidPrevious.length === 0 ? (
             <Text style={styles.payEmpty}>{t('panel.no_unpaid_previous')}</Text>
           ) : (
-            data.unpaidPrevious.map((p) => <PersonRow key={p.clientId} p={p} overdue />)
+            data.unpaidPrevious.map((p) => <PersonRow key={p.clientId} p={p} kind="overdue" />)
           )}
         </>
       )}
@@ -488,6 +506,8 @@ const styles = StyleSheet.create({
   payMeta: { fontSize: 10.5, color: C.greyD, marginTop: 2 },
   payAmount: { fontSize: 13, fontWeight: '800', color: C.white },
   payAmountOwed: { color: C.orange },
+  // Yaklaşan = henüz gecikmemiş, o yüzden uyarı turuncusu değil nötr mavi.
+  payAmountDue: { color: C.blue },
   payEmpty: { fontSize: 12, color: C.greyD, fontStyle: 'italic', paddingVertical: 4 },
   lessonInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   bookedBadge: { backgroundColor: 'rgba(198,249,78,.12)', borderWidth: 1, borderColor: 'rgba(198,249,78,.4)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
