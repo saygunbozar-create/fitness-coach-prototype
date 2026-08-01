@@ -41,7 +41,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web && node scripts/inject-pwa-head.js",
-    "sentry": "node scripts/sentry-issues.js"
+    "sentry": "node scripts/sentry-issues.js",
+    "sentry:sourcemaps": "node scripts/upload-sourcemaps.js"
   },
   "private": true
 }

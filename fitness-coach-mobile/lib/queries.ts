@@ -2307,7 +2307,19 @@ export function useDeleteLessonEntry(trainerId: string | undefined) {
       const { error } = await supabase.from('lesson_schedule').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] }),
+    // Takvimdeki ✕ de seans butonlarıyla aynı satırda ve aynı şekilde bekletiyordu.
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['lesson_schedule', trainerId] });
+      const previous = qc.getQueriesData<LessonScheduleEntryWithClient[]>({ queryKey: ['lesson_schedule', trainerId] });
+      for (const [key, rows] of previous) {
+        qc.setQueryData<LessonScheduleEntryWithClient[]>(key, (rows ?? []).filter((r) => r.id !== id));
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      for (const [key, rows] of context?.previous ?? []) qc.setQueryData(key, rows);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['lesson_schedule', trainerId] }),
   });
 }
 
@@ -2655,7 +2667,31 @@ export function useLogSessionFromSchedule(trainerId: string | undefined) {
         .insert({ client_id: input.client_id, date: input.date, time: input.time, status: 'tamamlandi', workout_day_id: null });
       if (error) throw error;
     },
-    onSuccess: (_data, input) => {
+    // "Seans Kullan" üç ağ gidiş-gelişi zincirliyor (paket → kalan sayım → insert), sonra beş
+    // sorgu tazeleniyor. Antrenör bunların hepsini bekliyordu; buton saniyelerce ölü duruyordu.
+    // Satırı önden ekliyoruz: rozet anında dönüyor, hata olursa onError eski hâli geri koyuyor.
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ['session_logs_week', trainerId] });
+      const previous = qc.getQueriesData<SessionLog[]>({ queryKey: ['session_logs_week', trainerId] });
+      const optimistic = {
+        // Gerçek id sunucudan gelecek; geçici id sadece React'in key'i için. Panel eşleştirmeyi
+        // danışan+tarih+saat ile yaptığı için bu satır rozeti doğru şekilde "kullanıldı" yapıyor.
+        id: `optimistic-${input.client_id}-${input.date}-${input.time ?? ''}`,
+        client_id: input.client_id,
+        date: input.date,
+        time: input.time,
+        status: 'tamamlandi',
+        workout_day_id: null,
+      } as SessionLog;
+      for (const [key, rows] of previous) {
+        qc.setQueryData<SessionLog[]>(key, [...(rows ?? []), optimistic]);
+      }
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      for (const [key, rows] of context?.previous ?? []) qc.setQueryData(key, rows);
+    },
+    onSettled: (_data, _err, input) => {
       qc.invalidateQueries({ queryKey: ['session_logs', input.client_id] });
       qc.invalidateQueries({ queryKey: ['session_history', input.client_id] });
       qc.invalidateQueries({ queryKey: ['completed_sessions_since', input.client_id] });
@@ -2672,7 +2708,19 @@ export function useUnlogSessionFromSchedule(trainerId: string | undefined) {
       const { error } = await supabase.from('session_logs').delete().eq('id', input.id);
       if (error) throw error;
     },
-    onSuccess: (_data, input) => {
+    // "Geri Al" da aynı sebeple bekletiyordu — satırı önden kaldırıyoruz.
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ['session_logs_week', trainerId] });
+      const previous = qc.getQueriesData<SessionLog[]>({ queryKey: ['session_logs_week', trainerId] });
+      for (const [key, rows] of previous) {
+        qc.setQueryData<SessionLog[]>(key, (rows ?? []).filter((r) => r.id !== input.id));
+      }
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      for (const [key, rows] of context?.previous ?? []) qc.setQueryData(key, rows);
+    },
+    onSettled: (_data, _err, input) => {
       qc.invalidateQueries({ queryKey: ['session_logs', input.client_id] });
       qc.invalidateQueries({ queryKey: ['session_history', input.client_id] });
       qc.invalidateQueries({ queryKey: ['completed_sessions_since', input.client_id] });
@@ -2727,6 +2775,72 @@ export function useMonthlyPaymentsSummary(trainerId: string | undefined, monthSt
       const paid = rows.filter((r) => r.paid).reduce((a, r) => a + r.amount, 0);
       const pending = rows.filter((r) => !r.paid).reduce((a, r) => a + r.amount, 0);
       return { total: paid + pending, paid, pending } as MonthlyPaymentsSummary;
+    },
+    enabled: !!trainerId,
+  });
+}
+
+export type PaymentPerson = { clientId: string; name: string; total: number; count: number; oldestDate: string };
+export type PaymentsOverview = {
+  paidThisMonth: PaymentPerson[];
+  unpaidPrevious: PaymentPerson[];
+  paidTotal: number;
+  unpaidTotal: number;
+};
+
+// Panel'in altındaki "kimden aldım / kim borçlu" listesi. Ödemeler ekranı tek danışanı
+// gösteriyor; buradaki soru tüm danışanlar genelinde olduğu için ayrı bir sorgu.
+//
+// İki isteği paralel atıyoruz ve ikisi de dar kapsamlı: bu ayın TAHSİL EDİLENLERİ ve
+// önceki aylardan ÖDENMEMİŞ olanlar. Tüm ödeme geçmişini çekip client tarafında filtrelemek
+// zamanla büyüyecek bir yük olurdu — eski ödenmemişler zaten az sayıda kalıyor.
+export function usePaymentsOverview(trainerId: string | undefined, monthStart: string, monthEnd: string) {
+  return useQuery({
+    queryKey: ['payments_overview', trainerId, monthStart, monthEnd],
+    queryFn: async () => {
+      const empty: PaymentsOverview = { paidThisMonth: [], unpaidPrevious: [], paidTotal: 0, unpaidTotal: 0 };
+      const { data: clients, error: clErr } = await supabase.from('clients').select('id, name').eq('trainer_id', trainerId);
+      if (clErr) throw clErr;
+      const clientRows = clients as { id: string; name: string }[];
+      if (clientRows.length === 0) return empty;
+      const nameById = new Map(clientRows.map((c) => [c.id, c.name]));
+      const ids = clientRows.map((c) => c.id);
+
+      const [paidRes, oweRes] = await Promise.all([
+        supabase.from('payments').select('client_id, amount, date').in('client_id', ids).eq('paid', true).gte('date', monthStart).lte('date', monthEnd),
+        supabase.from('payments').select('client_id, amount, date').in('client_id', ids).eq('paid', false).lt('date', monthStart),
+      ]);
+      if (paidRes.error) throw paidRes.error;
+      if (oweRes.error) throw oweRes.error;
+
+      const group = (rows: { client_id: string; amount: number; date: string }[]): PaymentPerson[] => {
+        const byClient = new Map<string, PaymentPerson>();
+        for (const r of rows) {
+          const cur = byClient.get(r.client_id) ?? {
+            clientId: r.client_id,
+            name: nameById.get(r.client_id) ?? '—',
+            total: 0,
+            count: 0,
+            oldestDate: r.date,
+          };
+          cur.total += Number(r.amount);
+          cur.count += 1;
+          if (r.date < cur.oldestDate) cur.oldestDate = r.date;
+          byClient.set(r.client_id, cur);
+        }
+        return Array.from(byClient.values());
+      };
+
+      const paidThisMonth = group(paidRes.data as any).sort((a, b) => compareTrNames(a.name, b.name));
+      // Borçlular en eskiden yeniye — en çok geciken en üstte, asıl takip edilmesi gereken o.
+      const unpaidPrevious = group(oweRes.data as any).sort((a, b) => a.oldestDate.localeCompare(b.oldestDate));
+
+      return {
+        paidThisMonth,
+        unpaidPrevious,
+        paidTotal: paidThisMonth.reduce((a, p) => a + p.total, 0),
+        unpaidTotal: unpaidPrevious.reduce((a, p) => a + p.total, 0),
+      } as PaymentsOverview;
     },
     enabled: !!trainerId,
   });

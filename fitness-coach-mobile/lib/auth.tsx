@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { preLoginLanguage } from './i18n';
+import { Sentry } from './sentry';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -29,6 +30,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setProfileSafe = (p: Profile | null) => {
     profileRef.current = p;
     setProfile(p);
+    // Sentry'de hatanın KİMDE olduğunu görebilmek için. Profilin tek geçiş noktası burası,
+    // yani giriş / çıkış / token yenileme hepsi buradan geçiyor.
+    // Sadece id ve rol gönderiliyor — isim/e-posta bilerek yok (sendDefaultPii: false ile tutarlı).
+    Sentry.setUser(p ? { id: p.id } : null);
+    Sentry.setTag('role', p?.role ?? 'anonim');
   };
 
   async function loadProfile(userId: string, attempt = 0) {

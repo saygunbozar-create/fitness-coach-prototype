@@ -140,6 +140,17 @@ const tr: Dict = {
 
   // Örnek isimler de çeviri: İngilizce bir forma "Ör. Ahmet Yılmaz" yazmak, ekranın geri
   // kalanı İngilizceyken tek başına Türkçe kalıyordu.
+  'panel.payments_title': 'Ödeme Durumu',
+  'panel.payments_right': '{{month}}',
+  'panel.paid_this_month': 'Bu ay ödeme alınanlar',
+  'panel.unpaid_previous': 'Önceki aylardan bekleyenler',
+  'panel.no_paid_this_month': 'Bu ay henüz ödeme alınmadı.',
+  'panel.no_unpaid_previous': 'Önceki aylardan bekleyen ödeme yok.',
+  'panel.payment_count': '{{count}} ödeme',
+  'panel.oldest_since': '{{date}} tarihinden beri',
+  'panel.paid_total': 'Toplam alınan',
+  'panel.unpaid_total': 'Toplam bekleyen',
+
   'placeholder.date_format': 'GG.AA.YYYY',
   'datepicker.open': 'Takvimi aç',
   'datepicker.today': 'Bugün',
@@ -909,6 +920,17 @@ const en: Dict = {
 
   'format.date_long': '{{weekday}}, {{month}} {{day}}',
   'format.date_short': '{{month}} {{day}}',
+
+  'panel.payments_title': 'Payment Status',
+  'panel.payments_right': '{{month}}',
+  'panel.paid_this_month': 'Collected this month',
+  'panel.unpaid_previous': 'Outstanding from previous months',
+  'panel.no_paid_this_month': 'No payments collected this month yet.',
+  'panel.no_unpaid_previous': 'Nothing outstanding from previous months.',
+  'panel.payment_count': '{{count}} payment(s)',
+  'panel.oldest_since': 'since {{date}}',
+  'panel.paid_total': 'Total collected',
+  'panel.unpaid_total': 'Total outstanding',
 
   'placeholder.date_format': 'DD.MM.YYYY',
   'datepicker.open': 'Open calendar',

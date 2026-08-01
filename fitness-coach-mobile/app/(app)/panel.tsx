@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
@@ -16,12 +16,15 @@ import {
   useLessonSchedule,
   useLogSessionFromSchedule,
   useMonthlyPaymentsSummary,
+  usePaymentsOverview,
+  type PaymentPerson,
   useSessionLogsForWeek,
   useUnlogSessionFromSchedule,
   useWeeklyCompletedSessionCount,
 } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
-import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, mondayOfWeek, nf } from '../../lib/theme';
+import { useSelectedClient } from '../../lib/selectedClient';
+import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, mondayOfWeek, monthNames, nf } from '../../lib/theme';
 
 function formatTrDateShort(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -58,6 +61,13 @@ function LessonScheduleCard() {
   const sessionLogsWeekQuery = useSessionLogsForWeek(profile?.id, weekStart, weekEnd);
   const logSession = useLogSessionFromSchedule(profile?.id);
   const unlogSession = useUnlogSessionFromSchedule(profile?.id);
+
+  const { setSelectedClientId } = useSelectedClient();
+
+  function openClient(clientId: string) {
+    setSelectedClientId(clientId);
+    router.push('/(app)/antrenman');
+  }
 
   const [addingLesson, setAddingLesson] = useState(false);
   const [lessonClientId, setLessonClientId] = useState<string | null>(null);
@@ -137,16 +147,18 @@ function LessonScheduleCard() {
                   const used = usedByKey.get(sessionKey(l.client_id, l.date, l.time));
                   return (
                     <View key={l.id} style={styles.lessonRow}>
-                      <View style={styles.lessonInfo}>
+                      {/* İsme dokununca o danışan seçilip antrenman programına gidiliyor —
+                          dersten hemen önce açılmak istenen ekran orası. */}
+                      <Pressable style={styles.lessonInfo} onPress={() => openClient(l.client_id)} hitSlop={4}>
                         <Text style={styles.lessonText}>
-                          {l.time.slice(0, 5)} · {l.clientName}
+                          {l.time.slice(0, 5)} · <Text style={styles.lessonClientLink}>{l.clientName}</Text>
                         </Text>
                         {l.booked_by_client && (
                           <View style={styles.bookedBadge}>
                             <Text style={styles.bookedBadgeText}>{t('panel.booked_badge')}</Text>
                           </View>
                         )}
-                      </View>
+                      </Pressable>
                       <View style={styles.lessonActions}>
                         {used ? (
                           <Pressable
@@ -261,6 +273,72 @@ function LessonScheduleCard() {
   );
 }
 
+// "Bu ay kimden aldım, önceki aylardan kim borçlu" — Ödemeler ekranı tek danışanı gösterdiği
+// için bu soru orada cevaplanamıyordu; genel bakış Panel'in altına ait.
+function PaymentStatusCard() {
+  const t = useT();
+  const { profile } = useAuth();
+  const { setSelectedClientId } = useSelectedClient();
+
+  const now = new Date();
+  const monthStart = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthEnd = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const overviewQuery = usePaymentsOverview(profile?.id, monthStart, monthEnd);
+  const data = overviewQuery.data;
+
+  function openClient(clientId: string) {
+    setSelectedClientId(clientId);
+    router.push('/(app)/odemeler');
+  }
+
+  const monthLabel = `${monthNames(t)[now.getMonth()]} ${now.getFullYear()}`;
+
+  function PersonRow({ p, overdue }: { p: PaymentPerson; overdue?: boolean }) {
+    return (
+      <Pressable style={styles.payRow} onPress={() => openClient(p.clientId)}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.payName}>{p.name}</Text>
+          <Text style={styles.payMeta}>
+            {t('panel.payment_count', { count: p.count })}
+            {overdue ? ` · ${t('panel.oldest_since', { date: formatTrDateShort(p.oldestDate) })}` : ''}
+          </Text>
+        </View>
+        <Text style={[styles.payAmount, overdue && styles.payAmountOwed]}>{nf(p.total)} ₺</Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Panel title={t('panel.payments_title')} right={monthLabel}>
+      {overviewQuery.isLoading || !data ? (
+        <ActivityIndicator color={C.lime} />
+      ) : (
+        <>
+          <View style={styles.paySectionHead}>
+            <Text style={styles.paySectionTitle}>{t('panel.paid_this_month')}</Text>
+            <Text style={styles.paySectionSum}>{nf(data.paidTotal)} ₺</Text>
+          </View>
+          {data.paidThisMonth.length === 0 ? (
+            <Text style={styles.payEmpty}>{t('panel.no_paid_this_month')}</Text>
+          ) : (
+            data.paidThisMonth.map((p) => <PersonRow key={p.clientId} p={p} />)
+          )}
+
+          <View style={[styles.paySectionHead, { marginTop: 16 }]}>
+            <Text style={styles.paySectionTitle}>{t('panel.unpaid_previous')}</Text>
+            <Text style={[styles.paySectionSum, styles.payAmountOwed]}>{nf(data.unpaidTotal)} ₺</Text>
+          </View>
+          {data.unpaidPrevious.length === 0 ? (
+            <Text style={styles.payEmpty}>{t('panel.no_unpaid_previous')}</Text>
+          ) : (
+            data.unpaidPrevious.map((p) => <PersonRow key={p.clientId} p={p} overdue />)
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
 function TrainerReportCard() {
   const t = useT();
   const { profile } = useAuth();
@@ -358,6 +436,8 @@ export default function PanelScreen() {
             <TrainerReportCard />
           </>
         )}
+        {/* İki listeye de genişlik gerektiği için masaüstünde sütunların altında, tam genişlikte. */}
+        <PaymentStatusCard />
       </ScrollView>
     </View>
   );
@@ -388,6 +468,27 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   lessonText: { fontSize: 12, fontWeight: '600', color: C.white },
+  lessonClientLink: { color: C.lime, fontWeight: '700' },
+
+  paySectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  // Bilerek textTransform:'uppercase' YOK — CSS büyük harfe çevirirken İngilizce kuralını
+  // uyguluyor ve "Önceki" → "ÖNCEKI" oluyor (Türkçede İ olmalı). Aynı hata uygulamanın başka
+  // yerlerinde de var (ör. kenar çubuğundaki "ANTRENÖR PANELI"), burada yenisini eklemiyoruz.
+  paySectionTitle: { fontSize: 12, fontWeight: '800', color: C.grey, letterSpacing: 0.2, flexShrink: 1 },
+  paySectionSum: { fontSize: 13, fontWeight: '800', color: C.lime },
+  payRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: C.edge,
+  },
+  payName: { fontSize: 13, fontWeight: '700', color: C.white },
+  payMeta: { fontSize: 10.5, color: C.greyD, marginTop: 2 },
+  payAmount: { fontSize: 13, fontWeight: '800', color: C.white },
+  payAmountOwed: { color: C.orange },
+  payEmpty: { fontSize: 12, color: C.greyD, fontStyle: 'italic', paddingVertical: 4 },
   lessonInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   bookedBadge: { backgroundColor: 'rgba(198,249,78,.12)', borderWidth: 1, borderColor: 'rgba(198,249,78,.4)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
   bookedBadgeText: { fontSize: 9, fontWeight: '800', color: C.lime, textTransform: 'uppercase', letterSpacing: 0.3 },
