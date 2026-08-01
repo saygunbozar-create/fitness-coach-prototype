@@ -67,13 +67,18 @@ function ago(iso) {
   const token = cfg('SENTRY_AUTH_TOKEN', null);
   if (!token) {
     console.error('SENTRY_AUTH_TOKEN yok.\n');
-    console.error('Token nasıl alınır:');
-    console.error(`  1. https://sentry.io/settings/${ORG}/developer-settings/`);
-    console.error('     (sol menüde "Custom Integrations" ya da "Developer Settings" olarak geçiyor)');
-    console.error('  2. Create New Integration → Internal Integration → İleri');
-    console.error('  3. Bir isim ver, Permissions altında "Issue & Event" iznini Read yap');
-    console.error('  4. Save Changes → sayfanın en altındaki Tokens bölümünden token\'ı kopyala\n');
-    console.error('Sonra fitness-coach-mobile/.env dosyasına şu satırı ekle:');
+    console.error('EN KOLAY YOL — kişisel token:');
+    console.error('  1. https://sentry.io/settings/account/api/auth-tokens/');
+    console.error('  2. Create New Token');
+    console.error('  3. Scope listesinden "event:read" işaretle (project:read de işaretlenebilir)');
+    console.error('  4. Token\'ı oluştur ve kopyala — sayfadan çıkınca bir daha gösterilmiyor\n');
+    console.error('ALTERNATİF — kuruluşa ait, kişiye bağlı olmayan token:');
+    console.error(`  https://sentry.io/settings/${ORG}/developer-settings/ → Create New Integration`);
+    console.error('  → Internal Integration → Permissions → "Issue & Event": Read → Save Changes');
+    console.error('  → token sayfanın en altındaki Tokens bölümünde çıkıyor\n');
+    console.error('NOT: Settings → Auth Tokens altındaki "Organization Auth Token" İŞE YARAMAZ —');
+    console.error('     onun yetkileri sabit ve CI içindir, event:read veremiyorsun.\n');
+    console.error('Token\'ı aldıktan sonra fitness-coach-mobile/.env dosyasına ekle:');
     console.error('  SENTRY_AUTH_TOKEN=<kopyaladığın token>');
     process.exitCode = 1;
     return;
