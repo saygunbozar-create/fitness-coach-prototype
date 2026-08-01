@@ -1,8 +1,11 @@
 // Sentry'deki açık hataları terminale döker — kimsenin panele girmesi gerekmesin diye.
 //
-// Gerekli: .env içinde SENTRY_AUTH_TOKEN (Sentry → Settings → Auth Tokens, `project:read`
-// + `event:read` yetkileriyle). Bu token DSN'den FARKLI: DSN sadece hata göndermeye yarıyor,
-// okumak için ayrı bir token gerekiyor. .env zaten .gitignore'da.
+// Gerekli: .env içinde SENTRY_AUTH_TOKEN. Bu token DSN'den FARKLI: DSN sadece hata
+// GÖNDERMEYE yarıyor, okumak için ayrı bir token gerekiyor. .env zaten .gitignore'da.
+// Token nasıl alınır: Sentry → Settings → Custom Integrations (eski adıyla Developer
+// Settings) → Create New Integration → Internal Integration → Permissions altında
+// Issue & Event: Read → kaydet, en altta çıkan token'ı kopyala.
+// Bu uç noktanın istediği yetki `event:read`.
 //
 // Kullanım:
 //   node scripts/sentry-issues.js               son 14 gün, çözülmemiş, sıklığa göre
@@ -37,9 +40,18 @@ function arg(name, fallback) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
+// statsPeriod belgelenmiş olarak sadece bu iki değeri kabul ediyor (ya da devre dışı için boş).
+// "7d" gibi bir şey yazılırsa Sentry sessizce farklı davranabiliyor — baştan uyarmak daha iyi.
+const SINCE_VALUES = ['24h', '14d'];
 const since = arg('since', '14d');
 const limit = arg('limit', '25');
 const showAll = process.argv.includes('--all');
+
+if (!SINCE_VALUES.includes(since)) {
+  console.error(`--since sadece ${SINCE_VALUES.join(' veya ')} olabilir (Sentry API'sinin kabul ettiği değerler). Verilen: ${since}`);
+  process.exitCode = 1;
+  return;
+}
 
 // "2 saat önce" gibi okunur bir fark — ham ISO tarih tabloda gürültü yapıyor.
 function ago(iso) {
@@ -55,9 +67,14 @@ function ago(iso) {
   const token = cfg('SENTRY_AUTH_TOKEN', null);
   if (!token) {
     console.error('SENTRY_AUTH_TOKEN yok.\n');
-    console.error('Sentry → Settings → Auth Tokens → yeni token (project:read, event:read),');
-    console.error('sonra fitness-coach-mobile/.env dosyasına şu satırı ekle:');
-    console.error('  SENTRY_AUTH_TOKEN=sntrys_...');
+    console.error('Token nasıl alınır:');
+    console.error(`  1. https://sentry.io/settings/${ORG}/developer-settings/`);
+    console.error('     (sol menüde "Custom Integrations" ya da "Developer Settings" olarak geçiyor)');
+    console.error('  2. Create New Integration → Internal Integration → İleri');
+    console.error('  3. Bir isim ver, Permissions altında "Issue & Event" iznini Read yap');
+    console.error('  4. Save Changes → sayfanın en altındaki Tokens bölümünden token\'ı kopyala\n');
+    console.error('Sonra fitness-coach-mobile/.env dosyasına şu satırı ekle:');
+    console.error('  SENTRY_AUTH_TOKEN=<kopyaladığın token>');
     process.exitCode = 1;
     return;
   }
