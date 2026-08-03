@@ -5,7 +5,8 @@ import { C } from '../../lib/theme';
 export default function AuthLayout() {
   const { session, profile } = useAuth();
 
-  if (session && profile) return <Redirect href={profile.role === 'trainer' ? '/(app)/panel' : '/(app)/antrenman'} />;
+  // Her iki rol de Panel'e gidiyor — danışanın da artık kendi özet ekranı var.
+  if (session && profile) return <Redirect href="/(app)/panel" />;
 
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />;
 }

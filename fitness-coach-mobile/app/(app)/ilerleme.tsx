@@ -113,6 +113,49 @@ export default function IlerlemeScreen() {
   const [cardioDateInput, setCardioDateInput] = useState('');
   const [injuryDraft, setInjuryDraft] = useState({ body_part: '', severity: 3, note: '' });
   const [viewingPhoto, setViewingPhoto] = useState<{ url: string | null; date: string } | null>(null);
+  // Fotoğraf karşılaştırma: iki fotoğrafı yan yana koymak. Danışanı en çok motive eden şey
+  // 8 hafta öncesiyle bugünü aynı anda görmek; tek tek listede bu hiç mümkün değildi.
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  // Üçüncüye basınca en eski seçim düşüyor — "önce ikisini kaldır" demek zorunda kalmasın.
+  function toggleCompare(id: string) {
+    setCompareIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 2 ? [prev[1], id] : [...prev, id]
+    );
+  }
+
+  // O tarihte veya ondan önce girilmiş EN YAKIN kilo. Fotoğrafın çekildiği gün tartıya
+  // çıkılmamış olabilir; en yakın önceki kayıt pratikte doğru cevap.
+  function weightAt(dateStr: string): number | null {
+    const logs = (weightLogsQuery.data ?? []).filter((w) => w.date <= dateStr);
+    if (!logs.length) return null;
+    const en = logs.reduce((a, b) => (a.date >= b.date ? a : b));
+    return Number(en.weight);
+  }
+
+  const comparePair = useMemo(() => {
+    if (compareIds.length !== 2) return null;
+    const photos = (photosQuery.data ?? []) as any[];
+    const secilen = compareIds.map((id) => photos.find((p) => p.id === id)).filter(Boolean);
+    if (secilen.length !== 2) return null;
+    // Her zaman eskiden yeniye — hangi sırayla seçildiğinden bağımsız olarak solda "önce".
+    return secilen.sort((a, b) => a.date.localeCompare(b.date));
+  }, [compareIds, photosQuery.data]);
+
+  const compareSummary = useMemo(() => {
+    if (!comparePair) return null;
+    const [a, b] = comparePair;
+    const gun = Math.round((new Date(b.date).getTime() - new Date(a.date).getTime()) / 86400000);
+    const wa = weightAt(a.date);
+    const wb = weightAt(b.date);
+    if (wa === null || wb === null) return t('ilerleme.compare_days', { days: gun });
+    const fark = wb - wa;
+    return t('ilerleme.compare_days_weight', {
+      days: gun,
+      delta: `${fark > 0 ? '+' : ''}${nf(fark, 1)}`,
+    });
+  }, [comparePair, weightLogsQuery.data, t]);
 
   // Boş tarih alanı = bugün, doluysa girilen (geçmişe dönük olabilir) tarih.
   const weightDateIso = weightDateInput.trim() ? parseTrDate(weightDateInput) : localDateStr();
@@ -648,15 +691,49 @@ export default function IlerlemeScreen() {
         </Panel>
 
         <Panel title={t('ilerleme.photos_title')} right={t('ilerleme.photos_count', { count: (photosQuery.data ?? []).length })}>
-          <Pressable style={styles.addPhotoBtn} onPress={pickPhoto} disabled={uploadPhoto.isPending}>
-            <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? t('ilerleme.uploading') : t('ilerleme.add_photo_btn')}</Text>
-          </Pressable>
+          <View style={styles.photoActions}>
+            <Pressable style={[styles.addPhotoBtn, { flex: 1 }]} onPress={pickPhoto} disabled={uploadPhoto.isPending}>
+              <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? t('ilerleme.uploading') : t('ilerleme.add_photo_btn')}</Text>
+            </Pressable>
+            {(photosQuery.data ?? []).length >= 2 && (
+              <Pressable
+                style={[styles.compareBtn, compareMode && styles.compareBtnOn]}
+                onPress={() => {
+                  setCompareMode((v) => !v);
+                  setCompareIds([]);
+                }}
+              >
+                <Text style={[styles.compareBtnText, compareMode && styles.compareBtnTextOn]}>
+                  {compareMode ? t('common.cancel') : t('ilerleme.compare_btn')}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          {compareMode && <Text style={styles.compareHint}>{t('ilerleme.compare_hint')}</Text>}
+
+          {comparePair && (
+            <View style={styles.compareRow}>
+              {comparePair.map((p, i) => (
+                <View key={p.id} style={styles.compareCol}>
+                  <Text style={styles.compareCaption}>{i === 0 ? t('ilerleme.compare_before') : t('ilerleme.compare_after')}</Text>
+                  {p.url ? <Image source={{ uri: p.url }} style={styles.comparePhoto} resizeMode="cover" /> : <View style={[styles.comparePhoto, styles.photoFallback]} />}
+                  <Text style={styles.compareDate}>{p.date}</Text>
+                  {weightAt(p.date) !== null && <Text style={styles.compareWeight}>{nf(weightAt(p.date)!, 1)} kg</Text>}
+                </View>
+              ))}
+            </View>
+          )}
+          {compareSummary && <Text style={styles.compareSummary}>{compareSummary}</Text>}
+
           <View style={styles.photoGrid}>
-            {(photosQuery.data ?? []).map((p: any) => (
+            {(photosQuery.data ?? []).map((p: any) => {
+              const secim = compareIds.indexOf(p.id);
+              return (
               <Pressable
                 key={p.id}
-                style={styles.photoWrap}
-                onPress={() => setViewingPhoto({ url: p.url, date: p.date })}
+                style={[styles.photoWrap, secim >= 0 && styles.photoWrapOn]}
+                onPress={() => (compareMode ? toggleCompare(p.id) : setViewingPhoto({ url: p.url, date: p.date }))}
                 onLongPress={() =>
                   showAlert(t('ilerleme.delete_photo_title'), t('ilerleme.delete_photo_body', { date: p.date }), [
                     { text: t('common.cancel'), style: 'cancel' },
@@ -669,9 +746,15 @@ export default function IlerlemeScreen() {
                 }
               >
                 {p.url ? <Image source={{ uri: p.url }} style={styles.photo} /> : <View style={[styles.photo, styles.photoFallback]} />}
+                {secim >= 0 && (
+                  <View style={styles.photoBadge}>
+                    <Text style={styles.photoBadgeText}>{secim + 1}</Text>
+                  </View>
+                )}
                 <Text style={styles.photoDate}>{p.date}</Text>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
         </Panel>
 
@@ -746,6 +829,49 @@ const styles = StyleSheet.create({
   addPhotoText: { fontSize: 13, color: C.greyD, fontWeight: '600' },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photoWrap: { width: '31%' },
+  photoWrapOn: { opacity: 1 },
+  photoActions: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  compareBtn: {
+    borderWidth: 1,
+    borderColor: C.edge,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 12,
+  },
+  compareBtnOn: { backgroundColor: C.lime, borderColor: C.lime },
+  compareBtnText: { fontSize: 12, fontWeight: '800', color: C.grey },
+  compareBtnTextOn: { color: C.bg },
+  compareHint: { fontSize: 11.5, color: C.greyD, fontStyle: 'italic', marginBottom: 12 },
+  compareRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  compareCol: { flex: 1, minWidth: 0 },
+  compareCaption: { fontSize: 10, fontWeight: '800', color: C.greyD, letterSpacing: 0.4, marginBottom: 5 },
+  comparePhoto: { width: '100%', aspectRatio: 0.75, borderRadius: 12, backgroundColor: C.card2 },
+  compareDate: { fontSize: 11, color: C.grey, marginTop: 5, fontWeight: '600' },
+  compareWeight: { fontSize: 13, fontWeight: '800', color: C.lime, marginTop: 1 },
+  compareSummary: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: C.white,
+    backgroundColor: C.card2,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  photoBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.lime,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoBadgeText: { fontSize: 11, fontWeight: '900', color: C.bg },
   photo: { width: '100%', aspectRatio: 1, borderRadius: 10, backgroundColor: C.card2 },
   photoFallback: { alignItems: 'center', justifyContent: 'center' },
   photoDate: { fontSize: 9, color: C.greyD, marginTop: 3, textAlign: 'center' },

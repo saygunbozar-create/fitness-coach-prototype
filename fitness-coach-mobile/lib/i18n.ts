@@ -140,6 +140,28 @@ const tr: Dict = {
 
   // Örnek isimler de çeviri: İngilizce bir forma "Ör. Ahmet Yılmaz" yazmak, ekranın geri
   // kalanı İngilizceyken tek başına Türkçe kalıyordu.
+  'ilerleme.compare_btn': 'Karşılaştır',
+  'ilerleme.compare_hint': 'Yan yana koymak için iki fotoğraf seç.',
+  'ilerleme.compare_before': 'ÖNCE',
+  'ilerleme.compare_after': 'SONRA',
+  'ilerleme.compare_days': 'Arada {{days}} gün var.',
+  'ilerleme.compare_days_weight': '{{days}} günde {{delta}} kg',
+
+  'client_panel.this_week': 'Bu Hafta',
+  'client_panel.sessions_this_week': 'tamamlanan seans',
+  'client_panel.sessions_this_month': 'Bu ay toplam {{count}} seans',
+  'client_panel.streak': '{{count}} hafta üst üste',
+  'client_panel.streak_line': '🔥 {{count}} haftadır aralıksız devam ediyorsun.',
+  'client_panel.no_sessions_yet': 'Henüz tamamlanan seansın yok. İlk seansından sonra burada görünecek.',
+  'client_panel.next_session': 'Sıradaki Seans',
+  'client_panel.book_cta': 'Randevu Al',
+  'client_panel.summary': 'Özet',
+  'client_panel.weight': 'Kilo',
+  'client_panel.sessions_left': 'Kalan seans',
+  'client_panel.checkin': 'Haftalık check-in',
+  'client_panel.checkin_done': 'Yapıldı',
+  'client_panel.checkin_pending': 'Bekliyor',
+
   'panel.payments_title': 'Ödeme Durumu',
   'panel.payments_right': '{{month}}',
   'panel.paid_this_month': 'Bu ay ödeme alınanlar',
@@ -928,6 +950,28 @@ const en: Dict = {
 
   'format.date_long': '{{weekday}}, {{month}} {{day}}',
   'format.date_short': '{{month}} {{day}}',
+
+  'ilerleme.compare_btn': 'Compare',
+  'ilerleme.compare_hint': 'Pick two photos to see them side by side.',
+  'ilerleme.compare_before': 'BEFORE',
+  'ilerleme.compare_after': 'AFTER',
+  'ilerleme.compare_days': '{{days}} days apart.',
+  'ilerleme.compare_days_weight': '{{delta}} kg in {{days}} days',
+
+  'client_panel.this_week': 'This Week',
+  'client_panel.sessions_this_week': 'sessions completed',
+  'client_panel.sessions_this_month': '{{count}} sessions this month',
+  'client_panel.streak': '{{count}} weeks in a row',
+  'client_panel.streak_line': "🔥 You've kept it up {{count}} weeks running.",
+  'client_panel.no_sessions_yet': 'No completed sessions yet. Your first one will show up here.',
+  'client_panel.next_session': 'Next Session',
+  'client_panel.book_cta': 'Book a Session',
+  'client_panel.summary': 'Summary',
+  'client_panel.weight': 'Weight',
+  'client_panel.sessions_left': 'Sessions left',
+  'client_panel.checkin': 'Weekly check-in',
+  'client_panel.checkin_done': 'Done',
+  'client_panel.checkin_pending': 'Pending',
 
   'panel.payments_title': 'Payment Status',
   'panel.payments_right': '{{month}}',

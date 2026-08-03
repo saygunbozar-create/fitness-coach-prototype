@@ -10,7 +10,7 @@ import { C } from '../lib/theme';
 type NavItem = { path: string; labelKey: string; glyph: string; trainerOnly?: boolean };
 
 const NAV_ITEMS: NavItem[] = [
-  { path: '/(app)/panel', labelKey: 'nav.panel', glyph: '▦', trainerOnly: true },
+  { path: '/(app)/panel', labelKey: 'nav.panel', glyph: '▦' },
   { path: '/(app)/antrenman', labelKey: 'nav.antrenman', glyph: '⬢' },
   { path: '/(app)/beslenme', labelKey: 'nav.beslenme', glyph: '◈' },
   { path: '/(app)/ilerleme', labelKey: 'nav.ilerleme', glyph: '↗' },

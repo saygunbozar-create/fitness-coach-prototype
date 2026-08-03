@@ -2780,6 +2780,34 @@ export function useMonthlyPaymentsSummary(trainerId: string | undefined, monthSt
   });
 }
 
+// Üst üste kaç HAFTA en az bir seans yapıldığı. Danışan bir dersi "yaptım" işaretlediğinde
+// karşılığında somut bir şey görsün diye.
+//
+// Kritik ayrıntı: içinde bulunulan haftada henüz seans yoksa seri SIFIRLANMAZ, geçen haftadan
+// sayılmaya başlanır. Aksi halde her Pazartesi sabahı herkesin serisi 0 görünür ve sayaç
+// motive etmek yerine cezalandırır.
+export function completedWeekStreak(dates: string[], weekStartOf: (d: Date) => string): number {
+  if (dates.length === 0) return 0;
+  const weeks = new Set(dates.map((d) => {
+    const [y, m, day] = d.split('-').map(Number);
+    return weekStartOf(new Date(y, m - 1, day));
+  }));
+
+  const shiftWeeks = (iso: string, n: number) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return weekStartOf(new Date(y, m - 1, d + n * 7));
+  };
+
+  const thisWeek = weekStartOf(new Date());
+  let cursor = weeks.has(thisWeek) ? thisWeek : shiftWeeks(thisWeek, -1);
+  let streak = 0;
+  while (weeks.has(cursor)) {
+    streak++;
+    cursor = shiftWeeks(cursor, -1);
+  }
+  return streak;
+}
+
 export type PaymentPerson = { clientId: string; name: string; total: number; count: number; oldestDate: string };
 export type PaymentsOverview = {
   paidThisMonth: PaymentPerson[];

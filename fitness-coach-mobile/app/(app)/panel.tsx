@@ -1,5 +1,5 @@
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
@@ -10,8 +10,15 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../lib/auth';
 import { useT } from '../../lib/i18n';
 import {
+  completedWeekStreak,
   useAddLessonEntry,
+  useClientByProfile,
   useClients,
+  useLatestCheckin,
+  useMyUpcomingAppointments,
+  usePackages,
+  useSessionHistory,
+  useWeightLogs,
   useDeleteLessonEntry,
   useLessonSchedule,
   useLogSessionFromSchedule,
@@ -24,11 +31,25 @@ import {
 } from '../../lib/queries';
 import { useIsDesktopWeb } from '../../lib/responsive';
 import { useSelectedClient } from '../../lib/selectedClient';
-import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, mondayOfWeek, monthNames, nf } from '../../lib/theme';
+import { addDaysToDateStr, C, checkinWeekStart, formatTimeInputTr, localDateStr, mondayOfWeek, monthNames, nf, type TFn } from '../../lib/theme';
 
 function formatTrDateShort(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${parseInt(d, 10)}.${m}`;
+}
+
+// Danışan panelindeki "sıradaki seans" için uzun tarih. Sıralama dile bağlı olduğu için
+// kalıp da çeviriden geliyor (bkz. format.date_long).
+const ISO_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+function formatClientDateLong(iso: string, t: TFn): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const jsDay = new Date(y, m - 1, d).getDay();
+  const isoDay = jsDay === 0 ? 7 : jsDay;
+  return t('format.date_long', {
+    day: d,
+    month: monthNames(t)[m - 1],
+    weekday: t(`weekday.${ISO_DAY_KEYS[isoDay - 1]}`),
+  });
 }
 
 // "10.05.2026" -> "2026-05-10"
@@ -426,13 +447,132 @@ function TrainerReportCard() {
   );
 }
 
+// Danışanın ana ekranı. Buradaki her şey zaten başka ekranlarda VAR — ama dağınık: "bu hafta
+// nerdeyim" sorusunun tek bir cevabı yoktu. Yeni tablo/sorgu eklemiyoruz, mevcut hook'ları
+// birleştiriyoruz (react-query önbelleği de paylaşılmış oluyor).
+function ClientDashboard() {
+  const t = useT();
+  const { profile } = useAuth();
+  const clientQuery = useClientByProfile(profile?.id);
+  const clientId = clientQuery.data?.id;
+
+  const historyQuery = useSessionHistory(clientId);
+  const appointmentsQuery = useMyUpcomingAppointments(clientId);
+  const weightQuery = useWeightLogs(clientId);
+  const checkinQuery = useLatestCheckin(clientId);
+  const packagesQuery = usePackages(clientId);
+
+  const history = historyQuery.data ?? [];
+  const packages = packagesQuery.data ?? [];
+
+  const weekStart = mondayOfWeek();
+  const weekEnd = addDaysToDateStr(weekStart, 6);
+  const monthStart = localDateStr(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+
+  const buHafta = history.filter((s) => s.date >= weekStart && s.date <= weekEnd).length;
+  const buAy = history.filter((s) => s.date >= monthStart).length;
+  const seri = useMemo(() => completedWeekStreak(history.map((s) => s.date), (d) => mondayOfWeek(d)), [history]);
+
+  const siradaki = (appointmentsQuery.data ?? [])[0];
+
+  // Kilo: en son kayıt ve bir önceki kayda göre fark.
+  // DİKKAT: useWeightLogs ESKİDEN YENİYE sıralıyor (İlerleme'deki grafik buna bağlı), yani
+  // son kayıt dizinin BAŞI değil SONU. Baştan almak "72 kg, +3,8" gibi ters bir sonuç veriyordu.
+  const weights = weightQuery.data ?? [];
+  const sonKilo = weights[weights.length - 1];
+  const oncekiKilo = weights[weights.length - 2];
+  const kiloFark = sonKilo && oncekiKilo ? Number(sonKilo.weight) - Number(oncekiKilo.weight) : null;
+
+  // Kalan seans — Ödemeler'deki "Kalan" ile AYNI formül olmalı, yoksa iki ekran çelişir.
+  const toplamSeans = packages.reduce((a, p) => a + p.total_sessions, 0);
+  const enErkenBaslangic = packages.length
+    ? packages.reduce((min, p) => (p.start_date < min ? p.start_date : min), packages[0].start_date)
+    : null;
+  const kullanilan = enErkenBaslangic ? history.filter((s) => s.date >= enErkenBaslangic).length : 0;
+  const kalanSeans = Math.max(0, toplamSeans - kullanilan);
+
+  const checkinYapildi = (checkinQuery.data?.date ?? '') >= checkinWeekStart();
+
+  const yukleniyor = historyQuery.isLoading || clientQuery.isLoading;
+
+  return (
+    <>
+      <Panel title={t('client_panel.this_week')} right={seri > 0 ? t('client_panel.streak', { count: seri }) : undefined}>
+        {yukleniyor ? (
+          <ActivityIndicator color={C.lime} />
+        ) : (
+          <>
+            <View style={styles.bigStatRow}>
+              <Text style={styles.bigStatNum}>{buHafta}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.bigStatLabel}>{t('client_panel.sessions_this_week')}</Text>
+                <Text style={styles.bigStatSub}>{t('client_panel.sessions_this_month', { count: buAy })}</Text>
+              </View>
+            </View>
+            {seri > 0 && <Text style={styles.streakLine}>{t('client_panel.streak_line', { count: seri })}</Text>}
+            {history.length === 0 && <Text style={styles.noteText}>{t('client_panel.no_sessions_yet')}</Text>}
+          </>
+        )}
+      </Panel>
+
+      <Panel title={t('client_panel.next_session')}>
+        {appointmentsQuery.isLoading ? (
+          <ActivityIndicator color={C.lime} />
+        ) : siradaki ? (
+          <>
+            <Text style={styles.nextDate}>{formatClientDateLong(siradaki.date, t)}</Text>
+            <Text style={styles.nextTime}>{siradaki.time.slice(0, 5)}</Text>
+          </>
+        ) : (
+          <Pressable style={styles.ctaBtn} onPress={() => router.push('/(app)/randevu')}>
+            <Text style={styles.ctaBtnText}>{t('client_panel.book_cta')}</Text>
+          </Pressable>
+        )}
+      </Panel>
+
+      <Panel title={t('client_panel.summary')}>
+        <View style={styles.sumRow}>
+          <Text style={styles.sumLabel}>{t('client_panel.weight')}</Text>
+          <Text style={styles.sumValue}>
+            {sonKilo ? `${nf(Number(sonKilo.weight), 1)} kg` : '—'}
+            {kiloFark !== null && kiloFark !== 0 ? (
+              <Text style={kiloFark < 0 ? styles.deltaGood : styles.deltaUp}>
+                {'  '}{kiloFark > 0 ? '+' : ''}{nf(kiloFark, 1)}
+              </Text>
+            ) : null}
+          </Text>
+        </View>
+        <View style={styles.sumRow}>
+          <Text style={styles.sumLabel}>{t('client_panel.sessions_left')}</Text>
+          <Text style={styles.sumValue}>{toplamSeans > 0 ? `${kalanSeans} / ${toplamSeans}` : '—'}</Text>
+        </View>
+        <Pressable style={styles.sumRow} onPress={() => router.push('/(app)/ilerleme')}>
+          <Text style={styles.sumLabel}>{t('client_panel.checkin')}</Text>
+          <Text style={[styles.sumValue, checkinYapildi ? styles.deltaGood : styles.deltaWaiting]}>
+            {checkinYapildi ? t('client_panel.checkin_done') : t('client_panel.checkin_pending')}
+          </Text>
+        </Pressable>
+      </Panel>
+    </>
+  );
+}
+
 export default function PanelScreen() {
   const t = useT();
   const { profile } = useAuth();
   const isTrainer = profile?.role === 'trainer';
   const isDesktopWeb = useIsDesktopWeb();
 
-  if (profile && !isTrainer) return <Redirect href="/(app)/antrenman" />;
+  if (profile && !isTrainer) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title={t('nav.panel')} />
+        <ScrollView contentContainerStyle={[styles.content, isDesktopWeb && styles.contentDesktop]}>
+          <ClientDashboard />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.flex}>
@@ -487,6 +627,30 @@ const styles = StyleSheet.create({
   },
   lessonText: { fontSize: 12, fontWeight: '600', color: C.white },
   lessonClientLink: { color: C.lime, fontWeight: '700' },
+
+  noteText: { fontSize: 12, color: C.greyD, fontStyle: 'italic', marginTop: 10 },
+  bigStatRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  bigStatNum: { fontSize: 46, fontWeight: '900', color: C.lime, lineHeight: 52 },
+  bigStatLabel: { fontSize: 13, fontWeight: '700', color: C.white },
+  bigStatSub: { fontSize: 11.5, color: C.greyD, marginTop: 3 },
+  streakLine: { fontSize: 12, fontWeight: '700', color: C.orange, marginTop: 12 },
+  nextDate: { fontSize: 15, fontWeight: '800', color: C.white },
+  nextTime: { fontSize: 26, fontWeight: '900', color: C.lime, marginTop: 2 },
+  ctaBtn: { backgroundColor: C.lime, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  ctaBtnText: { fontSize: 13, fontWeight: '800', color: C.bg },
+  sumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: C.edge,
+  },
+  sumLabel: { fontSize: 12.5, color: C.grey, fontWeight: '600' },
+  sumValue: { fontSize: 13.5, fontWeight: '800', color: C.white },
+  deltaGood: { color: C.lime },
+  deltaUp: { color: C.orange },
+  deltaWaiting: { color: C.orange },
 
   paySectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   // Bilerek textTransform:'uppercase' YOK — CSS büyük harfe çevirirken İngilizce kuralını
