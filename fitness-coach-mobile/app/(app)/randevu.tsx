@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
@@ -17,6 +18,7 @@ import {
   useClient,
   useDeleteAvailabilityException,
   useDeleteAvailabilityRule,
+  useLessonSchedule,
   useApproveReschedule,
   useCancelRescheduleRequest,
   useMyUpcomingAppointments,
@@ -133,6 +135,7 @@ export default function RandevuScreen() {
         <ScreenHeader title={t('randevu.availability_title')} />
         <ScrollView contentContainerStyle={styles.content}>
           <TrainerRescheduleRequestsPanel trainerId={profile?.id} />
+          <TrainerDayPreviewPanel trainerId={profile?.id} />
           <TrainerAvailabilityPanel trainerId={profile?.id} />
           <TrainerExceptionsPanel trainerId={profile?.id} />
         </ScrollView>
@@ -141,6 +144,105 @@ export default function RandevuScreen() {
   }
 
   return <ClientAppointmentScreen />;
+}
+
+// Antrenörün kendi gününü danışanın gördüğü gibi, somut saat saat görmesi için. Müsaitlik
+// kuralları soyut ("Pzt-Cum 09:00-20:00, 60 dk"); bu panel o kuraldan hangi saatlerin
+// çıktığını ve hangilerinin dolu olduğunu gösteriyor.
+//
+// Danışanın gördüğünden iki farkı var, ikisi de kasıtlı:
+//   1. Dolu saatlerde DANIŞAN ADI yazıyor (antrenör zaten bu veriye sahip; danışan görmemeli).
+//   2. Bugünün geçmiş saatleri elenmiyor, soluk gösteriliyor — danışan için geçmiş saat
+//      seçilemez olduğu için gizleniyor, ama antrenör "bugün neler oldu"yu da görmek istiyor.
+function TrainerDayPreviewPanel({ trainerId }: { trainerId: string | undefined }) {
+  const t = useT();
+  const { setSelectedClientId } = useSelectedClient();
+  const rulesQuery = useAvailabilityRules(trainerId);
+  const exceptionsQuery = useAvailabilityExceptions(trainerId);
+  const upcomingDays = useMemo(() => Array.from({ length: 14 }, (_, i) => addDaysToDateStr(localDateStr(), i)), []);
+  const [selectedDate, setSelectedDate] = useState(() => localDateStr());
+  const lessonsQuery = useLessonSchedule(trainerId, selectedDate, selectedDate);
+
+  const rules = rulesQuery.data ?? [];
+  const exceptions = exceptionsQuery.data ?? [];
+  const lessons = lessonsQuery.data ?? [];
+
+  const byTime = new Map(lessons.map((l) => [l.time.slice(0, 5), l]));
+
+  // Kuraldan türeyen saatler + elle eklenmiş dersler. Birleştirme ŞART: antrenör bir dersi
+  // kuralların dışında bir saate (ör. 07:30) elle eklemiş olabilir; sadece kurala bakarsak
+  // o ders hiç görünmez ve gün boşmuş gibi okunur.
+  const rows = useMemo(() => {
+    const times = new Set(generateSlotsForDate(rules, exceptions, selectedDate));
+    for (const l of lessons) times.add(l.time.slice(0, 5));
+    return Array.from(times).sort();
+  }, [rules, exceptions, selectedDate, lessons]);
+
+  const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+  const isToday = selectedDate === localDateStr();
+  const doluSayisi = rows.filter((r) => byTime.has(r)).length;
+
+  function openClient(clientId: string) {
+    setSelectedClientId(clientId);
+    router.push('/(app)/antrenman');
+  }
+
+  return (
+    <Panel
+      title={t('randevu.day_preview_title')}
+      right={rows.length ? t('randevu.day_preview_count', { taken: doluSayisi, total: rows.length }) : undefined}
+    >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateStrip}>
+        {upcomingDays.map((d) => {
+          const on = d === selectedDate;
+          const [, , dayNum] = d.split('-');
+          return (
+            <Pressable key={d} style={[styles.dateCard, on && styles.dateCardOn]} onPress={() => setSelectedDate(d)}>
+              <Text style={[styles.dateDow, on && styles.dateDowOn]}>{dayShort(isoWeekday(d), t)}</Text>
+              <Text style={[styles.dateNum, on && styles.dateNumOn]}>{parseInt(dayNum, 10)}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.fieldLabel}>{formatDateLong(selectedDate, t)}</Text>
+
+      {lessonsQuery.isLoading ? (
+        <ActivityIndicator color={C.lime} />
+      ) : rows.length === 0 ? (
+        <Text style={styles.noteText}>{t('randevu.day_preview_empty')}</Text>
+      ) : (
+        rows.map((time) => {
+          const lesson = byTime.get(time);
+          const gecmis = isToday && time < nowTime;
+          const satir = (
+            <View style={[styles.slotRow, gecmis && styles.slotRowPast]}>
+              <Text style={[styles.slotRowTime, lesson && styles.slotRowTimeTaken]}>{time}</Text>
+              {lesson ? (
+                <>
+                  <Text style={styles.slotRowName} numberOfLines={1}>{lesson.clientName}</Text>
+                  {lesson.booked_by_client && (
+                    <View style={styles.bookedBadgeSm}>
+                      <Text style={styles.bookedBadgeSmText}>{t('panel.booked_badge')}</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.slotRowFree}>{t('randevu.slot_free')}</Text>
+              )}
+            </View>
+          );
+          return lesson ? (
+            <Pressable key={time} onPress={() => openClient(lesson.client_id)}>
+              {satir}
+            </Pressable>
+          ) : (
+            <View key={time}>{satir}</View>
+          );
+        })
+      )}
+    </Panel>
+  );
 }
 
 // Danışanların gönderdiği randevu değişiklik talepleri. Antrenör onaylayana kadar randevu
@@ -759,6 +861,22 @@ const styles = StyleSheet.create({
   ruleDelete: { fontSize: 11, fontWeight: '700', color: C.red },
 
   dateStrip: { marginBottom: 16 },
+
+  slotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: C.edge,
+  },
+  slotRowPast: { opacity: 0.45 },
+  slotRowTime: { fontSize: 13, fontWeight: '800', color: C.greyD, width: 52 },
+  slotRowTimeTaken: { color: C.lime },
+  slotRowName: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: C.white },
+  slotRowFree: { flex: 1, fontSize: 12, color: C.greyD, fontStyle: 'italic' },
+  bookedBadgeSm: { backgroundColor: 'rgba(198,249,78,0.14)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  bookedBadgeSmText: { fontSize: 8.5, fontWeight: '800', color: C.lime, letterSpacing: 0.3 },
   dateCard: { width: 50, marginRight: 7, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: C.edge, backgroundColor: C.card2, alignItems: 'center', gap: 4 },
   dateCardOn: { backgroundColor: C.lime, borderColor: C.lime },
   dateCardOff: { opacity: 0.35 },

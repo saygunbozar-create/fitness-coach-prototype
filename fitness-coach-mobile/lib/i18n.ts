@@ -800,6 +800,11 @@ const tr: Dict = {
   'randevu.change_hint_needs_approval': 'Saat değişikliği antrenörünün onayına gönderilir.',
   'randevu.added_by_trainer': 'antrenörün ekledi',
 
+  'randevu.day_preview_title': 'Günün Saatleri',
+  'randevu.day_preview_count': '{{taken}}/{{total}} dolu',
+  'randevu.day_preview_empty': 'Bu gün için açık saat yok.',
+  'randevu.slot_free': 'Boş',
+
   'randevu.requests_title': 'Değişiklik Talepleri',
   'randevu.requests_count': '{{count}} talep',
   'randevu.no_requests': 'Bekleyen değişiklik talebi yok.',
@@ -1582,6 +1587,11 @@ const en: Dict = {
   'randevu.err_withdraw': 'Could not withdraw the request.',
   'randevu.change_hint_needs_approval': 'A time change is sent to your trainer for approval.',
   'randevu.added_by_trainer': 'added by your trainer',
+
+  'randevu.day_preview_title': "Day's Slots",
+  'randevu.day_preview_count': '{{taken}}/{{total}} booked',
+  'randevu.day_preview_empty': 'No open hours on this day.',
+  'randevu.slot_free': 'Free',
 
   'randevu.requests_title': 'Change Requests',
   'randevu.requests_count': '{{count}} request(s)',
