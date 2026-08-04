@@ -1107,9 +1107,14 @@ export function useAssignLessonDay(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; program_id: string; workout_day_id: string; log_date: string | null }) => {
-      const patch: { workout_day_id: string; log_date?: string } = { workout_day_id: input.workout_day_id };
-      if (!input.log_date) patch.log_date = todayStr();
-      const { error } = await supabase.from('program_lessons').update(patch).eq('id', input.id);
+      // log_date BURADA damgalanmıyor. Derse gün atamak bir PLANLAMA işi; seans günler sonra
+      // yapılabiliyor. Eskiden burada todayStr() yazıldığı için içerik atama gününe
+      // kaydediliyordu — antrenör 30 Temmuz'da tamamladığı seansı 15 Temmuz'da görüyordu.
+      // Artık tarih ilk set kaydedildiğinde (useUpdateLessonSetLog) yazılıyor.
+      const { error } = await supabase
+        .from('program_lessons')
+        .update({ workout_day_id: input.workout_day_id })
+        .eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ['program_lessons', clientId, vars.program_id] }),
@@ -1125,6 +1130,17 @@ export function useToggleLessonComplete(clientId: string | undefined) {
         .update({ completed: input.completed, completed_at: input.completed ? new Date().toISOString() : null })
         .eq('id', input.id);
       if (error) throw error;
+
+      // Hiç set işaretlenmeden "bitti" denen ders tarihsiz kalmasın — Program Geçmişi'nde
+      // tarihsiz satır olarak görünürdü. Tarihi olan derse dokunmuyoruz (is null şartı).
+      if (input.completed) {
+        const { error: stampErr } = await supabase
+          .from('program_lessons')
+          .update({ log_date: todayStr() })
+          .eq('id', input.id)
+          .is('log_date', null);
+        if (stampErr) throw stampErr;
+      }
     },
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ['program_lessons', clientId, vars.program_id] }),
   });
@@ -1198,7 +1214,11 @@ export function useLessonDayWorkout(clientId: string | undefined, dayId: string 
   });
 }
 
-// useUpdateSetLog ile aynı, sadece todayStr() yerine dersin sabit log_date'i kullanılır.
+// useUpdateSetLog ile aynı, sadece todayStr() yerine dersin log_date'i kullanılır.
+//
+// Ayrıca dersin tarihi BURADA sabitleniyor: log_date henüz boşsa ilk set kaydedildiğinde
+// o günün tarihi yazılıyor. Seansın gerçekten yapıldığı anı bilebildiğimiz tek yer burası —
+// gün atama planlama, tamamlama ise seans bittikten sonra (bazen ertesi gün) yapılıyor.
 export function useUpdateLessonSetLog(clientId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -1208,6 +1228,8 @@ export function useUpdateLessonSetLog(clientId: string | undefined) {
       setNumber: number;
       current: { repCount: number; kg: number; done: boolean };
       patch: Partial<{ repCount: number; kg: number; done: boolean }>;
+      lessonId?: string;
+      lessonHasDate?: boolean;
     }) => {
       const next = { ...input.current, ...input.patch };
       const { error } = await supabase.from('workout_logs').upsert(
@@ -1222,8 +1244,22 @@ export function useUpdateLessonSetLog(clientId: string | undefined) {
         { onConflict: 'workout_exercise_id,date,set_number' }
       );
       if (error) throw error;
+
+      // Tarihi bir kez sabitle. `is('log_date', null)` şartı yarışa karşı: aynı anda iki set
+      // işaretlenirse ikincisi ilkinin yazdığı tarihi ezmesin.
+      if (input.lessonId && !input.lessonHasDate) {
+        const { error: stampErr } = await supabase
+          .from('program_lessons')
+          .update({ log_date: input.date })
+          .eq('id', input.lessonId)
+          .is('log_date', null);
+        if (stampErr) throw stampErr;
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['lesson_day_workout', clientId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lesson_day_workout', clientId] });
+      qc.invalidateQueries({ queryKey: ['program_lessons', clientId] });
+    },
   });
 }
 

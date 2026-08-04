@@ -14,7 +14,7 @@ import {
   type ProgramLessonWithDay,
 } from '../lib/queries';
 import { useT } from '../lib/i18n';
-import { C } from '../lib/theme';
+import { C, localDateStr as todayStr } from '../lib/theme';
 import type { WorkoutDay } from '../lib/types';
 import { AuthField } from './AuthField';
 import { Panel } from './Panel';
@@ -43,7 +43,11 @@ function LessonDetail({
 }) {
   const t = useT();
   const onErr = useOnErr();
-  const workoutQuery = useLessonDayWorkout(clientId, lesson.workout_day_id ?? undefined, lesson.log_date ?? undefined);
+  // Ders henüz hiç işlenmediyse log_date boş olur; o hâlde bugünün sayfası açılır ve ilk set
+  // kaydedildiğinde tarih bugüne sabitlenir (bkz. useUpdateLessonSetLog). Böylece içerik,
+  // derse gün atandığı güne değil, seansın yapıldığı güne yazılıyor.
+  const effectiveDate = lesson.log_date ?? todayStr();
+  const workoutQuery = useLessonDayWorkout(clientId, lesson.workout_day_id ?? undefined, effectiveDate);
   const updateSetLog = useUpdateLessonSetLog(clientId);
   const updateDayNotes = useUpdateWorkoutDayNotes(clientId);
 
@@ -120,10 +124,12 @@ function LessonDetail({
               updateSetLog.mutate(
                 {
                   exerciseId: ex.id,
-                  date: lesson.log_date!,
+                  date: effectiveDate,
                   setNumber: set.setNumber,
                   current: { repCount: set.repCount, kg: set.kg, done: set.done },
                   patch: { done: !set.done },
+                  lessonId: lesson.id,
+                  lessonHasDate: !!lesson.log_date,
                 },
                 { onError: onErr(t('antrenman.err_save_title')) }
               )
@@ -132,9 +138,11 @@ function LessonDetail({
               updateSetLog.mutate(
                 {
                   exerciseId: ex.id,
-                  date: lesson.log_date!,
+                  date: effectiveDate,
                   setNumber: set.setNumber,
                   current: { repCount: set.repCount, kg: set.kg, done: set.done },
+                  lessonId: lesson.id,
+                  lessonHasDate: !!lesson.log_date,
                   patch: field === 'rep' ? { repCount: Math.max(0, set.repCount + delta) } : { kg: Math.max(0, set.kg + delta) },
                 },
                 { onError: onErr(t('antrenman.err_save_title')) }
