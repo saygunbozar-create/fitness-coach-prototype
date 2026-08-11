@@ -473,6 +473,14 @@ function ClientDashboard() {
   const buAy = history.filter((s) => s.date >= monthStart).length;
   const seri = useMemo(() => completedWeekStreak(history.map((s) => s.date), (d) => mondayOfWeek(d)), [history]);
 
+  // Kilo serisi: üst üste kaç hafta tartıya çıkıldı. Seans serisiyle aynı kural — bu haftaki
+  // giriş henüz yoksa seri kırılmıyor, geçen haftadan sayılıyor. Günlük değil HAFTALIK, çünkü
+  // günlük tartı dalgalanması motive etmek yerine moral bozuyor; Kilo Projeksiyonu da haftalık.
+  const kiloSerisi = useMemo(
+    () => completedWeekStreak((weightQuery.data ?? []).map((w) => w.date), (d) => mondayOfWeek(d)),
+    [weightQuery.data]
+  );
+
   const siradaki = (appointmentsQuery.data ?? [])[0];
 
   // Kilo: en son kayıt ve bir önceki kayda göre fark.
@@ -497,7 +505,7 @@ function ClientDashboard() {
 
   return (
     <>
-      <Panel title={t('client_panel.this_week')} right={seri > 0 ? t('client_panel.streak', { count: seri }) : undefined}>
+      <Panel title={t('client_panel.this_week')} right={seri >= 2 ? t('client_panel.streak', { count: seri }) : undefined}>
         {yukleniyor ? (
           <ActivityIndicator color={C.lime} />
         ) : (
@@ -509,7 +517,7 @@ function ClientDashboard() {
                 <Text style={styles.bigStatSub}>{t('client_panel.sessions_this_month', { count: buAy })}</Text>
               </View>
             </View>
-            {seri > 0 && <Text style={styles.streakLine}>{t('client_panel.streak_line', { count: seri })}</Text>}
+            {seri >= 2 && <Text style={styles.streakLine}>{t('client_panel.streak_line', { count: seri })}</Text>}
             {history.length === 0 && <Text style={styles.noteText}>{t('client_panel.no_sessions_yet')}</Text>}
           </>
         )}
@@ -531,8 +539,12 @@ function ClientDashboard() {
       </Panel>
 
       <Panel title={t('client_panel.summary')}>
-        <View style={styles.sumRow}>
-          <Text style={styles.sumLabel}>{t('client_panel.weight')}</Text>
+        <Pressable style={styles.sumRow} onPress={() => router.push('/(app)/ilerleme')}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.sumLabel}>{t('client_panel.weight')}</Text>
+            {/* Seri 2 haftadan kısaysa gösterilmiyor — "1 hafta üst üste" seri sayılmaz. */}
+            {kiloSerisi >= 2 && <Text style={styles.sumStreak}>{t('client_panel.weight_streak', { count: kiloSerisi })}</Text>}
+          </View>
           <Text style={styles.sumValue}>
             {sonKilo ? `${nf(Number(sonKilo.weight), 1)} kg` : '—'}
             {kiloFark !== null && kiloFark !== 0 ? (
@@ -541,7 +553,7 @@ function ClientDashboard() {
               </Text>
             ) : null}
           </Text>
-        </View>
+        </Pressable>
         <View style={styles.sumRow}>
           <Text style={styles.sumLabel}>{t('client_panel.sessions_left')}</Text>
           <Text style={styles.sumValue}>{toplamSeans > 0 ? `${kalanSeans} / ${toplamSeans}` : '—'}</Text>
@@ -647,6 +659,7 @@ const styles = StyleSheet.create({
     borderTopColor: C.edge,
   },
   sumLabel: { fontSize: 12.5, color: C.grey, fontWeight: '600' },
+  sumStreak: { fontSize: 11, fontWeight: '700', color: C.orange, marginTop: 3 },
   sumValue: { fontSize: 13.5, fontWeight: '800', color: C.white },
   deltaGood: { color: C.lime },
   deltaUp: { color: C.orange },
