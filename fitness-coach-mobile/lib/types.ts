@@ -13,6 +13,9 @@ export type Profile = {
   // Adresin kendisi kimlik doğrulama görevi görüyor, o yüzden paylaşılmamalı; Ayarlar'dan
   // yenilenince eski adres anında geçersiz olur.
   calendar_token: string;
+  // Rezervasyon sisteminin açılacağı an (migration 0069). NULL = her zaman açık.
+  // Sadece danışanı kısıtlar; antrenör açılıştan önce de elle ders ekleyebilir.
+  booking_opens_at: string | null;
 };
 
 export type PlanTier = {

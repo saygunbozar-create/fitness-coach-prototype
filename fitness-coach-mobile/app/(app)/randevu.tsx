@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { showAlert } from '../../lib/alert';
 import { AuthField } from '../../components/AuthField';
@@ -26,6 +26,8 @@ import {
   useRequestReschedule,
   useRescheduleRequests,
   useTakenSlots,
+  useTrainerBookingOpensAt,
+  useUpdateBookingOpensAt,
 } from '../../lib/queries';
 import { useSelectedClient } from '../../lib/selectedClient';
 import { addDaysToDateStr, C, formatTimeInputTr, localDateStr, monthNames, type TFn } from '../../lib/theme';
@@ -136,6 +138,7 @@ export default function RandevuScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <TrainerRescheduleRequestsPanel trainerId={profile?.id} />
           <TrainerDayPreviewPanel trainerId={profile?.id} />
+          <TrainerBookingGatePanel trainerId={profile?.id} />
           <TrainerAvailabilityPanel trainerId={profile?.id} />
           <TrainerExceptionsPanel trainerId={profile?.id} />
         </ScrollView>
@@ -310,6 +313,98 @@ function TrainerRescheduleRequestsPanel({ trainerId }: { trainerId: string | und
             </Pressable>
           </View>
         ))
+      )}
+    </Panel>
+  );
+}
+
+// Rezervasyon sisteminin ne zaman açılacağı (migration 0069). Boş bırakılırsa kapı yok.
+// Kapı SADECE danışanı kısıtlıyor — antrenör açılıştan önce de elle ders ekleyebiliyor,
+// çünkü programı önceden kurmak isteyebilir.
+function TrainerBookingGatePanel({ trainerId }: { trainerId: string | undefined }) {
+  const t = useT();
+  const { profile, refreshProfile } = useAuth();
+  const updateGate = useUpdateBookingOpensAt(trainerId);
+
+  const mevcut = profile?.booking_opens_at ?? null;
+  const [dateInput, setDateInput] = useState('');
+  const [timeInput, setTimeInput] = useState('');
+  const [hata, setHata] = useState<string | null>(null);
+
+  // Kayıtlı değeri forma doldur — kullanıcı geri gelince ne ayarladığını görsün.
+  useEffect(() => {
+    if (!mevcut) {
+      setDateInput('');
+      setTimeInput('');
+      return;
+    }
+    const d = new Date(mevcut);
+    const p = (n: number) => String(n).padStart(2, '0');
+    setDateInput(`${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`);
+    setTimeInput(`${p(d.getHours())}:${p(d.getMinutes())}`);
+  }, [mevcut]);
+
+  const acik = !mevcut || new Date(mevcut) <= new Date();
+
+  function kaydet() {
+    setHata(null);
+    const iso = parseTrDate(dateInput);
+    const saat = parseTrTime(timeInput);
+    if (!iso) {
+      setHata(t('randevu.gate_err_date'));
+      return;
+    }
+    if (!saat) {
+      setHata(t('randevu.gate_err_time'));
+      return;
+    }
+    // Yerel tarih+saatten timestamp üretiyoruz; cihaz saat diliminde okunup UTC'ye çevriliyor,
+    // yani antrenör "10 Ağustos 09:00" derken kendi saatini kastediyor.
+    const [y, m, d] = iso.split('-').map(Number);
+    const [hh, mm] = saat.split(':').map(Number);
+    const anISO = new Date(y, m - 1, d, hh, mm, 0, 0).toISOString();
+    updateGate.mutate(anISO, {
+      onSuccess: () => refreshProfile(),
+      onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('common.error')),
+    });
+  }
+
+  function kaldir() {
+    updateGate.mutate(null, {
+      onSuccess: () => refreshProfile(),
+      onError: (e: any) => showAlert(t('antrenman.err_save_title'), e.message ?? t('common.error')),
+    });
+  }
+
+  return (
+    <Panel
+      title={t('randevu.gate_title')}
+      right={mevcut ? (acik ? t('randevu.gate_open') : t('randevu.gate_scheduled')) : t('randevu.gate_always_open')}
+    >
+      <Text style={styles.noteText}>{t('randevu.gate_hint')}</Text>
+      <View style={{ height: 12 }} />
+
+      {mevcut && !acik && (
+        <Text style={styles.gateCountdown}>
+          {t('randevu.gate_opens_at', { moment: `${formatDateLong(mevcut.slice(0, 10), t)} · ${timeInput}` })}
+        </Text>
+      )}
+
+      <DateField label={t('randevu.gate_date_label')} value={dateInput} onChangeText={setDateInput} placeholder={t('placeholder.date_format')} />
+      <AuthField
+        label={t('randevu.gate_time_label')}
+        value={timeInput}
+        onChangeText={(v) => setTimeInput((prev) => formatTimeInputTr(v, prev))}
+        placeholder={t('panel.time_placeholder')}
+        keyboardType="number-pad"
+        maxLength={5}
+      />
+      {hata && <Text style={styles.errorText}>{hata}</Text>}
+      <PrimaryButton label={t('common.save')} loading={updateGate.isPending} onPress={kaydet} />
+      {mevcut && (
+        <Pressable style={styles.gateClearBtn} onPress={kaldir} hitSlop={8}>
+          <Text style={styles.gateClearText}>{t('randevu.gate_clear')}</Text>
+        </Pressable>
       )}
     </Panel>
   );
@@ -679,6 +774,7 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
   const t = useT();
   const rulesQuery = useAvailabilityRules(trainerId);
   const exceptionsQuery = useAvailabilityExceptions(trainerId);
+  const gateQuery = useTrainerBookingOpensAt(trainerId);
   const rules = rulesQuery.data ?? [];
   const exceptions = exceptionsQuery.data ?? [];
 
@@ -699,6 +795,25 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
           ),
       },
     ]);
+  }
+
+  // Rezervasyon kapısı henüz açılmadıysa slot ızgarasını hiç göstermiyoruz — saat seçip
+  // reddedilmek yerine ne zaman açılacağını okuyor. Kapı ayrıca sunucuda da zorlanıyor
+  // (migration 0069), yani buradaki gizleme tek savunma hattı değil.
+  if (gateQuery.data && new Date(gateQuery.data) > new Date()) {
+    const acilis = gateQuery.data;
+    const p = (n: number) => String(n).padStart(2, '0');
+    const d = new Date(acilis);
+    return (
+      <Panel title={t('randevu.book_title')} right={t('randevu.gate_closed_badge')}>
+        <Text style={styles.gateCountdown}>
+          {t('randevu.gate_opens_at', {
+            moment: `${formatDateLong(acilis.slice(0, 10), t)} · ${p(d.getHours())}:${p(d.getMinutes())}`,
+          })}
+        </Text>
+        <Text style={styles.noteText}>{t('randevu.gate_closed_hint')}</Text>
+      </Panel>
+    );
   }
 
   return (
@@ -871,6 +986,19 @@ const styles = StyleSheet.create({
     borderTopColor: C.edge,
   },
   slotRowPast: { opacity: 0.45 },
+
+  gateCountdown: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: C.orange,
+    backgroundColor: 'rgba(251,176,64,0.10)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  gateClearBtn: { alignSelf: 'center', marginTop: 12 },
+  gateClearText: { fontSize: 12, fontWeight: '700', color: C.grey },
   slotRowTime: { fontSize: 13, fontWeight: '800', color: C.greyD, width: 52 },
   slotRowTimeTaken: { color: C.lime },
   slotRowName: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: C.white },

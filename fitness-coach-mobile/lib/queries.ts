@@ -93,6 +93,33 @@ export function useUpdateBrandName(profileId: string | undefined) {
   });
 }
 
+// Rezervasyon sisteminin açılış anı (migration 0069). null geçmek kapıyı kaldırır.
+export function useUpdateBookingOpensAt(profileId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (isoOrNull: string | null) => {
+      if (!profileId) throw new Error('profileId eksik');
+      const { error } = await supabase.from('profiles').update({ booking_opens_at: isoOrNull }).eq('id', profileId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', profileId] }),
+  });
+}
+
+// Danışan, antrenörünün açılış anını görmek zorunda — kendi profilinde bu bilgi yok.
+// Sadece bu tek alan okunuyor; antrenörün profilinin geri kalanı danışana açılmıyor.
+export function useTrainerBookingOpensAt(trainerId: string | undefined) {
+  return useQuery({
+    queryKey: ['booking_opens_at', trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('booking_opens_at').eq('id', trainerId).single();
+      if (error) throw error;
+      return (data as { booking_opens_at: string | null }).booking_opens_at;
+    },
+    enabled: !!trainerId,
+  });
+}
+
 // ---------- Clients ----------
 
 export function useClients(trainerId: string | undefined) {
