@@ -47,7 +47,10 @@ function LessonDetail({
   // kaydedildiğinde tarih bugüne sabitlenir (bkz. useUpdateLessonSetLog). Böylece içerik,
   // derse gün atandığı güne değil, seansın yapıldığı güne yazılıyor.
   const effectiveDate = lesson.log_date ?? todayStr();
-  const workoutQuery = useLessonDayWorkout(clientId, lesson.workout_day_id ?? undefined, effectiveDate);
+  // GÖSTERİM için dersin kendi tarihi veriliyor; tarihsizse hiç kayıt okunmuyor (şablon çıkar).
+  // effectiveDate sadece YAZARKEN kullanılıyor. Bu ikisini ayırmak şart: ikisi de today'e
+  // düşerse, aynı güne atanmış iki tarihsiz ders birbirinin setlerini gösteriyordu.
+  const workoutQuery = useLessonDayWorkout(clientId, lesson.workout_day_id ?? undefined, lesson.log_date ?? undefined);
   const updateSetLog = useUpdateLessonSetLog(clientId);
   const updateDayNotes = useUpdateWorkoutDayNotes(clientId);
 

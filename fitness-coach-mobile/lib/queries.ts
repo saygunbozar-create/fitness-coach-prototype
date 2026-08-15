@@ -1206,14 +1206,22 @@ export function useLessonDayWorkout(clientId: string | undefined, dayId: string 
         .order('set_number');
       if (setsErr) throw setsErr;
 
-      const { data: logs, error: logErr } = await supabase
-        .from('workout_logs')
-        .select('*')
-        .in('workout_exercise_id', exIds.length ? exIds : ['00000000-0000-0000-0000-000000000000'])
-        .eq('date', logDate);
-      if (logErr) throw logErr;
+      // Ders henüz hiç işlenmemişse (log_date boş) HİÇBİR kayıt okunmuyor, sadece şablon
+      // gösteriliyor. Bugünün kayıtlarına düşmek yanlış olurdu: workout_logs
+      // (egzersiz, tarih, set) ile anahtarlanıyor, yani aynı güne atanmış BAŞKA bir tarihsiz
+      // ders bugün damgalanmışsa onun setleri bu derse aitmiş gibi görünürdü.
+      let logs: WorkoutLog[] = [];
+      if (logDate) {
+        const { data, error: logErr } = await supabase
+          .from('workout_logs')
+          .select('*')
+          .in('workout_exercise_id', exIds.length ? exIds : ['00000000-0000-0000-0000-000000000000'])
+          .eq('date', logDate);
+        if (logErr) throw logErr;
+        logs = data as WorkoutLog[];
+      }
 
-      const logByKey = new Map((logs as WorkoutLog[]).map((l) => [`${l.workout_exercise_id}:${l.set_number}`, l]));
+      const logByKey = new Map(logs.map((l) => [`${l.workout_exercise_id}:${l.set_number}`, l]));
       const setsByExId = new Map<string, WorkoutSet[]>();
       for (const s of setsTpl as WorkoutSet[]) {
         const list = setsByExId.get(s.workout_exercise_id) ?? [];
@@ -1237,7 +1245,8 @@ export function useLessonDayWorkout(clientId: string | undefined, dayId: string 
         }),
       })) as (WorkoutExercise & { sets: SetRow[] })[];
     },
-    enabled: !!clientId && !!dayId && !!logDate,
+    // logDate ARTIK şart değil — tarihsiz ders de şablonuyla açılabilmeli.
+    enabled: !!clientId && !!dayId,
   });
 }
 

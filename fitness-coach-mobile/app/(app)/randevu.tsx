@@ -79,6 +79,16 @@ function formatTrDateShort(dateStr: string): string {
   return `${parseInt(d, 10)}.${m}`;
 }
 
+// Bir timestamptz'i CİHAZIN YEREL saatine göre "tarih + saat" olarak yazar.
+// ISO metnin ilk 10 karakterini kesmek YANLIŞ: o UTC tarihini verir. Saati getHours() ile
+// yerel alıp tarihi UTC'den kesince, yerel 01:00 gibi bir açılış bir önceki gün görünüyordu.
+function formatMomentLocal(iso: string, t: TFn): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  const yerelTarih = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return `${formatDateLong(yerelTarih, t)} · ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 function timeToMinutes(t: string): number {
   const [h, m] = t.slice(0, 5).split(':').map(Number);
   return h * 60 + m;
@@ -384,9 +394,11 @@ function TrainerBookingGatePanel({ trainerId }: { trainerId: string | undefined 
       <Text style={styles.noteText}>{t('randevu.gate_hint')}</Text>
       <View style={{ height: 12 }} />
 
+      {/* KAYITLI değerden okunuyor, form alanlarından değil — kaydedilmemiş bir düzenleme
+          "planlanan an" gibi görünmemeli. */}
       {mevcut && !acik && (
         <Text style={styles.gateCountdown}>
-          {t('randevu.gate_opens_at', { moment: `${formatDateLong(mevcut.slice(0, 10), t)} · ${timeInput}` })}
+          {t('randevu.gate_opens_at', { moment: formatMomentLocal(mevcut, t) })}
         </Text>
       )}
 
@@ -801,15 +813,10 @@ function ClientBookingPanel({ trainerId, clientId }: { trainerId: string; client
   // reddedilmek yerine ne zaman açılacağını okuyor. Kapı ayrıca sunucuda da zorlanıyor
   // (migration 0069), yani buradaki gizleme tek savunma hattı değil.
   if (gateQuery.data && new Date(gateQuery.data) > new Date()) {
-    const acilis = gateQuery.data;
-    const p = (n: number) => String(n).padStart(2, '0');
-    const d = new Date(acilis);
     return (
       <Panel title={t('randevu.book_title')} right={t('randevu.gate_closed_badge')}>
         <Text style={styles.gateCountdown}>
-          {t('randevu.gate_opens_at', {
-            moment: `${formatDateLong(acilis.slice(0, 10), t)} · ${p(d.getHours())}:${p(d.getMinutes())}`,
-          })}
+          {t('randevu.gate_opens_at', { moment: formatMomentLocal(gateQuery.data, t) })}
         </Text>
         <Text style={styles.noteText}>{t('randevu.gate_closed_hint')}</Text>
       </Panel>

@@ -695,7 +695,9 @@ export default function IlerlemeScreen() {
             <Pressable style={[styles.addPhotoBtn, { flex: 1 }]} onPress={pickPhoto} disabled={uploadPhoto.isPending}>
               <Text style={styles.addPhotoText}>{uploadPhoto.isPending ? t('ilerleme.uploading') : t('ilerleme.add_photo_btn')}</Text>
             </Pressable>
-            {(photosQuery.data ?? []).length >= 2 && (
+            {/* `|| compareMode`: düğme aynı zamanda tek Vazgeç kontrolü. Sadece sayıya bağlarsak
+                mod açıkken fotoğraf silip 1'e düşünce ızgara seçim modunda kilitli kalıyordu. */}
+            {((photosQuery.data ?? []).length >= 2 || compareMode) && (
               <Pressable
                 style={[styles.compareBtn, compareMode && styles.compareBtnOn]}
                 onPress={() => {

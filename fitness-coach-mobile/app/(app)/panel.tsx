@@ -481,7 +481,15 @@ function ClientDashboard() {
     [weightQuery.data]
   );
 
-  const siradaki = (appointmentsQuery.data ?? [])[0];
+  // useMyUpcomingAppointments sadece `date >= bugün` süzüyor, saate bakmıyor — o yüzden
+  // sabah 09:00'daki seans akşam 20:00'de hâlâ "sıradaki" görünüyordu. Bugünün geçmiş
+  // saatlerini burada eliyoruz. Hook'a dokunmuyoruz: Randevu ekranındaki "Randevularım"
+  // listesinde bugün yapılmış seansın görünmesi doğru davranış.
+  const simdi = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+  const bugunStr = localDateStr();
+  const siradaki = (appointmentsQuery.data ?? []).find(
+    (a) => a.date > bugunStr || (a.date === bugunStr && a.time.slice(0, 5) >= simdi)
+  );
 
   // Kilo: en son kayıt ve bir önceki kayda göre fark.
   // DİKKAT: useWeightLogs ESKİDEN YENİYE sıralıyor (İlerleme'deki grafik buna bağlı), yani
