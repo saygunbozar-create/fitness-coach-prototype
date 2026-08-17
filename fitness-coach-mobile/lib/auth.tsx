@@ -2,7 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { preLoginLanguage } from './i18n';
 import { Sentry } from './sentry';
-import { supabase } from './supabase';
+import { initialUrlIsRecovery, supabase } from './supabase';
 import type { Profile } from './types';
 
 type AuthState = {
@@ -14,6 +14,12 @@ type AuthState = {
   signUpClient: (email: string, password: string, name: string, consent: boolean) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  // Şifre sıfırlama linkinden gelindiğinde true olur. Supabase'in linki HANGİ adrese
+  // düşürdüğünden bağımsız çalışsın diye var: yönlendirme adresi izin listesinde değilse
+  // Supabase onu yok sayıp Site URL'e (sitenin köküne) atıyor ve kullanıcı şifre ekranı
+  // yerine giriş ekranında buluyordu. Bu bayrak açıkken kök de olsa şifre ekranına gidiyoruz.
+  recoveryMode: boolean;
+  clearRecoveryMode: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -22,6 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Başlangıç değeri modül yüklenirken okunan adresten geliyor (bkz. lib/supabase.ts);
+  // onAuthStateChange'deki PASSWORD_RECOVERY ikinci bir güvence olarak duruyor.
+  const [recoveryMode, setRecoveryMode] = useState(initialUrlIsRecovery);
   // Iki loadProfile çağrısı üst üste (hızlı ard arda çıkış/giriş) yarışırsa, geç dönen değil
   // SON BAŞLATILAN kazanmalı — yoksa eski kullanıcının profili ekranda kalabilir.
   const loadSeq = useRef(0);
@@ -70,6 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Supabase, kurtarma linkiyle oturum açıldığında bu olayı gönderiyor — linkin hangi
+      // adrese düştüğünden bağımsız. Tek güvenilir sinyal bu.
+      if (_event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
       setSession(newSession);
       if (newSession) {
         // Don't toggle `loading` here — this fires on routine events too (token refresh,
@@ -118,7 +130,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUpTrainer, signUpClient, signOut, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        profile,
+        loading,
+        signIn,
+        signUpTrainer,
+        signUpClient,
+        signOut,
+        refreshProfile,
+        recoveryMode,
+        clearRecoveryMode: () => setRecoveryMode(false),
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

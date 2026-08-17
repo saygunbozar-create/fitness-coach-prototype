@@ -13,7 +13,7 @@ import { C } from '../lib/theme';
 // geçici "recovery" oturumu bu sayfayı hiç göstermeden kullanıcıyı uygulamaya atardı.
 export default function ResetPassword() {
   const t = useT();
-  const { session } = useAuth();
+  const { session, clearRecoveryMode } = useAuth();
   const [checked, setChecked] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -45,6 +45,8 @@ export default function ResetPassword() {
       setError(err.message);
       return;
     }
+    // Bayrak temizlenmezse yönlendirmeler kullanıcıyı sonsuza kadar bu ekrana geri getirir.
+    clearRecoveryMode();
     setDone(true);
   }
 

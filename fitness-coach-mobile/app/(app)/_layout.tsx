@@ -13,7 +13,7 @@ import { useSelectedClient } from '../../lib/selectedClient';
 import { C } from '../../lib/theme';
 
 export default function AppLayout() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading, signOut, recoveryMode } = useAuth();
   const { selectedClientId, setSelectedClientId } = useSelectedClient();
   const isTrainer = profile?.role === 'trainer';
   const isDesktopWeb = useIsDesktopWeb();
@@ -73,6 +73,10 @@ export default function AppLayout() {
       </View>
     );
   }
+
+  // Kurtarma oturumu geçerli bir oturum olduğu için kullanıcı buraya kadar gelebiliyor;
+  // şifresini belirlemeden uygulamaya girmesin.
+  if (recoveryMode) return <Redirect href="/reset-password" />;
 
   if (!session || !profile) return <Redirect href="/(auth)/login" />;
 
