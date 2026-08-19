@@ -40,6 +40,8 @@ const TYPE_ICON: Record<string, string> = {
   lesson_completed: '📓',
   package_added: '📦',
   client_birthday: '🎉',
+  booking: '📅',
+  reschedule_request: '🔄',
 };
 
 export default function BildirimlerScreen() {
