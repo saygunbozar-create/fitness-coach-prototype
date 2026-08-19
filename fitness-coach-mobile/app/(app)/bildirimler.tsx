@@ -42,6 +42,8 @@ const TYPE_ICON: Record<string, string> = {
   client_birthday: '🎉',
   booking: '📅',
   reschedule_request: '🔄',
+  reschedule_approved: '✔️',
+  reschedule_rejected: '⚠️',
 };
 
 export default function BildirimlerScreen() {
