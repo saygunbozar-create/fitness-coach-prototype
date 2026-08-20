@@ -23,6 +23,39 @@ function esc(s: string): string {
     .replace(/\r?\n/g, '\\n');
 }
 
+
+// RFC 5545 §3.1: bir içerik satırı 75 OKTETİ aşamaz; aşarsa CRLF + tek boşlukla katlanır.
+// Sayım karakter değil BAYT üzerinden yapılıyor — Türkçe harfler UTF-8'de 2 bayt, yani
+// "Çağrı Şahin" gibi bir danışan adında karakter saymak sınırı yine aşardı. Katlama kod
+// noktası sınırında yapılıyor ki bir karakter ortadan ikiye bölünmesin.
+function fold(line: string): string {
+  const enc = new TextEncoder();
+  if (enc.encode(line).length <= 75) return line;
+  const parts: string[] = [];
+  let cur = '';
+  let curBytes = 0;
+  for (const ch of line) {
+    const b = enc.encode(ch).length;
+    // Devam satırları baştaki boşlukla birlikte 75'i geçmemeli, o yüzden onlarda sınır 74.
+    const limit = parts.length === 0 ? 75 : 74;
+    if (curBytes + b > limit) {
+      parts.push(cur);
+      cur = '';
+      curBytes = 0;
+    }
+    cur += ch;
+    curBytes += b;
+  }
+  if (cur) parts.push(cur);
+  return parts.join('\r\n ');
+}
+
+// Satırları katlayıp birleştirir. SON satır da CRLF ile bitmek ZORUNDA (RFC 5545) —
+// eksikliği Google Takvim'in aboneliği sessizce boş çekmesine yol açıyordu.
+function buildIcs(lines: string[]): string {
+  return lines.map(fold).join('\r\n') + '\r\n';
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -60,7 +93,7 @@ function icsResponse(body: string, status = 200): Response {
 // "bu token var mı yok mu" bilgisini sızdırmıyoruz ve takvim uygulamaları hata döngüsüne girmiyor.
 function emptyCalendar(): Response {
   return icsResponse(
-    ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Coachbook//TR', 'CALSCALE:GREGORIAN', 'END:VCALENDAR'].join('\r\n')
+    buildIcs(['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Coachbook//TR', 'CALSCALE:GREGORIAN', 'END:VCALENDAR'])
   );
 }
 
@@ -150,5 +183,5 @@ Deno.serve(async (req: Request) => {
   }
 
   lines.push('END:VCALENDAR');
-  return icsResponse(lines.join('\r\n'));
+  return icsResponse(buildIcs(lines));
 });
